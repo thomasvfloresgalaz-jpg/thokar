@@ -5,9 +5,7 @@ services:
     healthCheckPath: /healthz
     autoDeploy: true
     envVars:
-      - key: BOOSTR_API_KEY
-        sync: false
-      - key: BOOSTR_TIMEOUT_MS
+      - key: AUTORIESGO_TIMEOUT_MS
         value: 12000
-      - key: PLATE_REQUESTS_PER_10_SECONDS
+      - key: PLATE_REQUESTS_PER_MINUTE
         value: 4

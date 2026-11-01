@@ -1,5 +1,5 @@
 /* THOKAR Taller: shell offline. Las consultas /api siempre van a red. */
-const CACHE = 'thokar-taller-v7-boostr';
+const CACHE = 'thokar-taller-v8-autoriesgo';
 const SHELL = ['./', 'index.html', 'styles.css', 'lib.js', 'app.js', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png'];
 

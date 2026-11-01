@@ -1,68 +1,79 @@
-# THOKAR Taller 4.0 — Boostr API + Render
+# THOKAR Taller 4.1 — AutoRiesgo sin API key + Render
 
-Esta versión elimina por completo Playwright y la automatización de PatenteChile. La búsqueda por patente se hace desde el backend de THOKAR contra la API oficial de Boostr.
+Esta versión reemplaza Boostr por el endpoint público para agentes/LLMs de AutoRiesgo. No usa Playwright, PatenteChile ni API key.
 
 ## Arquitectura
 
-`THOKAR (navegador) -> /api/vehiculo/:patente -> backend Node/Render -> Boostr API`
+`THOKAR (navegador) -> /api/vehiculo/:patente -> backend Node/Render -> AutoRiesgo agent/lookup`
 
-La API key de Boostr **nunca va en app.js ni en el navegador**. Sólo se configura como variable de entorno secreta en Render.
+Endpoint utilizado:
 
-## Archivos importantes
+`GET https://api.autoriesgo.cl/api/v1/report/agent/lookup?patente=PATENTE`
 
-- `server.js`: endpoint propio de THOKAR y servidor de la PWA.
-- `boostrProvider.js`: llamada a `https://api.boostr.cl/vehicle/{patente}.json` y mapeo de datos.
-- `package.json`: ya no incluye Playwright.
-- `Dockerfile`: usa `node:22-alpine`, mucho más liviano que la imagen anterior con Chromium.
-- `render.yaml`: declara `BOOSTR_API_KEY` como variable secreta (`sync: false`).
+La documentación pública de AutoRiesgo indica que las rutas con `agent` están optimizadas para agentes/LLMs, son GET-friendly y no requieren clave.
 
-## 1. Conseguir API key de Boostr
+## Qué procesa THOKAR
 
-Solicita/contrata tu API key en Boostr. La consulta de patentes requiere `X-API-KEY`.
+El backend lee únicamente `vehicle_data` de la respuesta y descarta el resto. Reconoce, cuando AutoRiesgo los entregue:
 
-El plan gratuito vigente documenta hasta 5 consultas diarias; los campos extendidos (VIN/chasis, color, kilometraje, combustible, fabricante, procedencia, puertas, versión, cilindrada y transmisión) dependen del plan contratado.
+- patente
+- marca
+- modelo
+- año
+- tipo
+- versión
+- color
+- combustible
+- motor
+- VIN/chasis
+- kilometraje
+- fabricante
+- procedencia
+- cilindrada
+- transmisión
+- puertas
+- estado/mes de revisión técnica
 
-## 2. Reemplazar archivos en GitHub
+No procesa datos de propietario y no usa `purchase_full_report`.
+
+## 1. Reemplazar archivos en GitHub
 
 Sube todos los archivos de este ZIP a la raíz de tu repositorio y reemplaza los existentes.
 
-Si aún aparecen del proyecto anterior, puedes borrar de GitHub estos archivos porque ya no se usan:
+Borra estos archivos antiguos si todavía aparecen:
 
+- `boostrProvider.js`
+- `boostrProvider.test.js`
 - `patenteChileProvider.js`
 - `vehicleParser.js`
 - `vehicleParser.test.js`
 
-El archivo nuevo que debe existir es:
+Deben existir ahora:
 
-- `boostrProvider.js`
-- `boostrProvider.test.js`
+- `autoRiesgoProvider.js`
+- `autoRiesgoProvider.test.js`
+- `server.js`
+- `package.json`
+- `Dockerfile`
+- `render.yaml`
 
-## 3. Configurar la API key en Render
+## 2. Render: ya no necesitas API key
 
-En Render abre tu servicio THOKAR y entra a:
+Puedes borrar de Render la variable `BOOSTR_API_KEY` si todavía existe. Esta versión no la lee.
 
-**Environment -> Environment Variables -> Add Environment Variable**
+Variables opcionales:
 
-Agrega exactamente:
+- `AUTORIESGO_TIMEOUT_MS=12000`
+- `PLATE_REQUESTS_PER_MINUTE=4`
+- `AUTORIESGO_BASE_URL=https://api.autoriesgo.cl`
 
-- Key: `BOOSTR_API_KEY`
-- Value: `TU_API_KEY_REAL_DE_BOOSTR`
-
-No uses comillas y no pongas la clave dentro de GitHub.
-
-Variables opcionales ya soportadas:
-
-- `BOOSTR_TIMEOUT_MS=12000`
-- `PLATE_REQUESTS_PER_10_SECONDS=4`
-- `BOOSTR_BASE_URL=https://api.boostr.cl`
-
-## 4. Volver a desplegar
+## 3. Volver a desplegar
 
 En Render usa:
 
 **Manual Deploy -> Clear build cache & deploy**
 
-## 5. Comprobar que quedó bien
+## 4. Comprobar el despliegue
 
 Abre:
 
@@ -74,37 +85,17 @@ Debe responder parecido a:
 {
   "ok": true,
   "app": "THOKAR Taller",
-  "vehicleLookup": "boostr",
+  "vehicleLookup": "autoriesgo-agent",
   "configured": true,
   "layout": "flat",
-  "build": "4.0.0-boostr"
+  "build": "4.1.0-autoriesgo"
 }
 ```
 
-Si `configured` sale `false`, falta `BOOSTR_API_KEY` en Render.
+Después abre THOKAR y prueba una patente.
 
-## Datos que THOKAR puede mapear
+## Límites y estabilidad
 
-Según lo que incluya tu plan de Boostr, THOKAR reconoce:
+El endpoint gratuito es un servicio externo y AutoRiesgo puede cambiar su formato, disponibilidad o condiciones. THOKAR aplica además un límite local de 4 consultas por minuto por IP para evitar abuso.
 
-- patente y dígito verificador
-- marca, modelo, año y tipo
-- número de motor
-- VIN/chasis
-- color
-- combustible
-- kilometraje registrado
-- fabricante
-- país y región de procedencia
-- puertas
-- versión
-- cilindrada/tamaño de motor
-- transmisión
-- código SII
-- tasación fiscal
-
-THOKAR no envía `include=owner` y el backend usa una lista explícita de campos técnicos; si Boostr devolviera un objeto `owner`, se descarta.
-
-## Notas de límites
-
-Boostr documenta un rate-limit general de hasta 5 solicitudes cada 10 segundos. THOKAR aplica además un límite local conservador de 4 cada 10 segundos por IP.
+Esta integración usa el endpoint público documentado; no automatiza páginas web ni intenta evadir CAPTCHA o bloqueos.

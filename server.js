@@ -1,6 +1,6 @@
 const path = require('path');
 const express = require('express');
-const { lookupVehicle, cleanPlate } = require('./boostrProvider');
+const { lookupVehicle, cleanPlate } = require('./autoRiesgoProvider');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -18,21 +18,21 @@ app.use((req, res, next) => {
   next();
 });
 
-// Límite local conservador. Boostr documenta además su propio rate-limit.
+// Límite local conservador para evitar abuso del endpoint gratuito.
 const buckets = new Map();
 function rateLimit(req, res, next) {
   const now = Date.now();
-  const windowMs = 10_000;
-  const limit = Math.max(1, Math.min(5, Number(process.env.PLATE_REQUESTS_PER_10_SECONDS || 4)));
+  const windowMs = 60_000;
+  const limit = Math.max(1, Math.min(10, Number(process.env.PLATE_REQUESTS_PER_MINUTE || 4)));
   const key = req.ip || req.socket.remoteAddress || 'unknown';
   const previous = buckets.get(key) || [];
   const active = previous.filter((ts) => now - ts < windowMs);
 
   if (active.length >= limit) {
-    res.setHeader('Retry-After', '10');
+    res.setHeader('Retry-After', '60');
     return res.status(429).json({
       ok: false,
-      error: { code: 'RATE_LIMIT', message: 'Demasiadas consultas. Espera unos segundos e intenta nuevamente.' }
+      error: { code: 'RATE_LIMIT', message: 'Demasiadas consultas. Espera un minuto e intenta nuevamente.' }
     });
   }
 
@@ -42,7 +42,7 @@ function rateLimit(req, res, next) {
 }
 
 setInterval(() => {
-  const cutoff = Date.now() - 10_000;
+  const cutoff = Date.now() - 60_000;
   for (const [key, timestamps] of buckets) {
     const active = timestamps.filter((ts) => ts >= cutoff);
     if (active.length) buckets.set(key, active);
@@ -55,10 +55,10 @@ app.get('/healthz', (req, res) => {
   res.json({
     ok: true,
     app: 'THOKAR Taller',
-    vehicleLookup: 'boostr',
-    configured: Boolean(String(process.env.BOOSTR_API_KEY || '').trim()),
+    vehicleLookup: 'autoriesgo-agent',
+    configured: true,
     layout: 'flat',
-    build: '4.0.0-boostr'
+    build: '4.1.0-autoriesgo'
   });
 });
 
@@ -75,7 +75,7 @@ app.get('/api/vehiculo/:patente', rateLimit, async (req, res) => {
 
   try {
     const vehicle = await lookupVehicle(plate);
-    return res.json({ ok: true, source: 'Boostr API', vehicle });
+    return res.json({ ok: true, source: 'AutoRiesgo', vehicle });
   } catch (error) {
     const status = Number(error.status || 502);
     return res.status(status).json({
@@ -89,7 +89,7 @@ app.get('/api/vehiculo/:patente', rateLimit, async (req, res) => {
 });
 
 // Estructura plana: sólo estos archivos de la raíz se publican.
-// boostrProvider.js, server.js, .env y el resto del backend NO se sirven al navegador.
+// autoRiesgoProvider.js, server.js, .env y el resto del backend NO se sirven al navegador.
 const PUBLIC_FILES = new Set([
   'index.html',
   'app.js',
@@ -130,7 +130,7 @@ app.get('/{*splat}', (req, res) => {
 });
 
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`THOKAR escuchando en puerto ${PORT} · proveedor Boostr`);
+  console.log(`THOKAR escuchando en puerto ${PORT} · proveedor AutoRiesgo agent`);
 });
 
 function shutdown() {

@@ -179,12 +179,10 @@
     if (code === 'INVALID_PLATE' || status === 400) return 'La patente no tiene un formato válido.';
     if (code === 'NOT_FOUND' || status === 404) return 'No encontré información técnica para esa patente.';
     if (code === 'RATE_LIMIT' || status === 429) return 'Se hicieron demasiadas consultas. Espera un minuto e intenta otra vez.';
-    if (code === 'BOOSTR_NOT_CONFIGURED') return 'Falta configurar BOOSTR_API_KEY en Render.';
-    if (code === 'BOOSTR_AUTH') return 'Boostr rechazó la API key. Revisa BOOSTR_API_KEY en Render.';
-    if (code === 'BOOSTR_RATE_LIMIT') return 'Boostr alcanzó su límite de consultas. Espera unos segundos e intenta otra vez.';
-    if (code === 'BOOSTR_TIMEOUT' || status === 504) return 'Boostr tardó demasiado en responder. Intenta nuevamente.';
-    if (code === 'BOOSTR_UNAVAILABLE') return 'No se pudo conectar con Boostr API. Intenta nuevamente.';
-    if (code === 'BOOSTR_BAD_RESPONSE' || code === 'BOOSTR_API_ERROR' || code === 'BOOSTR_HTTP_ERROR') return er.message || 'Boostr devolvió una respuesta que THOKAR no pudo procesar.';
+    if (code === 'AUTORIESGO_RATE_LIMIT') return 'AutoRiesgo limitó temporalmente las consultas. Espera un momento e intenta otra vez.';
+    if (code === 'AUTORIESGO_TIMEOUT' || status === 504) return 'AutoRiesgo tardó demasiado en responder. Intenta nuevamente.';
+    if (code === 'AUTORIESGO_UNAVAILABLE') return 'No se pudo conectar con AutoRiesgo. Intenta nuevamente.';
+    if (code === 'AUTORIESGO_BAD_RESPONSE' || code === 'AUTORIESGO_HTTP_ERROR') return er.message || 'AutoRiesgo devolvió una respuesta que THOKAR no pudo procesar.';
     if (er.message) return er.message;
     if (status >= 500) return 'El servidor de THOKAR no pudo completar la consulta de patente.';
     return 'No se pudo consultar la patente (' + status + ').';
@@ -666,8 +664,8 @@
       '<div class="btn-row" style="margin-top:12px"><button class="btn" id="btn-detect">Detectar modelo</button><button class="btn primary" id="btn-test">Probar conexión</button></div>' +
       '<p class="small" id="test-out" style="margin-top:10px" aria-live="polite"></p></div>' +
       '<div class="card"><h3>Búsqueda automática por patente</h3>' +
-      '<p class="muted small" style="margin:6px 0 8px">La consulta pasa por el backend de THOKAR y usa Boostr API. La clave de Boostr se guarda sólo como variable de entorno en Render y nunca se envía al teléfono.</p>' +
-      '<p class="muted small">Los campos disponibles dependen de tu plan de Boostr. THOKAR solicita únicamente la ficha del vehículo y no pide información del propietario.</p></div>' +
+      '<p class="muted small" style="margin:6px 0 8px">La consulta pasa por el backend de THOKAR y usa el endpoint público para agentes/LLMs de AutoRiesgo. No requiere API key en Render.</p>' +
+      '<p class="muted small">THOKAR usa únicamente <code>vehicle_data</code> de la respuesta gratuita: marca, modelo, año y otros campos técnicos que AutoRiesgo entregue. No procesa información de propietario ni inicia compras de informes.</p></div>' +
       '<div class="card"><h3>Respaldo</h3><p class="muted small" style="margin:6px 0 12px">Vehículos, libreta y conversaciones. Descárgalo de vez en cuando por si cambias de teléfono o borras los datos del navegador.</p>' +
       '<div class="btn-row"><button class="btn" id="btn-export">Descargar respaldo</button><button class="btn" id="btn-import">Importar respaldo</button></div><input type="file" id="import-input" accept="application/json,.json" hidden></div>' +
       '<div class="card"><h3>Instalar en el teléfono</h3>' +

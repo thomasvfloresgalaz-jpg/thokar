@@ -1,12 +1,12 @@
 {
   "name": "thokar-taller",
-  "version": "4.0.0-boostr",
+  "version": "4.1.0-autoriesgo",
   "private": true,
-  "description": "THOKAR Taller con backend Node y consulta de patentes mediante Boostr API.",
+  "description": "THOKAR Taller con backend Node y consulta gratuita de patentes mediante el endpoint agent/lookup de AutoRiesgo.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test boostrProvider.test.js vehicleParser.test.js"
+    "test": "node --test autoRiesgoProvider.test.js"
   },
   "engines": {
     "node": ">=22"
