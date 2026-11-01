@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "6.2.3",
+  "version": "6.2.3-prototype.1",
   "private": true,
-  "description": "THOKAR 6.2.3 · control de consultas IA, identificación técnica, Cabina/Sol, Boostr y Gemini.",
+  "description": "THOKAR Prototipo 1 · PRT/reSTART + SII como fuentes principales, Boostr fallback, Gemini.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
