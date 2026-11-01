@@ -1,7 +1,7 @@
 :root{
-  --bg:#F4F2EE;--surface:#FFFFFF;--surface-2:#ECE8E1;--surface-3:#E4DFD6;
-  --text:#111315;--text-2:#5B616B;--line:#E3E0DA;--accent:#FF6A00;--accent-press:#E95F00;
-  --ok:#1E8E5A;--warn:#B7791F;--danger:#C62828;--shadow:0 18px 50px rgba(17,19,21,.14);
+  --bg:#F5F5F4;--surface:#FFFFFF;--surface-2:#F0F1F2;--surface-3:#E6E8EA;
+  --text:#111315;--text-2:#606771;--line:#DDE0E3;--accent:#D91820;--accent-press:#B9151C;
+  --ok:#168A55;--warn:#A96C16;--danger:#C62828;--shadow:0 16px 38px rgba(17,19,21,.12);
   --sp1:4px;--sp2:8px;--sp3:12px;--sp4:16px;--sp6:24px;--sp8:32px;
   --r1:12px;--r2:20px;--r3:28px;--ease:cubic-bezier(.2,.8,.2,1);
   --t12:12px;--t14:14px;--t16:16px;--t20:20px;--t28:28px;--t36:36px;
@@ -11,9 +11,9 @@
   color-scheme:light;
 }
 html[data-theme="dark"]{
-  --bg:#0F1113;--surface:#171A1E;--surface-2:#20242A;--surface-3:#292E35;
-  --text:#F3F5F7;--text-2:#AAB0B8;--line:#32363D;--accent:#FF7A1A;--accent-press:#FF8A35;
-  --ok:#46B97A;--warn:#E1AA4D;--danger:#EF6464;--shadow:0 18px 50px rgba(0,0,0,.38);
+  --bg:#090A0C;--surface:#11151A;--surface-2:#181E24;--surface-3:#222A32;
+  --text:#F4F5F7;--text-2:#9BA3AD;--line:#29313A;--accent:#E11D2A;--accent-press:#C51622;
+  --ok:#39B97A;--warn:#E0A43B;--danger:#F06464;--shadow:0 16px 38px rgba(0,0,0,.34);
   color-scheme:dark;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -35,7 +35,7 @@ svg{display:block;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap
 .icon-btn svg{width:24px;height:24px}.icon-btn:active{transform:scale(.98);background:var(--surface-2)}
 .btn{min-height:52px;border-radius:var(--r1);border:1px solid var(--line);background:var(--surface);padding:0 var(--sp4);font-weight:700;transition:transform .14s var(--ease),background .14s var(--ease)}
 .btn:active{transform:scale(.98);background:var(--surface-2)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:#111315}.btn.primary:active{background:var(--accent-press)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:active{background:var(--accent-press)}
 .btn.ghost{background:transparent}.btn.danger{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 45%,var(--line))}.btn.block{width:100%}
 .row{display:flex;gap:var(--sp3);align-items:center}.row>*{min-width:0}.grow{flex:1}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp3)}
@@ -133,3 +133,57 @@ html[data-theme="dark"] .status-chip.diagnostico{background:#4C3610;color:#FFD78
 @media (prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 .active-plate{view-transition-name:active-plate}
 ::view-transition-old(active-plate),::view-transition-new(active-plate){animation-duration:180ms;animation-timing-function:var(--ease)}
+
+
+/* ===== THOKAR 5.1 · workspace de pestañas a pantalla completa ===== */
+.home{padding-bottom:calc(82px + var(--safe-bottom))}
+.home-top{margin-bottom:var(--sp4)}
+.case-list{gap:10px;margin-top:var(--sp4)}
+.case-card{grid-template-columns:auto 1fr auto;padding:14px;border-radius:16px;background:var(--surface);}
+.case-main{display:grid;gap:2px;min-width:0}
+.case-details{font-size:13px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.case-meta{font-size:12px}
+.case-card .plate-chip{min-width:82px;font-size:18px;padding:6px 8px}
+.search-dock.compact{bottom:calc(var(--safe-bottom) + 8px);width:min(520px,calc(100% - 20px));height:58px;border-radius:18px;padding:5px 6px 5px 14px;gap:6px;background:color-mix(in srgb,var(--surface) 96%,transparent);box-shadow:0 10px 28px rgba(0,0,0,.24)}
+.search-dock.compact input{font-size:16px;font-weight:800;letter-spacing:.05em;padding:0 4px;min-height:46px}
+.search-submit{width:48px;height:48px;flex:0 0 48px;border:0;border-radius:14px;display:grid;place-items:center;background:var(--accent);color:#fff}
+.search-submit svg{width:23px;height:23px}.search-submit:disabled{opacity:.5}
+.search-status{bottom:calc(var(--safe-bottom) + 72px);font-size:13px}
+
+.workspace{height:var(--vh);min-height:var(--vh);display:flex;flex-direction:column;overflow:hidden;background:var(--bg);max-width:760px;margin:0 auto}
+.workspace-header{flex:0 0 auto;padding:calc(var(--safe-top) + 10px) 14px 0;background:var(--bg);border-bottom:1px solid var(--line);z-index:4}
+.workspace-nav{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;gap:10px;align-items:center;margin:0 0 10px}
+.workspace-nav .icon-btn{width:48px;height:48px;border-radius:15px;background:var(--surface)}
+.workspace-identity{min-width:0;display:flex;gap:10px;align-items:center}
+.workspace-identity .plate-chip{min-width:78px;padding:6px 8px;font-size:17px;flex:0 0 auto}
+.workspace-car-name{font-size:16px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.workspace-car-spec{font-size:12px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.workspace-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 2px 10px}
+.workspace-summary>div{display:flex;align-items:baseline;gap:8px;min-width:0}.workspace-summary small{color:var(--text-2);font-size:12px}.workspace-summary strong{font-size:16px;white-space:nowrap}
+.workspace-tabs{padding:0 0 10px;gap:6px}
+.workspace-tabs .view-tab{min-height:44px;border-radius:12px;font-size:14px}
+.workspace-tabs .view-tab[aria-selected="true"]{background:var(--accent);color:#fff}
+.workspace-content{flex:1;min-height:0;background:var(--bg)}
+.workspace-scroll{overflow-y:auto;overscroll-behavior-y:contain;padding:14px 14px calc(24px + var(--safe-bottom));}
+.workspace-chat{overflow:hidden;padding:0 14px}
+.workspace-chat .talk{height:100%;min-height:0}
+.workspace-chat .talk-thread{padding-top:8px;padding-bottom:12px}
+.workspace-chat .composer-wrap{padding-bottom:calc(8px + var(--safe-bottom));background:var(--bg);border-top:1px solid var(--line)}
+.workspace-chat .composer{padding-top:8px}
+
+/* La hoja arrastrable de 5.0 ya no se usa */
+.workspace-sheet,.sheet-handle{display:none!important}
+
+@media (max-width:420px){
+  .workspace-header{padding-left:10px;padding-right:10px}
+  .workspace-nav{grid-template-columns:46px minmax(0,1fr) 46px;gap:8px}
+  .workspace-nav .icon-btn{width:46px;height:46px}
+  .workspace-identity{gap:7px}
+  .workspace-identity .plate-chip{min-width:72px;font-size:16px}
+  .workspace-car-name{font-size:15px}
+  .workspace-summary{padding-left:2px;padding-right:2px}
+  .workspace-chat{padding-left:10px;padding-right:10px}
+  .workspace-scroll{padding-left:10px;padding-right:10px}
+  .case-card{grid-template-columns:78px 1fr;align-items:start}
+  .case-card .status-chip{grid-column:2;justify-self:start;margin-top:4px}
+}
