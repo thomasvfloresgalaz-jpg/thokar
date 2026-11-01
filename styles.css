@@ -155,9 +155,15 @@ p { margin: 0; }
 
 
 /* ---------- Asistente: chat tipo WhatsApp ---------- */
+/*
+   El chat es la acción principal de esta pestaña. Su altura se adapta al
+   viewport real para terminar justo antes de la navegación inferior.
+   Las preguntas rápidas/recomendaciones quedan después y aparecen al
+   desplazar la página manualmente.
+*/
 .assistant-chat-window {
-  height: clamp(510px, 68dvh, 700px);
-  min-height: 510px;
+  height: calc(100dvh - var(--tabs-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 58px);
+  min-height: 0;
   margin-top: 12px;
   display: flex;
   flex-direction: column;
@@ -340,7 +346,7 @@ p { margin: 0; }
 
 .assistant-quick-block,
 .assistant-recommendations {
-  margin-top: 18px;
+  margin-top: 24px;
 }
 .assistant-section-title {
   font-family: var(--font-display);
@@ -363,12 +369,11 @@ p { margin: 0; }
   font-weight: 500;
 }
 
-@media (max-height: 720px) {
-  .assistant-chat-window { height: 500px; min-height: 500px; }
-}
-
 @media (max-width: 380px) {
-  .assistant-chat-window { height: clamp(490px, 66dvh, 620px); min-height: 490px; }
+  .assistant-chat-window {
+    height: calc(100dvh - var(--tabs-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 58px);
+    min-height: 0;
+  }
   .whatsapp-head { padding-left: 9px; padding-right: 9px; }
   .assistant-avatar { flex-basis: 40px; width: 40px; height: 40px; }
   .assistant-contact-name { font-size: 22px; }

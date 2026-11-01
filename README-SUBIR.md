@@ -1,4 +1,4 @@
-# THOKAR 4.0.3 — Asistente tipo WhatsApp
+# THOKAR 4.0.4 — Chat primero
 
 Cambios de esta versión:
 
@@ -8,7 +8,7 @@ Cambios de esta versión:
 - Las preguntas rápidas a Gemini están debajo de la ventana.
 - Debajo se agregan búsquedas/recomendaciones para Aceite y filtro, Bujías, Pastillas delanteras, Filtro de aire, Filtro de cabina, Distribución y Amortiguadores.
 - Se quitó el logo grande del contenido de la aplicación. El logo original se conserva en los iconos PWA/Android/iPhone.
-- Build: `4.0.3-whatsapp-assistant`.
+- Build: `4.0.4-chat-first`.
 
 ---
 
