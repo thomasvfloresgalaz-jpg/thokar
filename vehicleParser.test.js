@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseVehicleText, parseRows, sanitizeVehicle } = require('../backend/vehicleParser');
+const { parseVehicleText, parseRows, sanitizeVehicle } = require('./vehicleParser');
 
 test('extrae solo campos técnicos y omite datos personales', () => {
   const text = `Información del propietario\nNombre completo: PERSONA EJEMPLO\nRUT: 11.111.111-1\nInformación Vehicular\nPatente: ABCD12\nMarca: TOYOTA\nModelo: YARIS\nAño: 2009\nColor: GRIS\nN° Motor: 1NZ1234567\nN° Chasis: JTDBT923X01234567\nProcedencia: JAPON\nFabricante: TOYOTA`;
