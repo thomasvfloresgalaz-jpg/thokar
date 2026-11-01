@@ -1,4 +1,4 @@
-# THOKAR 5.2.0 · Chat y Registro
+# THOKAR 5.3.0 · Datos primero, zonas claras y eliminar vehículo
 
 Esta versión parte de THOKAR 5.1 y corrige problemas detectados usando la app desde el teléfono.
 
@@ -47,11 +47,11 @@ Comprueba:
 Debe incluir:
 
 ```json
-"build": "5.2.0-service-log"
+"build": "5.3.0-vehicle-zones"
 ```
 
 ## Actualización en Android
 
-El Service Worker usa la caché `thokar-taller-v22-service-log`.
+El Service Worker usa la caché `thokar-taller-v23-vehicle-zones`.
 
 Si la PWA continúa mostrando una versión anterior, usa **Ajustes → Forzar actualización**.

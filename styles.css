@@ -198,3 +198,23 @@ html[data-theme="dark"] .status-chip.diagnostico{background:#4C3610;color:#FFD78
 }
 .workspace-scroll{scroll-padding-bottom:24px}
 .chat-autosave{flex:0 0 auto;padding:7px 2px 5px;color:var(--text-2);font-size:12px;text-align:center}
+
+
+/* ===== THOKAR 5.3 · datos primero + zonas claras + eliminar vehículo ===== */
+.case-card{position:relative;display:grid;grid-template-columns:1fr 44px;align-items:stretch;padding:0;overflow:hidden}
+.case-open{border:0;background:transparent;text-align:left;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:14px;min-width:0}
+.case-open:active{transform:scale(.985)}
+.case-delete{align-self:center;justify-self:center;width:40px;height:40px;border:0;border-left:1px solid var(--line);background:transparent;color:var(--text-2);display:grid;place-items:center}
+.case-delete svg{width:20px;height:20px}
+.zone-help{margin:-4px 0 10px}
+.car-illustration{border:1px solid var(--line);background:var(--surface-2);border-radius:18px;padding:12px}
+.car-figure{position:relative;max-width:420px;margin:0 auto}
+.car-figure svg{width:100%;height:auto;display:block}
+.car-body-fill{fill:color-mix(in srgb,var(--surface) 85%, transparent)}
+.car-body-line{fill:none;stroke:var(--text-2);stroke-width:2}
+.car-window{fill:color-mix(in srgb,var(--surface-3) 70%, transparent);stroke:var(--text-2);stroke-width:1.5}
+.wheel{fill:color-mix(in srgb,var(--surface-3) 65%, transparent);stroke:var(--text);stroke-width:2}
+.hotspot{position:absolute;border:1px solid color-mix(in srgb,var(--accent) 40%, var(--line));background:color-mix(in srgb,var(--surface) 85%, transparent);color:var(--text);border-radius:999px;padding:6px 10px;font-size:12px;font-weight:800;box-shadow:0 6px 14px rgba(0,0,0,.08)}
+.hs-motor{left:34%;top:46%}.hs-frenos{right:7%;top:63%}.hs-neumaticos{left:7%;top:63%}.hs-suspension{left:6%;top:41%}.hs-bateria{right:17%;top:42%}.hs-interior{left:40%;top:18%}
+.zone-prompt-grid{grid-template-columns:1fr}.zone-prompt-tile{min-height:72px}
+@media (max-width:420px){.case-open{grid-template-columns:74px 1fr;align-items:start}.case-open .status-chip{grid-column:2;justify-self:start;margin-top:4px}.case-delete{width:44px;height:44px}.hotspot{font-size:11px;padding:5px 8px}}
