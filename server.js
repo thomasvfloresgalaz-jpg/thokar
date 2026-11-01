@@ -213,7 +213,7 @@ app.get('/healthz', (req, res) => {
     model: geminiConfig().model,
     layout: 'flat',
     protected: tokenReady,
-    build: '6.2.0-identity-fix'
+    build: '6.2.1-android-recovery'
   });
 });
 

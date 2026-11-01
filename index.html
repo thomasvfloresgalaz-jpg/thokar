@@ -8,22 +8,26 @@
   <title>THOKAR Taller</title>
   <meta name="description" content="THOKAR: vehículo, diagnóstico asistido y registro de servicio.">
   <meta name="robots" content="noindex, nofollow">
-  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="manifest" href="manifest.webmanifest?v=621">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="THOKAR">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=621">
 </head>
 <body>
-  <main id="app" aria-live="polite"></main>
+  <main id="app" aria-live="polite"><section class="preboot"><div class="preboot-brand">THOKAR - INGENIERÍA QUE MUEVE</div><div class="preboot-status">Cargando interfaz…</div></section></main>
   <div id="overlay-root"></div>
   <div id="toast-root"></div>
   <div id="connection-root"></div>
   <div id="update-root"></div>
-  <script src="lib.js"></script>
-  <script src="app.js"></script>
+  <script src="lib.js?v=621"></script>
+  <script>
+window.addEventListener('error',function(){setTimeout(function(){if(!window.THOKAR_APP_READY){var a=document.getElementById('app');if(a)a.innerHTML='<section class="preboot error"><div class="preboot-brand">THOKAR - INGENIERÍA QUE MUEVE</div><div class="preboot-status">No se pudo cargar la interfaz.</div><button onclick="location.replace(\'/?recovery=\'+Date.now())">Recargar sin caché</button></section>'}},50)});
+setTimeout(function(){if(!window.THOKAR_APP_READY){var a=document.getElementById('app');if(a&&a.querySelector('.preboot'))a.querySelector('.preboot-status').textContent='Actualizando archivos locales…'}},1800);
+</script>
+<script src="app.js?v=621"></script>
 </body>
 </html>

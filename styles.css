@@ -372,3 +372,9 @@ body.theme-solar .car-illustration.detailed{background:linear-gradient(180deg,#f
 .identity-source.confirmed{color:var(--ok)}
 .identity-warning{margin-top:16px;padding:12px 14px;border:1px solid color-mix(in srgb,var(--warn) 38%,var(--line));background:color-mix(in srgb,var(--warn) 8%,var(--surface));border-radius:16px;color:var(--text-2);font-size:13px;line-height:1.45}
 html[data-theme="sol"] .identity-warning{background:#fff7e8;border-color:#c58a2b;color:#4a3520}
+
+
+/* 6.2.1 Android recovery */
+.brand-line{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-family:var(--font-head);color:var(--accent-2);letter-spacing:.045em;margin-bottom:4px}.brand-line strong{font-size:16px}.brand-line span{font-size:13px;color:var(--text-2)}
+.preboot,.boot-fallback{min-height:100dvh;padding:calc(env(safe-area-inset-top) + 28px) 18px 32px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:14px;background:#060304;color:#FFE9E5}.preboot-brand{font:700 18px/1.3 system-ui,sans-serif;color:#FF5A4F}.preboot-status{font:500 14px/1.4 system-ui,sans-serif;color:#C99A95}.preboot button,.boot-fallback button{min-height:52px;border:1px solid #5A1219;background:#FF2A2A;color:#120304;padding:0 18px;border-radius:16px;font-weight:800}
+html[data-theme="sol"] .preboot,html[data-theme="sol"] .boot-fallback{background:#F3ECE6;color:#171110}

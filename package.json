@@ -1,6 +1,6 @@
 {
   "name": "thokar-taller",
-  "version": "6.2.0",
+  "version": "6.2.1",
   "private": true,
   "description": "THOKAR 6.2 · identificación técnica confirmable, Cabina/Sol, Boostr y Gemini.",
   "main": "server.js",
