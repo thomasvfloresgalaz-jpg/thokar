@@ -9,7 +9,15 @@ services:
         sync: false
       - key: BOOSTR_API_KEY
         sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
       - key: BOOSTR_TIMEOUT_MS
         value: 12000
-      - key: PLATE_REQUESTS_PER_10_SECONDS
-        value: 4
+      - key: PLATE_REQUESTS_PER_MINUTE
+        value: 12
+      - key: AI_REQUESTS_PER_MINUTE
+        value: 20
+      - key: PLATE_CACHE_MS
+        value: 21600000

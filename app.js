@@ -2,9 +2,7 @@
 (function () {
   'use strict';
   var L = window.ThokarLib;
-  var API = 'https://generativelanguage.googleapis.com/v1beta';
-  var FALLBACK_MODEL = 'gemini-flash-latest';
-  var APP_BUILD = '4.1.0-ux';
+  var APP_BUILD = '4.2.0-polish';
   var K = { settings: 'thokar.settings', vehicles: 'thokar.vehicles', chats: 'thokar.chats', log: 'thokar.log', draft: 'thokar.draft' };
 
   /* ---------- Almacenamiento (con respaldo en memoria) ---------- */
@@ -19,20 +17,30 @@
     return { plate: '', dv: '', tipo: '', marca: '', modelo: '', version: '', anio: '', color: '', combustible: '', motor: '', chasis: '', procedencia: '', regionProcedencia: '', fabricante: '', km: '', cilindrada: '', puertas: '', transmision: '', codigoSii: '', tasacionFiscal: '', tipoSello: '', multas: '', mesRevision: '', revisionTecnica: '', revisionGases: '', permisoCirculacion: '', soap: '', kmRegistrado: '', transportePublico: '', tipoTransportePublico: '', restriccion: '', siniestrado: '' };
   }
   var db = {
-    settings: load(K.settings, { apiKey: '', model: '', auto: '', appToken: '' }),
+    settings: load(K.settings, { appToken: '', keepAwake: true, quickRecent: [] }),
     vehicles: load(K.vehicles, {}),
     chats: load(K.chats, {}),
     log: load(K.log, {})
   };
+  if (db.settings.keepAwake === undefined) db.settings.keepAwake = true;
+  if (!Array.isArray(db.settings.quickRecent)) db.settings.quickRecent = [];
   var cur = Object.assign(emptyVehicle(), load(K.draft, {}));
-  var tab = 'vehiculo';
+  var tab = (new URLSearchParams(location.search).get('tab') || 'vehiculo');
+  if (['vehiculo','asistente','libreta','ajustes'].indexOf(tab) < 0) tab = 'vehiculo';
   var busy = false;
   var pendingImage = '';
   var installEvent = null;
   var wakeLock = null;
   var backendState = 'idle';
   var backendBuild = '';
+  var backendInfo = {};
   var keyboardOpen = false;
+  var swRegistration = null;
+  var toastAction = null;
+  var sheetOpen = false;
+  var sheetStatePushed = false;
+  var jumpButtonVisible = false;
+  var launchNewChat = new URLSearchParams(location.search).get('new') === '1';
 
   function persist(which) {
     (which || ['settings', 'vehicles', 'chats', 'log']).forEach(function (n) { save(K[n], db[n]); });
@@ -54,11 +62,14 @@
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
   var toastTimer;
-  function toast(msg) {
+  function vibrate(ms) { try { if (navigator.vibrate) navigator.vibrate(ms || 10); } catch (e) {} }
+  function toast(msg, actionLabel, action) {
     var root = $('#toast-root');
-    root.innerHTML = '<div class="toast" role="status">' + esc(msg) + '</div>';
+    toastAction = typeof action === 'function' ? action : null;
+    root.innerHTML = '<div class="toast" role="status"><span>' + esc(msg) + '</span>' +
+      (toastAction && actionLabel ? '<button id="btn-toast-action">' + esc(actionLabel) + '</button>' : '') + '</div>';
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { root.innerHTML = ''; }, 3800);
+    toastTimer = setTimeout(function () { root.innerHTML = ''; toastAction = null; }, toastAction ? 6500 : 3800);
   }
 
   function md(text) {
@@ -95,102 +106,73 @@
   }
 
   /* ---------- Hojas emergentes ---------- */
+  function setupSheetDrag(sheet) {
+    var grabber = $('.sheet-grabber', sheet);
+    if (!grabber) return;
+    var startY = 0, dy = 0, dragging = false;
+    grabber.addEventListener('pointerdown', function (e) { dragging = true; startY = e.clientY; dy = 0; grabber.setPointerCapture(e.pointerId); });
+    grabber.addEventListener('pointermove', function (e) { if (!dragging) return; dy = Math.max(0, e.clientY - startY); sheet.style.transform = 'translateY(' + dy + 'px)'; });
+    grabber.addEventListener('pointerup', function () { dragging = false; sheet.style.transform = ''; if (dy > 72) closeSheet(); });
+  }
   function openSheet(html, mount) {
     var root = $('#sheet-root');
-    root.innerHTML = '<div class="sheet-bg" data-sheet-bg><div class="sheet" role="dialog" aria-modal="true">' + html + '</div></div>';
+    if (!sheetOpen) { history.pushState({ thokarSheet: true }, '', location.href); sheetStatePushed = true; }
+    sheetOpen = true;
+    root.innerHTML = '<div class="sheet-bg" data-sheet-bg><div class="sheet" role="dialog" aria-modal="true"><div class="sheet-grabber" aria-hidden="true"><span></span></div>' + html + '</div></div>';
     var bg = $('[data-sheet-bg]', root);
     bg.addEventListener('click', function (e) { if (e.target === bg) closeSheet(); });
-    if (mount) mount($('.sheet', root));
+    var sheet = $('.sheet', root); setupSheetDrag(sheet);
+    if (mount) mount(sheet);
     var first = $('.sheet textarea, .sheet input', root);
-    if (first) first.focus();
+    if (first) setTimeout(function () { first.focus(); }, 40);
   }
-  function closeSheet() { $('#sheet-root').innerHTML = ''; }
+  function closeSheet(fromPop) {
+    if (!sheetOpen) return;
+    sheetOpen = false; $('#sheet-root').innerHTML = '';
+    if (!fromPop && sheetStatePushed && history.state && history.state.thokarSheet) { sheetStatePushed = false; history.back(); }
+    else if (fromPop) sheetStatePushed = false;
+  }
+  window.addEventListener('popstate', function () { if (sheetOpen) closeSheet(true); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
 
-  /* ---------- Conexión con Gemini ---------- */
+  /* ---------- IA por backend THOKAR ---------- */
   function fail(msg, status) { var e = new Error(msg); e.handled = true; if (status) e.status = status; return e; }
-
-  function friendlyError(status, body) {
-    var raw = (body && body.error && body.error.message) || '';
-    var st = (body && body.error && body.error.status) || '';
-    var detail = raw ? ' Detalle de Google: ' + raw.slice(0, 220) : '';
-    if (status === 400 && /API key|API_KEY/i.test(raw + st)) return 'Google dice que la clave no es válida. Cópiala de nuevo desde AI Studio.' + detail;
-    if (status === 400) return 'Gemini no aceptó la consulta.' + detail;
-    if (status === 401 || status === 403) return 'Google rechazó la clave o no tienes acceso. Revisa que sea una clave de AI Studio.' + detail;
-    if (status === 404) return 'Ese modelo no está disponible para tu clave.' + detail;
-    if (status === 429) return 'Llegaste al límite gratuito de este modelo. Espera un minuto o elige otro modelo en Ajustes.' + detail;
-    if (status >= 500) return 'Gemini no está disponible en este momento. Intenta de nuevo en un rato.' + detail;
-    return 'No se pudo completar la consulta (' + status + ').' + detail;
+  function authHeaders(extra) {
+    var headers = Object.assign({ 'Accept': 'application/json' }, extra || {});
+    var token = (db.settings.appToken || '').trim();
+    if (token) headers['X-THOKAR-TOKEN'] = token;
+    return headers;
   }
-
-  /* Pide a Gemini con la clave en el encabezado; si el navegador la bloquea, reintenta con la clave en la URL. */
-  async function gfetch(path, key, init) {
-    init = init || {};
-    var headers = Object.assign({}, init.headers || {}, { 'x-goog-api-key': key });
-    try {
-      return await fetch(API + path, Object.assign({}, init, { headers: headers }));
-    } catch (e1) {
-      var sep = path.indexOf('?') >= 0 ? '&' : '?';
-      try {
-        return await fetch(API + path + sep + 'key=' + encodeURIComponent(key), Object.assign({}, init, { headers: init.headers || {} }));
-      } catch (e2) {
-        throw fail('La solicitud no llegó a Google. Revisa tu internet, desactiva VPN o bloqueadores de anuncios e intenta de nuevo.');
-      }
-    }
+  function backendError(status, body) {
+    var er = body && body.error ? body.error : {}, code = er.code || '';
+    if (code === 'APP_NOT_PROTECTED') return 'Configura APP_TOKEN en Render con al menos 32 caracteres.';
+    if (code === 'APP_AUTH' || status === 401) return 'THOKAR rechazó el token. Revisa APP_TOKEN en Render y Token THOKAR en Ajustes.';
+    if (code === 'ORIGIN_DENIED' || status === 403) return 'El backend rechazó el origen de la solicitud.';
+    if (code === 'GEMINI_NOT_CONFIGURED') return 'Falta configurar GEMINI_API_KEY en Render.';
+    if (code === 'GEMINI_RATE_LIMIT' || code === 'AI_RATE_LIMIT' || status === 429) return 'La IA recibió demasiadas solicitudes. Espera un momento e intenta nuevamente.';
+    if (code === 'GEMINI_TIMEOUT' || status === 504) return 'Gemini tardó demasiado en responder. Intenta nuevamente.';
+    return er.message || ('El backend no pudo completar la solicitud (' + status + ').');
   }
-
-  async function listModels(key) {
-    var r = await gfetch('/models?pageSize=200', key);
-    var j = await r.json().catch(function () { return {}; });
-    if (!r.ok) throw fail(friendlyError(r.status, j), r.status);
-    var names = (j.models || []).filter(function (m) {
-      return (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0;
-    }).map(function (m) { return m.name; });
-    return L.rankModels(names);
+  async function backendJson(path, body) {
+    if (!navigator.onLine) throw fail('Sin internet. Conéctate para continuar.');
+    var res;
+    try { res = await fetch(path, { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), cache: 'no-store', body: JSON.stringify(body) }); }
+    catch (e) { throw fail('No pude comunicarme con el backend de THOKAR.'); }
+    var data = await res.json().catch(function () { return {}; });
+    if (!res.ok || !data.ok) throw fail(backendError(res.status, data), res.status);
+    return data.text || '';
   }
-
-  /* Prueba el modelo guardado y, si ese modelo falla (no existe, sin cupo gratuito o saturado), prueba los siguientes. */
-  async function gemini(body) {
-    var key = (db.settings.apiKey || '').trim();
-    if (!key) throw fail('Falta la clave de Gemini. Pégala en Ajustes.');
+  async function geminiJson(body) { return backendJson('/api/ai/json', body); }
+  async function geminiStream(body, onChunk) {
     if (!navigator.onLine) throw fail('Sin internet. Conéctate para usar el asistente.');
-    var manual = (db.settings.model || '').trim();
-    var queue = manual ? [manual] : (db.settings.auto ? [db.settings.auto] : []);
-    var tried = [], listed = false, lastErr = null;
-    while (tried.length < 4) {
-      if (!queue.length) {
-        if (listed || manual) break;
-        listed = true;
-        try {
-          (await listModels(key)).forEach(function (m) { if (tried.indexOf(m) < 0 && queue.indexOf(m) < 0) queue.push(m); });
-        } catch (e) { lastErr = e; if (e.status === 400 || e.status === 401 || e.status === 403) throw e; }
-        if (!queue.length && tried.indexOf(FALLBACK_MODEL) < 0) queue.push(FALLBACK_MODEL);
-        if (!queue.length) break;
-      }
-      var model = queue.shift(); tried.push(model);
-      var res = await gfetch('/models/' + encodeURIComponent(model) + ':generateContent', key, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-      });
-      var j = await res.json().catch(function () { return {}; });
-      if (res.ok) {
-        var cand = j.candidates && j.candidates[0];
-        var text = cand && cand.content && cand.content.parts
-          ? cand.content.parts.map(function (p) { return p.text || ''; }).join('').trim() : '';
-        if (!text) {
-          var why = (j.promptFeedback && j.promptFeedback.blockReason) ? ' (' + j.promptFeedback.blockReason + ')' : '';
-          throw fail('Gemini no devolvió respuesta' + why + '. Reformula la pregunta.');
-        }
-        if (!manual && db.settings.auto !== model) { db.settings.auto = model; persist(['settings']); }
-        return text;
-      }
-      lastErr = fail(friendlyError(res.status, j), res.status);
-      if (!manual && (res.status === 404 || res.status === 429 || res.status === 503)) {
-        if (db.settings.auto === model) { db.settings.auto = ''; persist(['settings']); }
-        continue;
-      }
-      break;
-    }
-    throw lastErr || fail('No se pudo conectar con Gemini.');
+    var res;
+    try { res = await fetch('/api/ai/stream', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), cache: 'no-store', body: JSON.stringify(body) }); }
+    catch (e) { throw fail('No pude comunicarme con el backend de THOKAR.'); }
+    if (!res.ok) { var data = await res.json().catch(function () { return {}; }); throw fail(backendError(res.status, data), res.status); }
+    if (!res.body || !res.body.getReader) { var text = await res.text(); if (text) onChunk(text); return text; }
+    var reader = res.body.getReader(), decoder = new TextDecoder(), full = '';
+    while (true) { var part = await reader.read(); if (part.done) break; var chunk = decoder.decode(part.value, { stream: true }); if (chunk) { full += chunk; onChunk(chunk); } }
+    return full.trim();
   }
 
   /* ---------- Búsqueda automática por patente (backend THOKAR) ---------- */
@@ -198,6 +180,7 @@
     var er = body && body.error ? body.error : {};
     var code = er.code || '';
     if (code === 'INVALID_PLATE' || status === 400) return 'La patente no tiene un formato válido.';
+    if (code === 'APP_NOT_PROTECTED') return 'Configura APP_TOKEN en Render con al menos 32 caracteres antes de usar las APIs.';
     if (code === 'APP_AUTH' || status === 401) return 'THOKAR rechazó el token de acceso. Revisa APP_TOKEN en Render y en Ajustes.';
     if (code === 'NOT_FOUND' || status === 404) return 'No encontré información técnica para esa patente.';
     if (code === 'RATE_LIMIT' || status === 429) return 'Se hicieron demasiadas consultas. Espera un minuto e intenta otra vez.';
@@ -215,6 +198,11 @@
   function lookupStatus(message, isError) {
     var out = $('#lookup-status');
     if (!out) return;
+    if (isError === 'loading') {
+      out.innerHTML = '<span class="lookup-loading"><span class="skeleton sk1"></span><span class="skeleton sk2"></span></span>';
+      out.style.color = '';
+      return;
+    }
     out.textContent = message || '';
     out.style.color = isError ? 'var(--red)' : '';
   }
@@ -223,9 +211,13 @@
     if (busy) return;
     if (!L.isPlateOk(cur.plate)) { toast('Escribe la patente primero.'); return; }
     if (!navigator.onLine) { toast('Sin internet.'); return; }
+    if (backendState !== 'ok') {
+      toast('Despertando el servidor…');
+      try { await wakeBackend(true); } catch (e) { toast(e.message || 'El servidor no respondió.'); return; }
+    }
     var btn = $('#btn-lookup');
     busy = true;
-    lookupStatus('Consultando la ficha técnica…', false);
+    lookupStatus('', 'loading');
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Buscando…'; }
     var ctl = new AbortController();
     var timer = setTimeout(function () { ctl.abort(); }, 60000);
@@ -352,7 +344,7 @@
       var url = URL.createObjectURL(file);
       var img = new Image();
       img.onload = function () {
-        var max = 1600, w = img.naturalWidth, h = img.naturalHeight;
+        var max = 1280, w = img.naturalWidth, h = img.naturalHeight;
         var scale = Math.min(1, max / Math.max(w, h));
         var c = document.createElement('canvas');
         c.width = Math.round(w * scale); c.height = Math.round(h * scale);
@@ -375,7 +367,7 @@
         'Extrae SOLO datos del vehículo, nunca del propietario. Responde únicamente un JSON con estas claves: ' +
         'patente, marca, modelo, anio, motor, chasis, combustible. Usa "" si un dato no se ve con claridad. ' +
         'Copia patente, motor y chasis carácter por carácter, sin adivinar.';
-      var text = await gemini({
+      var text = await geminiJson({
         contents: [{ role: 'user', parts: [{ inline_data: { mime_type: 'image/jpeg', data: b64 } }, { text: prompt }] }],
         generationConfig: { temperature: 0, responseMimeType: 'application/json' }
       });
@@ -409,32 +401,37 @@
     if (busy) return;
     if (!text && !pendingImage) return;
     if (!text) text = 'Mira esta foto y dime qué ves y qué podría ser.';
-    if (!(db.settings.apiKey || '').trim()) { toast('Primero pega tu clave de Gemini en Ajustes.'); setTab('ajustes'); return; }
-    var key = chatKey();
-    var th = db.chats[key] = db.chats[key] || [];
-    var image = pendingImage; pendingImage = '';
-    th.push({ role: 'user', text: text + (image ? '  [foto adjunta]' : '') });
-    busy = true; render(); scrollChatEnd();
+    if (!(db.settings.appToken || '').trim()) { toast('Primero configura el Token THOKAR en Ajustes.'); setTab('ajustes'); return; }
+    var key = chatKey(), th = db.chats[key] = db.chats[key] || [], image = pendingImage; pendingImage = '';
+    var now = Date.now();
+    th.push({ role: 'user', text: text + (image ? '  [foto adjunta]' : ''), at: now });
+    var modelMessage = { role: 'model', text: '', streaming: true, at: now + 1 }; th.push(modelMessage);
+    busy = true; persist(['chats']); render(); scrollChatEnd();
     try {
-      var recent = th.slice(-12).filter(function (m) { return !m.error; });
+      var recent = th.slice(0, -1).filter(function (m) { return !m.error && !m.streaming; }).slice(-12);
       var contents = recent.map(function (m) { return { role: m.role, parts: [{ text: m.text }] }; });
-      if (image) contents[contents.length - 1].parts.unshift({ inline_data: { mime_type: 'image/jpeg', data: image } });
-      var reply = await gemini({
-        systemInstruction: { parts: [{ text: L.buildSystemPrompt(cur) }] },
-        contents: contents,
-        generationConfig: { temperature: 0.3 }
+      if (image && contents.length) contents[contents.length - 1].parts.unshift({ inline_data: { mime_type: 'image/jpeg', data: image } });
+      var modelIndex = th.length - 1;
+      await geminiStream({ systemInstruction: { parts: [{ text: L.buildSystemPrompt(cur) }] }, contents: contents, generationConfig: { temperature: 0.3 } }, function (chunk) {
+        modelMessage.text += chunk; modelMessage.streaming = false;
+        var node = $('[data-msg-content="' + modelIndex + '"]');
+        if (node) { node.innerHTML = md(modelMessage.text); node.classList.remove('streaming-placeholder'); }
+        var thread = $('#chat-thread'); if (thread && thread.scrollHeight - thread.scrollTop - thread.clientHeight < 160) thread.scrollTop = thread.scrollHeight;
       });
-      th.push({ role: 'model', text: reply });
-    } catch (e) {
-      th.push({ role: 'model', text: e.message || 'Error inesperado.', error: true });
-    }
-    if (th.length > 40) db.chats[key] = th.slice(-40);
+      modelMessage.streaming = false;
+      if (!modelMessage.text.trim()) throw fail('Gemini no devolvió una respuesta.');
+    } catch (e) { modelMessage.streaming = false; modelMessage.error = true; modelMessage.text = e.message || 'Error inesperado.'; }
+    if (th.length > 50) db.chats[key] = th.slice(-50);
     busy = false; persist(['chats']); render(); scrollChatEnd();
   }
+  function retryMessage(index) {
+    var list = db.chats[chatKey()] || [], i = Number(index), prev = list[i - 1];
+    if (!prev || prev.role !== 'user') return toast('No encontré la pregunta original para reintentar.');
+    list.splice(i, 1); persist(['chats']); ask(String(prev.text || '').replace(/\s+\[foto adjunta\]$/, ''));
+  }
   function scrollChatEnd() {
-    var box = $('#chat-thread');
-    if (!box) return;
-    requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; });
+    var box = $('#chat-thread'); if (!box) return;
+    requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; updateJumpLatest(); });
   }
 
   /* ---------- Libreta ---------- */
@@ -473,7 +470,7 @@
           var list = db.log[cur.plate] = db.log[cur.plate] || [];
           list.unshift(entry);
           list.sort(function (a, b) { return String(b.fecha).localeCompare(String(a.fecha)); });
-          if (entry.km && !cur.km) { cur.km = entry.km; saveDraft(); }
+          if (entry.km) { cur.km = entry.km; saveDraft(); if (db.vehicles[cur.plate]) db.vehicles[cur.plate].km = entry.km; }
           if (!db.vehicles[cur.plate] && (cur.marca || cur.modelo)) db.vehicles[cur.plate] = Object.assign({}, cur);
           persist(['log', 'vehicles']);
           closeSheet(); toast('Trabajo guardado.'); render();
@@ -518,7 +515,7 @@
     a.download = 'thokar-respaldo-' + todayISO() + '.json';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
-    toast('Respaldo descargado. La clave de Gemini no se incluye.');
+    toast('Respaldo descargado. Los tokens y claves de Render no se incluyen.');
   }
 
   function importBackup(file) {
@@ -542,69 +539,77 @@
 
   async function testConnection() {
     var out = $('#test-out');
-    var key = (db.settings.apiKey || '').trim();
-    if (!key) { out.textContent = 'Primero pega la clave.'; return; }
-    out.innerHTML = '<span class="spinner"></span> Probando…';
-    var lines = ['Clave: ' + key.length + ' caracteres (debería empezar con AIza y tener unos 39).'];
+    if (!out) return;
+    out.innerHTML = '<span class="spinner"></span> Probando backend e IA…';
     try {
-      var models = await listModels(key);
-      lines.push('Lista de modelos: ' + models.length + ' disponibles' + (models.length ? ' (' + models.slice(0, 3).join(', ') + ')' : '') + '.');
-    } catch (e) { lines.push('Lista de modelos: ' + e.message); }
-    try {
-      var t = await gemini({ contents: [{ role: 'user', parts: [{ text: 'Responde solo con la palabra OK.' }] }], generationConfig: { temperature: 0 } });
-      lines.push('<strong style="color:var(--ok)">Conectado.</strong> Modelo usado: ' + (db.settings.model || db.settings.auto || FALLBACK_MODEL) + '. Respuesta: ' + t.slice(0, 40));
-    } catch (e) { lines.push('<strong style="color:var(--red)">Falló:</strong> ' + e.message); }
-    out.innerHTML = lines.map(function (l) { return '<div style="margin-top:6px">' + (l.indexOf('<strong') === 0 ? l : esc(l)) + '</div>'; }).join('');
-  }
-
-  async function doDetect() {
-    var out = $('#test-out');
-    var key = (db.settings.apiKey || '').trim();
-    if (!key) { out.textContent = 'Primero pega la clave.'; return; }
-    out.innerHTML = '<span class="spinner"></span> Buscando modelo…';
-    try {
-      var list = await listModels(key);
-      if (!list.length) { out.textContent = 'No encontré un modelo compatible. Escríbelo a mano.'; return; }
-      db.settings.auto = list[0]; db.settings.model = ''; persist(['settings']);
-      var inp = $('#s-model'); if (inp) inp.value = '';
-      out.textContent = 'Modelo en uso: ' + list[0] + '. Otros disponibles: ' + list.slice(1, 4).join(', ') + '.';
-    } catch (e) { out.innerHTML = '<span style="color:var(--red)">' + esc(e.message) + '</span>'; }
+      await wakeBackend(true);
+      var text = await geminiJson({ contents: [{ role: 'user', parts: [{ text: 'Responde solo con OK.' }] }], generationConfig: { temperature: 0 } });
+      out.innerHTML = '<strong style="color:var(--ok)">Conectado.</strong> Backend, APP_TOKEN y Gemini respondieron: ' + esc(text.slice(0, 30));
+    } catch (e) { out.innerHTML = '<strong style="color:var(--red)">Falló:</strong> ' + esc(e.message || 'No se pudo probar la conexión.'); }
   }
 
   /* ---------- Estado de app / móvil ---------- */
   function renderConnectionState() {
     var root = $('#connection-root');
     if (!root) return;
-    if (backendState === 'connecting') root.innerHTML = '<div class="connection-pill"><span class="spinner mini"></span> Conectando…</div>';
-    else if (backendState === 'error') root.innerHTML = '<button class="connection-pill error-pill" id="btn-retry-backend">Backend sin respuesta · Reintentar</button>';
+    if (backendState === 'connecting') root.innerHTML = '<div class="connection-pill"><span class="status-dot waking"></span><span>Despertando servidor…</span></div>';
+    else if (backendState === 'offline') root.innerHTML = '<div class="connection-pill error-pill"><span class="status-dot offline"></span><span>Sin internet</span></div>';
+    else if (backendState === 'error') root.innerHTML = '<button class="connection-pill error-pill" id="btn-retry-backend"><span class="status-dot offline"></span>Servidor sin respuesta · Reintentar</button>';
     else root.innerHTML = '';
   }
 
-  async function wakeBackend() {
+  async function wakeBackend(silent) {
+    if (!navigator.onLine) { backendState = 'offline'; renderConnectionState(); if (!silent) toast('Sin internet.'); throw fail('Sin internet.'); }
     backendState = 'connecting'; renderConnectionState();
-    var ctl = new AbortController();
-    var timer = setTimeout(function () { ctl.abort(); }, 45000);
-    try {
-      var res = await fetch('/healthz?ts=' + Date.now(), { cache: 'no-store', signal: ctl.signal });
-      var data = await res.json().catch(function () { return {}; });
-      if (!res.ok || !data.ok) throw new Error('health');
-      backendState = 'ok'; backendBuild = data.build || '';
-      renderConnectionState();
-      if (backendBuild && backendBuild !== APP_BUILD) showUpdateBanner('Hay una versión nueva de THOKAR disponible.');
-      if (tab === 'ajustes') render();
-    } catch (e) {
-      backendState = 'error'; renderConnectionState();
-    } finally { clearTimeout(timer); }
+    var delays = [0, 2000, 5000, 10000], lastError = null;
+    for (var i = 0; i < delays.length; i++) {
+      if (delays[i]) await new Promise(function (resolve) { setTimeout(resolve, delays[i]); });
+      var ctl = new AbortController();
+      var timer = setTimeout(function () { ctl.abort(); }, 20000);
+      try {
+        var res = await fetch('/healthz?ts=' + Date.now(), { cache: 'no-store', signal: ctl.signal });
+        var data = await res.json().catch(function () { return {}; });
+        if (!res.ok || !data.ok) throw new Error('health');
+        clearTimeout(timer); backendState = 'ok'; backendBuild = data.build || ''; backendInfo = data; renderConnectionState();
+        if (backendBuild && backendBuild !== APP_BUILD) showUpdateBanner('Hay una versión nueva de THOKAR disponible.');
+        if (tab === 'ajustes') render();
+        return data;
+      } catch (e) { lastError = e; clearTimeout(timer); backendState = 'connecting'; renderConnectionState(); }
+    }
+    backendState = 'error'; renderConnectionState();
+    if (!silent) toast('El servidor no respondió. Toca Reintentar.');
+    throw fail(lastError && lastError.name === 'AbortError' ? 'El servidor está tardando en despertar.' : 'Backend sin respuesta.');
   }
 
   function showUpdateBanner(message) {
     var root = $('#update-root');
     if (!root) return;
-    root.innerHTML = '<div class="update-banner"><span>' + esc(message || 'Hay una versión nueva disponible.') + '</span><button id="btn-update-reload">Actualizar</button></div>';
+    root.innerHTML = '<div class="update-banner"><span>' + esc(message || 'Hay una versión nueva disponible.') + '</span><button id="btn-update-apply">Actualizar</button></div>';
+  }
+
+  function applyServiceWorkerUpdate() {
+    if (swRegistration && swRegistration.waiting) { swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' }); return; }
+    window.location.reload();
+  }
+  async function checkForUpdate(manual) {
+    if (!('serviceWorker' in navigator)) return;
+    try {
+      if (!swRegistration) swRegistration = await navigator.serviceWorker.getRegistration();
+      if (swRegistration) await swRegistration.update();
+      if (swRegistration && swRegistration.waiting) showUpdateBanner('Hay una versión nueva de THOKAR disponible.');
+      else if (manual) toast('THOKAR ya está actualizado.');
+    } catch (e) { if (manual) toast('No pude comprobar actualizaciones.'); }
+  }
+  async function forceUpdate() {
+    try {
+      if ('serviceWorker' in navigator) { var regs = await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(function (r) { return r.unregister(); })); }
+      if ('caches' in window) { var keys = await caches.keys(); await Promise.all(keys.map(function (k) { return caches.delete(k); })); }
+    } catch (e) {}
+    window.location.replace('/?refresh=' + Date.now());
   }
 
   async function updateWakeLock() {
-    var shouldHold = tab === 'asistente' && document.visibilityState === 'visible';
+    var shouldHold = db.settings.keepAwake !== false && tab === 'asistente' && document.visibilityState === 'visible';
     if (!shouldHold) {
       if (wakeLock) { try { await wakeLock.release(); } catch (e) {} wakeLock = null; }
       return;
@@ -618,9 +623,10 @@
 
   function syncKeyboardState() {
     var vv = window.visualViewport;
-    if (!vv) return;
+    var h = vv ? vv.height : window.innerHeight;
+    document.documentElement.style.setProperty('--vvh', Math.round(h) + 'px');
     var active = document.activeElement && document.activeElement.id === 'chat-input';
-    var open = active && vv.height < window.innerHeight - 120;
+    var open = Boolean(active && (keyboardOpen || !vv || vv.height < window.innerHeight - 80));
     if (open !== keyboardOpen) {
       keyboardOpen = open;
       document.body.classList.toggle('keyboard-open', open);
@@ -639,7 +645,20 @@
     vehiculo: '<svg viewBox="0 0 24 24"><path d="M5 16V11l1.6-4.2A2 2 0 0 1 8.5 5.5h7a2 2 0 0 1 1.9 1.3L19 11v5"/><path d="M3.5 16h17v2.5h-3V17H6.5v1.5h-3z"/><circle cx="7.5" cy="13" r=".6"/><circle cx="16.5" cy="13" r=".6"/></svg>',
     asistente: '<svg viewBox="0 0 24 24"><path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>',
     libreta: '<svg viewBox="0 0 24 24"><path d="M6 3.5h11a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6z"/><path d="M6 3.5v17M9.5 8h5.5M9.5 11.5h5.5"/></svg>',
-    ajustes: '<svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>'
+    ajustes: '<svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>',
+    close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    bolt: '<svg viewBox="0 0 24 24"><path d="M13 2L4.5 13H11l-1 9 8.5-11H12z"/></svg>',
+    plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+    send: '<svg viewBox="0 0 24 24"><path d="M3 11.5L21 3l-7.5 18-2.2-7.3z"/><path d="M11.3 13.7L21 3"/></svg>',
+    copy: '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+    save: '<svg viewBox="0 0 24 24"><path d="M5 3h12l2 2v16H5z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/></svg>',
+    checklist: '<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1.5 1.5L7.5 5M3.5 12l1.5 1.5 2.5-2.5M3.5 18l1.5 1.5 2.5-2.5"/></svg>',
+    share: '<svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/></svg>',
+    retry: '<svg viewBox="0 0 24 24"><path d="M20 6v5h-5"/><path d="M19 11a8 8 0 1 0 1 5"/></svg>',
+    search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>',
+    chevron: '<svg viewBox="0 0 24 24"><path d="M8 10l4 4 4-4"/></svg>',
+    more: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>',
+    down: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>'
   };
   var TABS = [['vehiculo', 'Vehículo'], ['asistente', 'Asistente'], ['libreta', 'Libreta'], ['ajustes', 'Ajustes']];
 
@@ -648,6 +667,24 @@
   function renderTabs() {
     $('#tabs').innerHTML = '<div class="tabs-inner">' + TABS.map(function (t) {
       return '<button class="tab" data-tab="' + t[0] + '"' + (tab === t[0] ? ' aria-current="page"' : '') + '>' + ICONS[t[0]] + '<span>' + t[1] + '</span></button>';
+    }).join('') + '</div>';
+  }
+
+  function serviceDueHtml() {
+    if (!L.isPlateOk(cur.plate)) return '';
+    var list = (db.log[cur.plate] || []).filter(function (e) { return e.nextKm || e.nextFecha; }).slice(0, 4);
+    if (!list.length) return '';
+    var currentKm = Number(String(cur.km || '').replace(/\D/g, '')) || 0;
+    var today = new Date(todayISO() + 'T12:00:00');
+    return '<div class="service-due-list">' + list.map(function (e) {
+      var state = 'ok', label = 'Próximo';
+      var km = Number(String(e.nextKm || '').replace(/\D/g, '')) || 0;
+      var days = null;
+      if (e.nextFecha) { var d = new Date(e.nextFecha + 'T12:00:00'); days = Math.round((d - today) / 86400000); }
+      if ((km && currentKm && currentKm >= km) || (days !== null && days < 0)) { state = 'due'; label = 'Vencido'; }
+      else if ((km && currentKm && km - currentKm <= 1500) || (days !== null && days <= 45)) { state = 'soon'; label = 'Próximo'; }
+      var when = [km ? L.formatKm(km) + ' km' : '', e.nextFecha ? L.formatDate(e.nextFecha) : ''].filter(Boolean).join(' · ');
+      return '<div class="service-due ' + state + '"><span><strong>' + esc(e.trabajo || 'Servicio') + '</strong><small>' + esc(when) + '</small></span><b>' + label + '</b></div>';
     }).join('') + '</div>';
   }
 
@@ -679,11 +716,12 @@
         '<div><div class="vehicle-summary-plate">' + esc(cur.plate || '—') + '</div><div class="vehicle-summary-name">' + esc(carLine) + '</div>' +
         (subLine ? '<div class="vehicle-summary-meta">' + esc(subLine) + '</div>' : '') + '</div>' +
         '<div class="vehicle-km"><span>Kilometraje</span><strong>' + esc(cur.km ? L.formatKm(cur.km) + ' km' : 'Sin registrar') + '</strong></div>' +
+        serviceDueHtml() +
         '<div class="vehicle-summary-actions"><button class="btn primary" data-tab-go="asistente">Consultar IA</button><button class="btn" data-tab-go="libreta">Libreta</button></div>' +
       '</section>';
     }
 
-    html += '<details class="vehicle-details"' + (!hasData ? ' open' : '') + '><summary>Datos técnicos</summary><div class="card details-card"><div class="grid2 field">' +
+    html += '<details class="vehicle-details"' + (!hasData ? ' open' : '') + '><summary><span>Datos técnicos</span>' + ICONS.chevron + '</summary><div class="card details-card"><div class="grid2 field">' +
       '<div><label for="f-marca">Marca</label><input id="f-marca" autocomplete="off" value="' + esc(cur.marca) + '"></div>' +
       '<div><label for="f-anio">Año</label><input id="f-anio" inputmode="numeric" maxlength="4" value="' + esc(cur.anio) + '"></div>' +
       '<div class="span2"><label for="f-modelo">Modelo</label><input id="f-modelo" autocomplete="off" value="' + esc(cur.modelo) + '"></div>' +
@@ -698,12 +736,12 @@
       '<div><label for="f-procedencia">Procedencia</label><input id="f-procedencia" autocomplete="off" value="' + esc(cur.procedencia) + '"></div>' +
       '<div><label for="f-fabricante">Fabricante</label><input id="f-fabricante" autocomplete="off" value="' + esc(cur.fabricante) + '"></div>' +
       '</div></div></details>' +
-      (extraHtml ? '<details class="vehicle-details"><summary>Antecedentes adicionales</summary><div class="card details-card"><div class="grid2 field">' + extraHtml + '</div></div></details>' : '') +
+      (extraHtml ? '<details class="vehicle-details"><summary><span>Antecedentes adicionales</span>' + ICONS.chevron + '</summary><div class="card details-card"><div class="grid2 field">' + extraHtml + '</div></div></details>' : '') +
       '<div class="btn-row" style="margin-top:12px"><button class="btn primary" id="btn-save">Guardar vehículo</button><button class="btn" id="btn-clear">Vehículo nuevo</button></div>' +
       '<div style="margin-top:24px"><h3>Recientes</h3>' +
       (savedPlates.length ? '<div class="recent-vehicles">' + savedPlates.map(function (p) {
         var v = db.vehicles[p];
-        return '<button class="recent-chip" data-load="' + esc(p) + '"><span>' + esc(p) + '</span><small>' + esc([v.marca, v.modelo].filter(Boolean).join(' ')) + '</small></button>';
+        return '<button class="recent-chip' + (p === cur.plate ? ' active' : '') + '" data-load="' + esc(p) + '"><span>' + esc(p) + '</span><small>' + esc([v.marca, v.modelo].filter(Boolean).join(' ')) + '</small></button>';
       }).join('') + '</div>' : '<p class="muted" style="margin-top:6px">Aún no hay vehículos guardados.</p>') + '</div>';
     return html;
   }
@@ -713,18 +751,27 @@
     return text.length > 950 || text.split('\n').length > 13;
   }
 
+  function chatTime(ts) {
+    if (!ts) return '';
+    try { return new Intl.DateTimeFormat('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(ts)); } catch (e) { return ''; }
+  }
+
   function renderChatMessage(m, index) {
     var roleClass = m.role === 'user' ? 'user' : 'model' + (m.error ? ' error' : '');
-    var body = m.role === 'user' ? esc(m.text) : md(m.text);
-    var longClass = m.role === 'model' && !m.error && messageIsLong(m.text) ? ' collapsible' : '';
+    var body = m.streaming && !m.text ? '<span class="typing-dots" aria-label="Escribiendo"><i></i><i></i><i></i></span>' : (m.role === 'user' ? esc(m.text) : md(m.text));
+    var longClass = m.role === 'model' && !m.error && !m.streaming && messageIsLong(m.text) ? ' collapsible' : '';
     var html = '<div class="msg-wrap ' + (m.role === 'user' ? 'user-wrap' : 'model-wrap') + '">' +
-      '<div class="msg ' + roleClass + '"><div class="msg-content' + longClass + '" data-msg-content="' + index + '">' + body + '</div>' +
-      (longClass ? '<button class="msg-more" data-msg-expand="' + index + '">Ver más</button>' : '') + '</div>';
-    if (m.role === 'model' && !m.error) {
+      '<div class="msg ' + roleClass + '"><div class="msg-content' + longClass + (m.streaming && !m.text ? ' streaming-placeholder' : '') + '" data-msg-content="' + index + '">' + body + '</div>' +
+      (longClass ? '<button class="msg-more" data-msg-expand="' + index + '">Ver más</button>' : '') + '<div class="msg-time">' + esc(chatTime(m.at)) + '</div></div>';
+    if (m.role === 'model' && m.error) {
+      html += '<div class="msg-actions"><button data-msg-retry="' + index + '">' + ICONS.retry + '<span>Reintentar</span></button></div>';
+    } else if (m.role === 'model' && !m.streaming) {
+      var canChecklist = checklistFromText(m.text).length >= 3;
       html += '<div class="msg-actions" aria-label="Acciones de la respuesta">' +
-        '<button data-msg-copy="' + index + '">Copiar</button>' +
-        '<button data-msg-save="' + index + '">Guardar</button>' +
-        '<button data-msg-checklist="' + index + '">Checklist</button>' +
+        '<button data-msg-copy="' + index + '">' + ICONS.copy + '<span>Copiar</span></button>' +
+        '<button data-msg-save="' + index + '">' + ICONS.save + '<span>Guardar</span></button>' +
+        (canChecklist ? '<button data-msg-checklist="' + index + '">' + ICONS.checklist + '<span>Checklist</span></button>' : '') +
+        '<button data-msg-share="' + index + '">' + ICONS.share + '<span>Compartir</span></button>' +
       '</div>';
     }
     return html + '</div>';
@@ -745,17 +792,37 @@
       });
   }
 
+  function rememberQuick(index) {
+    index = Number(index);
+    var list = Array.isArray(db.settings.quickRecent) ? db.settings.quickRecent.slice() : [];
+    list = list.filter(function (x) { return Number(x) !== index; });
+    list.unshift(index); db.settings.quickRecent = list.slice(0, 3); persist(['settings']);
+  }
   function openAssistantActions() {
     var links = L.searchLinks(cur);
-    function qbtn(i) { return '<button class="action-sheet-item" data-quick="' + i + '">' + esc(QUICK[i][0]) + '</button>'; }
-    var html = '<div class="action-sheet-head"><div><h3>Acciones rápidas</h3><p class="muted small">Para ' + esc(cur.plate || 'el vehículo actual') + '</p></div><button class="sheet-x" data-sheet-close aria-label="Cerrar">×</button></div>' +
-      '<div class="action-category"><div class="action-category-title">Mantención</div><div class="action-grid">' + [0,1,3,4].map(qbtn).join('') + '</div></div>' +
+    function qbtn(i) { var icon = i >= 5 ? ICONS.search : ICONS.bolt; return '<button class="action-sheet-item" data-quick="' + i + '"><span class="action-icon">' + icon + '</span><span>' + esc(QUICK[i][0]) + '</span></button>'; }
+    var recent = (db.settings.quickRecent || []).filter(function (i) { return QUICK[Number(i)]; }).slice(0, 3);
+    var html = '<div class="action-sheet-head"><div><h3>Acciones rápidas</h3><p class="muted small">Para ' + esc(cur.plate || 'el vehículo actual') + '</p></div><button class="sheet-x icon-button" data-sheet-close aria-label="Cerrar">' + ICONS.close + '</button></div>';
+    if (recent.length) html += '<div class="action-category"><div class="action-category-title">Usadas recientemente</div><div class="action-grid">' + recent.map(qbtn).join('') + '</div></div>';
+    html += '<div class="action-category"><div class="action-category-title">Mantención</div><div class="action-grid">' + [0,1,3,4].map(qbtn).join('') + '</div></div>' +
       '<div class="action-category"><div class="action-category-title">Diagnóstico</div><div class="action-grid">' + [5,6,7].map(qbtn).join('') + '</div></div>';
-    if (links.length) {
-      html += '<div class="action-category"><div class="action-category-title">Repuestos y catálogos</div><div class="action-grid">' +
-        links.map(function (l) { return '<a class="action-sheet-item" href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + '</a>'; }).join('') + '</div></div>';
-    }
-    openSheet(html, function (sheet) { $('[data-sheet-close]', sheet).addEventListener('click', closeSheet); });
+    if (links.length) html += '<div class="action-category"><div class="action-category-title">Repuestos y catálogos</div><div class="action-grid">' + links.map(function (l) { return '<a class="action-sheet-item" href="' + esc(l.url) + '" target="_blank" rel="noopener"><span class="action-icon">' + ICONS.search + '</span><span>' + esc(l.label) + '</span></a>'; }).join('') + '</div></div>';
+    openSheet(html);
+  }
+
+  function openChatMenu() {
+    openSheet('<div class="action-sheet-head"><div><h3>Conversación</h3><p class="muted small">' + esc(cur.plate || 'Vehículo actual') + '</p></div><button class="sheet-x icon-button" data-sheet-close aria-label="Cerrar">' + ICONS.close + '</button></div>' +
+      '<div class="action-category"><div class="action-grid one-col"><button class="action-sheet-item" id="sheet-new-chat"><span class="action-icon">' + ICONS.plus + '</span><span>Nueva conversación</span></button></div></div>', function (sheet) {
+        $('#sheet-new-chat', sheet).addEventListener('click', function () { db.chats[chatKey()] = []; persist(['chats']); closeSheet(); render(); });
+      });
+  }
+
+  function updateJumpLatest() {
+    var box = $('#chat-thread'), btn = $('#btn-jump-latest');
+    if (!box || !btn) return;
+    var far = box.scrollHeight - box.scrollTop - box.clientHeight > 220;
+    btn.classList.toggle('hidden', !far);
+    jumpButtonVisible = far;
   }
 
   function getChatMessage(index) {
@@ -774,23 +841,27 @@
     }
   }
 
+  function autoAiTitle(text) {
+    var lines = String(text || '').split('\n').map(function (x) { return x.replace(/[*`#]/g, '').trim(); }).filter(Boolean), summary = '';
+    for (var i = 0; i < lines.length; i++) { if (/^Resumen:/i.test(lines[i])) { summary = lines[i].replace(/^Resumen:\s*/i, ''); break; } }
+    if (!summary) summary = lines[0] || 'Diagnóstico IA';
+    summary = summary.replace(/^\d+[.)]\s*/, '').replace(/^[-•]\s*/, '').trim();
+    if (summary.length > 58) summary = summary.slice(0, 55).trim() + '…';
+    return summary || 'Diagnóstico IA';
+  }
   function saveAiMessage(index) {
     var m = getChatMessage(index);
     if (!m || !L.isPlateOk(cur.plate)) { toast('Carga y guarda un vehículo antes de guardar el diagnóstico.'); return; }
-    openSheet('<h3>Guardar en Libreta</h3>' +
-      '<div class="field"><label for="ai-save-title">Título</label><input id="ai-save-title" value="Diagnóstico IA"></div>' +
-      '<div class="field" style="margin-top:12px"><label for="ai-save-note">Contenido</label><textarea id="ai-save-note" style="min-height:190px">' + esc(m.text) + '</textarea></div>' +
-      '<div class="btn-row" style="margin-top:14px"><button class="btn" data-sheet-close>Cancelar</button><button class="btn primary" id="ai-save-confirm">Guardar</button></div>',
-      function (sheet) {
-        $('[data-sheet-close]', sheet).addEventListener('click', closeSheet);
-        $('#ai-save-confirm', sheet).addEventListener('click', function () {
-          var title = $('#ai-save-title', sheet).value.trim() || 'Diagnóstico IA';
-          var note = $('#ai-save-note', sheet).value.trim();
-          var list = db.log[cur.plate] = db.log[cur.plate] || [];
-          list.unshift({ id: uid(), fecha: todayISO(), km: cur.km || '', trabajo: title, notas: note, source: 'ai' });
-          persist(['log']); closeSheet(); toast('Guardado en la Libreta.');
-        });
-      });
+    var list = db.log[cur.plate] = db.log[cur.plate] || [];
+    var entry = { id: uid(), fecha: todayISO(), km: cur.km || '', trabajo: autoAiTitle(m.text), notas: m.text, source: 'ai' };
+    list.unshift(entry); persist(['log']); vibrate(10);
+    toast('Guardado en Libreta', 'Deshacer', function () { db.log[cur.plate] = (db.log[cur.plate] || []).filter(function (e) { return e.id !== entry.id; }); persist(['log']); toast('Guardado deshecho.'); if (tab === 'libreta') render(); });
+  }
+  function shareChatMessage(index) {
+    var m = getChatMessage(index); if (!m) return;
+    var title = (cur.plate ? cur.plate + ' · ' : '') + 'THOKAR';
+    if (navigator.share) { navigator.share({ title: title, text: m.text }).catch(function () {}); return; }
+    copyChatMessage(index);
   }
 
   function checklistFromText(text) {
@@ -804,14 +875,28 @@
     return unique.slice(0, 12);
   }
 
-  function saveChecklistFromMessage(index) {
+  async function saveChecklistFromMessage(index) {
     var m = getChatMessage(index);
     if (!m || !L.isPlateOk(cur.plate)) { toast('Carga y guarda un vehículo antes de crear un checklist.'); return; }
-    var items = checklistFromText(m.text);
-    if (!items.length) { toast('No encontré pasos claros para convertir en checklist.'); return; }
-    var list = db.log[cur.plate] = db.log[cur.plate] || [];
-    list.unshift({ id: uid(), fecha: todayISO(), km: cur.km || '', trabajo: 'Checklist IA', notas: '', source: 'ai', checklist: items.map(function (x) { return { text: x, done: false }; }) });
-    persist(['log']); toast('Checklist guardado en la Libreta.');
+    if (busy) return; busy = true; toast('Preparando checklist…');
+    try {
+      var text = await geminiJson({ contents: [{ role: 'user', parts: [{ text: 'Convierte esta respuesta técnica en un checklist práctico. Responde SOLO JSON con {"titulo":"...","items":["...","..."]}. Incluye entre 3 y 12 pasos concretos, sin inventar datos. Respuesta original:\n\n' + m.text }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } });
+      var parsed = L.parseModelJson(text) || {}, title = String(parsed.titulo || 'Checklist IA').trim().slice(0, 80);
+      var items = Array.isArray(parsed.items) ? parsed.items.map(function (x) { return String(x || '').trim(); }).filter(Boolean).slice(0, 12) : [];
+      if (items.length < 3) items = checklistFromText(m.text);
+      if (items.length < 3) throw fail('No encontré suficientes pasos claros para crear el checklist.');
+      openSheet('<h3>Revisar checklist</h3><div class="field"><label for="check-title">Título</label><input id="check-title" value="' + esc(title) + '"></div><div class="field" style="margin-top:12px"><label for="check-items">Pasos (uno por línea)</label><textarea id="check-items" style="min-height:220px">' + esc(items.join('\n')) + '</textarea></div><div class="btn-row" style="margin-top:14px"><button class="btn" data-sheet-close>Cancelar</button><button class="btn primary" id="check-save">Guardar</button></div>', function (sheet) {
+        $('#check-save', sheet).addEventListener('click', function () {
+          var edited = $('#check-items', sheet).value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 20);
+          if (!edited.length) return toast('Añade al menos un paso.');
+          var list = db.log[cur.plate] = db.log[cur.plate] || [];
+          var entry = { id: uid(), fecha: todayISO(), km: cur.km || '', trabajo: $('#check-title', sheet).value.trim() || 'Checklist IA', notas: '', source: 'ai', checklist: edited.map(function (x) { return { text: x, done: false }; }) };
+          list.unshift(entry); persist(['log']); closeSheet(); vibrate(10);
+          toast('Checklist guardado', 'Deshacer', function () { db.log[cur.plate] = (db.log[cur.plate] || []).filter(function (e) { return e.id !== entry.id; }); persist(['log']); toast('Checklist eliminado.'); });
+        });
+      });
+    } catch (e) { toast(e.message || 'No pude preparar el checklist.'); }
+    finally { busy = false; }
   }
 
   function assistantView() {
@@ -825,8 +910,8 @@
     if (!hasCar) {
       html += '<div class="notice assistant-notice">Carga una patente para que la IA responda con contexto. <button class="link-btn" data-tab-go="vehiculo">Cargar vehículo</button></div>';
     }
-    if (!(db.settings.apiKey || '').trim()) {
-      html += '<div class="notice assistant-notice">Falta la clave de Gemini. <button class="link-btn" data-tab-go="ajustes">Abrir Ajustes</button></div>';
+    if (!(db.settings.appToken || '').trim()) {
+      html += '<div class="notice assistant-notice">Falta configurar el Token THOKAR. <button class="link-btn" data-tab-go="ajustes">Abrir Ajustes</button></div>';
     }
 
     var starter = !th.length && !busy ? '<div class="assistant-starter"><div class="starter-title">¿Qué necesitas revisar?</div><div class="starter-grid">' +
@@ -842,16 +927,16 @@
             (vehicleMeta ? '<div class="assistant-contact-meta">' + esc(vehicleMeta) + '</div>' : '') +
           '</div>' +
         '</button>' +
-        (th.length ? '<button class="assistant-clear-icon" id="btn-clear-chat" aria-label="Nueva conversación" title="Nueva conversación">×</button>' : '') +
+        '<button class="assistant-clear-icon icon-button" id="btn-chat-menu" aria-label="Opciones del chat" title="Opciones del chat">' + ICONS.more + '</button>' +
       '</div>' +
       '<div class="thread assistant-thread whatsapp-thread" id="chat-thread" aria-live="polite">' + starter + th.map(renderChatMessage).join('') +
-        (busy ? '<div class="msg-wrap model-wrap"><div class="msg model typing"><span class="spinner"></span> Consultando…</div></div>' : '') + '<div id="thread-end"></div></div>' +
+        '<div id="thread-end"></div><button class="jump-latest icon-button hidden" id="btn-jump-latest" aria-label="Ir al último mensaje">' + ICONS.down + '</button></div>' +
       (pendingImage ? '<div class="assistant-attachment small muted">Foto lista para enviar. <button class="link-btn" id="btn-unattach">Quitar</button></div>' : '') +
       '<form class="composer assistant-composer whatsapp-composer" id="composer">' +
-        '<button type="button" class="composer-action-btn assistant-action-btn" id="btn-assistant-actions" aria-label="Acciones rápidas" title="Acciones rápidas">⚡</button>' +
-        '<button type="button" class="composer-action-btn assistant-photo-btn" id="btn-attach" aria-label="Adjuntar foto" title="Adjuntar foto">＋</button>' +
+        '<button type="button" class="composer-action-btn assistant-action-btn icon-button" id="btn-assistant-actions" aria-label="Acciones rápidas" title="Acciones rápidas">' + ICONS.bolt + '</button>' +
+        '<button type="button" class="composer-action-btn assistant-photo-btn icon-button" id="btn-attach" aria-label="Adjuntar foto" title="Adjuntar foto">' + ICONS.plus + '</button>' +
         '<textarea id="chat-input" rows="1" placeholder="Escribe un mensaje…" aria-label="Mensaje"></textarea>' +
-        '<button class="whatsapp-send" type="submit" aria-label="Enviar"' + (busy ? ' disabled' : '') + '>Enviar</button>' +
+        '<button class="whatsapp-send icon-button send-button" type="submit" aria-label="Enviar"' + (busy ? ' disabled' : '') + '>' + ICONS.send + '</button>' +
       '</form><input type="file" id="chat-photo" accept="image/*" hidden>' +
       '</section>';
     return html;
@@ -868,7 +953,9 @@
     if (!list.length) html += '<div class="empty muted"><p>Todavía no hay trabajos, diagnósticos ni checklists guardados.</p></div>';
     html += list.map(function (e) {
       var next = [e.nextKm ? L.formatKm(e.nextKm) + ' km' : '', e.nextFecha ? L.formatDate(e.nextFecha) : ''].filter(Boolean).join(' o ');
-      var checklist = Array.isArray(e.checklist) && e.checklist.length ? '<div class="saved-checklist">' + e.checklist.map(function (item, i) {
+      var checkCount = Array.isArray(e.checklist) ? e.checklist.length : 0;
+      var checkDone = checkCount ? e.checklist.filter(function (x) { return x.done; }).length : 0;
+      var checklist = checkCount ? '<div class="check-progress"><span>Checklist</span><strong>' + checkDone + '/' + checkCount + '</strong></div><div class="saved-checklist">' + e.checklist.map(function (item, i) {
         return '<label><input type="checkbox" data-check-entry="' + esc(e.id) + '" data-check-index="' + i + '"' + (item.done ? ' checked' : '') + '><span>' + esc(item.text) + '</span></label>';
       }).join('') + '</div>' : '';
       return '<div class="entry"><div class="head"><span class="title">' + esc(e.trabajo) + '</span><span class="muted small">' + esc(L.formatDate(e.fecha)) + '</span></div>' +
@@ -881,27 +968,20 @@
   }
 
   function settingsView() {
+    var protectedOk = backendInfo.protected === true;
+    var boostrOk = backendInfo.configured === true;
+    var geminiOk = backendInfo.geminiConfigured === true;
     return '<h2>Ajustes</h2><div class="stack" style="margin-top:14px">' +
-      '<div class="card"><h3>Inteligencia artificial (Gemini)</h3>' +
-      '<p class="muted small" style="margin:6px 0 12px">Usa la clave de Google AI Studio. Se guarda solo en este teléfono.</p>' +
-      '<p style="margin-bottom:12px"><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--text)">Crear mi clave en Google AI Studio</a></p>' +
-      '<div class="field"><label for="s-key">Clave de Gemini</label><input id="s-key" type="password" autocomplete="off" spellcheck="false" value="' + esc(db.settings.apiKey) + '"></div>' +
-      '<div class="field" style="margin-top:12px"><label for="s-model">Modelo (vacío = automático)</label><input id="s-model" autocomplete="off" spellcheck="false" placeholder="' + esc(db.settings.auto || 'automático') + '" value="' + esc(db.settings.model) + '"></div>' +
-      '<div class="btn-row" style="margin-top:12px"><button class="btn" id="btn-detect">Detectar modelo</button><button class="btn primary" id="btn-test">Probar conexión</button></div>' +
-      '<p class="small" id="test-out" style="margin-top:10px" aria-live="polite"></p></div>' +
-      '<div class="card"><h3>Protección de consultas</h3>' +
-      '<p class="muted small" style="margin:6px 0 10px">Opcional. Si defines <strong>APP_TOKEN</strong> en Render, pega aquí el mismo valor. Se guarda solo en este teléfono y protege las consultas de patente contra uso externo casual.</p>' +
-      '<div class="field"><label for="s-app-token">Token THOKAR</label><input id="s-app-token" type="password" autocomplete="off" spellcheck="false" value="' + esc(db.settings.appToken || '') + '"></div></div>' +
-      '<div class="card"><h3>Búsqueda automática por patente</h3>' +
-      '<p class="muted small" style="margin:6px 0 8px">La consulta pasa por el backend de THOKAR y usa Boostr API. BOOSTR_API_KEY permanece únicamente en Render.</p>' +
-      '<p class="muted small">Estado del backend: ' + esc(backendState === 'ok' ? 'conectado' : backendState === 'error' ? 'con error' : 'comprobando') + (backendBuild ? ' · ' + esc(backendBuild) : '') + '</p></div>' +
-      '<div class="card"><h3>Respaldo</h3><p class="muted small" style="margin:6px 0 12px">Vehículos, libreta y conversaciones. Descárgalo antes de cambiar de teléfono o borrar datos del navegador.</p>' +
-      '<div class="btn-row"><button class="btn" id="btn-export">Descargar respaldo</button><button class="btn" id="btn-import">Importar respaldo</button></div><input type="file" id="import-input" accept="application/json,.json" hidden></div>' +
-      '<div class="card"><h3>Instalar en el teléfono</h3>' +
-      '<p class="muted small" style="margin:6px 0 10px">Android (Chrome): menú ⋮ → Instalar app. iPhone (Safari): Compartir → Agregar a pantalla de inicio.</p>' +
-      (installEvent ? '<button class="btn primary block" id="btn-install">Instalar ahora</button>' : '') + '</div>' +
-      (storageOk ? '' : '<div class="notice">Este navegador no deja guardar datos. Lo que escribas se perderá al cerrar la app.</div>') +
-      '<p class="muted small">THOKAR · versión ' + APP_BUILD + '</p></div>';
+      '<div class="card"><div class="settings-status-head"><div><h3>Conexión</h3><p class="muted small">THOKAR usa Boostr y Gemini desde el backend de Render.</p></div><span class="status-badge ' + (backendState === 'ok' ? 'ok' : 'warn') + '">' + esc(backendState === 'ok' ? 'Conectado' : backendState === 'connecting' ? 'Conectando' : 'Revisar') + '</span></div>' +
+      '<div class="settings-status-list"><div><span>APP_TOKEN</span><strong class="' + (protectedOk ? 'ok-text' : 'warn-text') + '">' + (protectedOk ? 'Configurado' : 'Falta') + '</strong></div><div><span>Boostr</span><strong class="' + (boostrOk ? 'ok-text' : 'warn-text') + '">' + (boostrOk ? 'Configurado' : 'Falta clave') + '</strong></div><div><span>Gemini</span><strong class="' + (geminiOk ? 'ok-text' : 'warn-text') + '">' + (geminiOk ? 'Configurado' : 'Falta clave') + '</strong></div></div>' +
+      '<div class="field" style="margin-top:14px"><label for="s-app-token">Token THOKAR</label><input id="s-app-token" type="password" autocomplete="off" spellcheck="false" placeholder="El mismo APP_TOKEN de Render" value="' + esc(db.settings.appToken || '') + '"></div>' +
+      '<p class="muted small" style="margin-top:8px">En Render define <strong>APP_TOKEN</strong> (32+ caracteres), <strong>BOOSTR_API_KEY</strong> y <strong>GEMINI_API_KEY</strong>. Las claves de proveedores nunca se guardan en el teléfono.</p>' +
+      '<button class="btn primary block" id="btn-test" style="margin-top:12px">Probar conexión completa</button><p class="small" id="test-out" style="margin-top:10px" aria-live="polite"></p></div>' +
+      '<div class="card"><h3>Comportamiento</h3><label class="setting-toggle"><span><strong>Mantener pantalla encendida</strong><small>Mientras el Asistente está abierto</small></span><input id="s-wake-lock" type="checkbox"' + (db.settings.keepAwake !== false ? ' checked' : '') + '></label></div>' +
+      '<div class="card"><h3>Actualización de la app</h3><p class="muted small" style="margin:6px 0 12px">Versión instalada: <strong>' + APP_BUILD + '</strong>' + (backendBuild ? ' · servidor: <strong>' + esc(backendBuild) + '</strong>' : '') + '.</p><div class="btn-row"><button class="btn" id="btn-check-update">Buscar actualización</button><button class="btn danger" id="btn-force-update">Forzar actualización</button></div></div>' +
+      '<div class="card"><h3>Respaldo</h3><p class="muted small" style="margin:6px 0 12px">Vehículos, libreta y conversaciones. Los tokens no se exportan.</p><div class="btn-row"><button class="btn" id="btn-export">Descargar respaldo</button><button class="btn" id="btn-import">Importar respaldo</button></div><input type="file" id="import-input" accept="application/json,.json" hidden></div>' +
+      '<div class="card"><h3>Instalar en el teléfono</h3><p class="muted small" style="margin:6px 0 10px">Android (Chrome): menú ⋮ → Instalar app. iPhone (Safari): Compartir → Agregar a pantalla de inicio.</p>' + (installEvent ? '<button class="btn primary block" id="btn-install">Instalar ahora</button>' : '') + '</div>' +
+      (storageOk ? '' : '<div class="notice">Este navegador no deja guardar datos. Lo que escribas se perderá al cerrar la app.</div>') + '</div>';
   }
 
   function render() {
@@ -909,11 +989,15 @@
     var view = tab === 'vehiculo' ? vehicleView() : tab === 'asistente' ? assistantView() : tab === 'libreta' ? logView() : settingsView();
     app.innerHTML = view;
     renderTabs();
-    if (tab === 'asistente') scrollChatEnd();
+    if (tab === 'asistente') {
+      scrollChatEnd();
+      var thread = $('#chat-thread'); if (thread) thread.addEventListener('scroll', updateJumpLatest, { passive: true });
+      var ta = $('#chat-input'); var draft = load(K.draft + '.chat.' + chatKey(), ''); if (ta && draft) { ta.value = draft; resizeChatInput(ta); }
+    }
   }
 
   /* ---------- Eventos ---------- */
-  document.addEventListener('input', function (e) { onField(e); if (e.target.id === 'chat-input') resizeChatInput(e.target); });
+  document.addEventListener('input', function (e) { onField(e); if (e.target.id === 'chat-input') { resizeChatInput(e.target); save(K.draft + '.chat.' + chatKey(), e.target.value); } });
   document.addEventListener('change', function (e) {
     if (e.target.id === 'f-combustible') onField(e);
     if (e.target.id === 'photo-input') { readPhoto(e.target.files[0]); e.target.value = ''; }
@@ -922,9 +1006,8 @@
       var f = e.target.files[0]; e.target.value = '';
       if (f) loadChatImage(f).then(function (b64) { pendingImage = b64; render(); }, function (er) { toast(er.message); });
     }
-    if (e.target.id === 's-key') { db.settings.apiKey = e.target.value.trim(); persist(['settings']); toast('Clave guardada.'); }
-    if (e.target.id === 's-model') { db.settings.model = e.target.value.trim(); persist(['settings']); }
-    if (e.target.id === 's-app-token') { db.settings.appToken = e.target.value.trim(); persist(['settings']); toast('Token THOKAR guardado en este teléfono.'); }
+    if (e.target.id === 's-app-token') { db.settings.appToken = e.target.value.trim(); persist(['settings']); toast('Token THOKAR guardado en este teléfono.'); wakeBackend(true).catch(function () {}); }
+    if (e.target.id === 's-wake-lock') { db.settings.keepAwake = e.target.checked; persist(['settings']); updateWakeLock(); }
     if (e.target.dataset.checkEntry) {
       var entry = (db.log[cur.plate] || []).filter(function (x) { return x.id === e.target.dataset.checkEntry; })[0];
       var idx = Number(e.target.dataset.checkIndex);
@@ -934,7 +1017,7 @@
   document.addEventListener('submit', function (e) {
     if (e.target.id === 'composer') {
       e.preventDefault();
-      var ta = $('#chat-input'); var v = ta.value; ta.value = '';
+      var ta = $('#chat-input'); var v = ta.value; ta.value = ''; save(K.draft + '.chat.' + chatKey(), '');
       ask(v);
     }
   });
@@ -950,10 +1033,13 @@
     if (t.dataset.tabGo) return setTab(t.dataset.tabGo);
     if (t.dataset.load) return loadVehicle(t.dataset.load);
     if (t.dataset.del) return deleteVehicle(t.dataset.del);
-    if (t.dataset.quick !== undefined) { if ($('#sheet-root').innerHTML) closeSheet(); return ask(QUICK[+t.dataset.quick][1]); }
+    if (t.dataset.quick !== undefined) { rememberQuick(+t.dataset.quick); if ($('#sheet-root').innerHTML) closeSheet(); return ask(QUICK[+t.dataset.quick][1]); }
     if (t.dataset.msgCopy !== undefined) return copyChatMessage(t.dataset.msgCopy);
     if (t.dataset.msgSave !== undefined) return saveAiMessage(t.dataset.msgSave);
     if (t.dataset.msgChecklist !== undefined) return saveChecklistFromMessage(t.dataset.msgChecklist);
+    if (t.dataset.msgShare !== undefined) return shareChatMessage(t.dataset.msgShare);
+    if (t.dataset.msgRetry !== undefined) return retryMessage(t.dataset.msgRetry);
+    if (t.dataset.sheetClose !== undefined) return closeSheet();
     if (t.dataset.msgExpand !== undefined) { var c = $('[data-msg-content="' + t.dataset.msgExpand + '"]'); if (c) c.classList.toggle('expanded'); t.textContent = c && c.classList.contains('expanded') ? 'Ver menos' : 'Ver más'; return; }
     if (t.dataset.remind) return openReminder(t.dataset.remind);
     if (t.dataset.delentry) return deleteEntry(t.dataset.delentry);
@@ -962,37 +1048,53 @@
       case 'btn-assistant-actions': return openAssistantActions();
       case 'btn-vehicle-sheet': return openVehicleSheet();
       case 'btn-retry-backend': return wakeBackend();
-      case 'btn-update-reload': return window.location.reload();
+      case 'btn-update-apply': return applyServiceWorkerUpdate();
+      case 'btn-check-update': return checkForUpdate(true);
+      case 'btn-force-update': return forceUpdate();
+      case 'btn-toast-action': if (toastAction) { var undo = toastAction; toastAction = null; $('#toast-root').innerHTML = ''; return undo(); } break;
       case 'btn-attach': return $('#chat-photo').click();
       case 'btn-unattach': pendingImage = ''; return render();
       case 'btn-paste': return openPaste();
       case 'btn-photo': return $('#photo-input').click();
       case 'btn-save': return saveVehicle();
       case 'btn-clear': cur = emptyVehicle(); saveDraft(); return render();
-      case 'btn-clear-chat': db.chats[chatKey()] = []; persist(['chats']); return render();
+      case 'btn-chat-menu': return openChatMenu();
+      case 'btn-jump-latest': return scrollChatEnd();
       case 'btn-add-entry': return openEntry();
       case 'btn-export': return exportBackup();
       case 'btn-import': return $('#import-input').click();
-      case 'btn-test': db.settings.apiKey = ($('#s-key').value || '').trim(); db.settings.model = ($('#s-model').value || '').trim(); persist(['settings']); return testConnection();
-      case 'btn-detect': db.settings.apiKey = ($('#s-key').value || '').trim(); persist(['settings']); return doDetect();
+      case 'btn-test': return testConnection();
       case 'btn-install': installEvent.prompt(); installEvent = null; return render();
     }
   });
 
   window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); installEvent = e; if (tab === 'ajustes') render(); });
   window.addEventListener('offline', function () { toast('Sin internet. El asistente necesita conexión.'); });
-  document.addEventListener('visibilitychange', updateWakeLock);
+  document.addEventListener('visibilitychange', function () { updateWakeLock(); if (document.visibilityState === 'visible') checkForUpdate(false); });
   window.addEventListener('focus', updateWakeLock);
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', syncKeyboardState);
     window.visualViewport.addEventListener('scroll', syncKeyboardState);
   }
-  document.addEventListener('focusin', syncKeyboardState);
-  document.addEventListener('focusout', function () { setTimeout(syncKeyboardState, 80); });
+  document.addEventListener('focusin', function (e) {
+    if (e.target && e.target.id === 'chat-input') { keyboardOpen = true; document.body.classList.add('keyboard-open'); setTimeout(scrollChatEnd, 80); }
+    syncKeyboardState();
+  });
+  document.addEventListener('focusout', function (e) {
+    if (e.target && e.target.id === 'chat-input') setTimeout(function () { keyboardOpen = false; document.body.classList.remove('keyboard-open'); syncKeyboardState(); }, 120);
+  });
 
   if ('serviceWorker' in navigator) {
+    var reloadingForController = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (reloadingForController) return;
+      reloadingForController = true;
+      window.location.reload();
+    });
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('sw.js').then(function (reg) {
+        swRegistration = reg;
+        if (reg.waiting && navigator.serviceWorker.controller) showUpdateBanner('Hay una versión nueva de THOKAR disponible.');
         reg.addEventListener('updatefound', function () {
           var nw = reg.installing;
           if (!nw) return;
@@ -1000,11 +1102,14 @@
             if (nw.state === 'installed' && navigator.serviceWorker.controller) showUpdateBanner('Hay una versión nueva de THOKAR disponible.');
           });
         });
+        setTimeout(function () { reg.update().catch(function () {}); }, 1500);
       }).catch(function () {});
     });
   }
 
+  if (launchNewChat) { db.chats[chatKey()] = []; persist(['chats']); history.replaceState(null, '', location.pathname + '?tab=asistente'); }
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
   render();
-  wakeBackend();
+  wakeBackend().catch(function () {});
   updateWakeLock();
 })();

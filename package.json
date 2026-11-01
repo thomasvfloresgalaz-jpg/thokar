@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "4.1.0-ux",
+  "version": "4.2.0-polish",
   "private": true,
-  "description": "THOKAR Taller con backend Node y consulta de patentes mediante Boostr API.",
+  "description": "THOKAR Taller PWA con backend Node, Boostr API y Gemini en streaming.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

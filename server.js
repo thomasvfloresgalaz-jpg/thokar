@@ -1,29 +1,53 @@
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
 const { lookupVehicle, cleanPlate } = require('./boostrProvider');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const ROOT = __dirname;
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
-app.use(express.json({ limit: '32kb' }));
+app.use(express.json({ limit: '3mb' }));
 
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   next();
 });
 
+function sameOriginOnly(req, res, next) {
+  const origin = String(req.get('Origin') || '').trim();
+  if (!origin) return next();
+  const expected = `${req.protocol}://${req.get('host')}`;
+  if (origin !== expected) {
+    return res.status(403).json({ ok: false, error: { code: 'ORIGIN_DENIED', message: 'Origen no permitido.' } });
+  }
+  next();
+}
+
+function safeEqual(a, b) {
+  const aa = Buffer.from(String(a || ''), 'utf8');
+  const bb = Buffer.from(String(b || ''), 'utf8');
+  if (aa.length !== bb.length || !aa.length) return false;
+  return crypto.timingSafeEqual(aa, bb);
+}
 
 function requireAppToken(req, res, next) {
   const expected = String(process.env.APP_TOKEN || '').trim();
-  if (!expected) return next();
+  if (expected.length < 32) {
+    return res.status(503).json({
+      ok: false,
+      error: { code: 'APP_NOT_PROTECTED', message: 'Configura APP_TOKEN en Render con al menos 32 caracteres.' }
+    });
+  }
   const got = String(req.get('X-THOKAR-TOKEN') || '').trim();
-  if (!got || got !== expected) {
+  if (!safeEqual(got, expected)) {
     return res.status(401).json({
       ok: false,
       error: { code: 'APP_AUTH', message: 'Token de acceso THOKAR inválido o ausente.' }
@@ -32,100 +56,219 @@ function requireAppToken(req, res, next) {
   next();
 }
 
-// Límite local conservador. Boostr documenta además su propio rate-limit.
-const buckets = new Map();
-function rateLimit(req, res, next) {
-  const now = Date.now();
-  const windowMs = 10_000;
-  const limit = Math.max(1, Math.min(5, Number(process.env.PLATE_REQUESTS_PER_10_SECONDS || 4)));
-  const key = req.ip || req.socket.remoteAddress || 'unknown';
-  const previous = buckets.get(key) || [];
-  const active = previous.filter((ts) => now - ts < windowMs);
+function makeRateLimit({ windowMs, limit, code = 'RATE_LIMIT' }) {
+  const buckets = new Map();
+  setInterval(() => {
+    const cutoff = Date.now() - windowMs;
+    for (const [key, timestamps] of buckets) {
+      const active = timestamps.filter((ts) => ts >= cutoff);
+      if (active.length) buckets.set(key, active); else buckets.delete(key);
+    }
+  }, Math.min(windowMs, 30_000)).unref();
 
-  if (active.length >= limit) {
-    res.setHeader('Retry-After', '10');
-    return res.status(429).json({
-      ok: false,
-      error: { code: 'RATE_LIMIT', message: 'Demasiadas consultas. Espera unos segundos e intenta nuevamente.' }
-    });
-  }
-
-  active.push(now);
-  buckets.set(key, active);
-  next();
+  return function rateLimit(req, res, next) {
+    const now = Date.now();
+    const key = req.ip || req.socket.remoteAddress || 'unknown';
+    const active = (buckets.get(key) || []).filter((ts) => now - ts < windowMs);
+    if (active.length >= limit) {
+      const retry = Math.max(1, Math.ceil((windowMs - (now - active[0])) / 1000));
+      res.setHeader('Retry-After', String(retry));
+      return res.status(429).json({ ok: false, error: { code, message: 'Demasiadas solicitudes. Espera un momento e intenta nuevamente.' } });
+    }
+    active.push(now); buckets.set(key, active); next();
+  };
 }
 
-setInterval(() => {
-  const cutoff = Date.now() - 10_000;
-  for (const [key, timestamps] of buckets) {
-    const active = timestamps.filter((ts) => ts >= cutoff);
-    if (active.length) buckets.set(key, active);
-    else buckets.delete(key);
+const plateRateLimit = makeRateLimit({ windowMs: 60_000, limit: Math.max(2, Math.min(30, Number(process.env.PLATE_REQUESTS_PER_MINUTE || 12))) });
+const aiRateLimit = makeRateLimit({ windowMs: 60_000, limit: Math.max(2, Math.min(60, Number(process.env.AI_REQUESTS_PER_MINUTE || 20))), code: 'AI_RATE_LIMIT' });
+
+const plateCache = new Map();
+const PLATE_CACHE_MS = Math.max(60_000, Math.min(24 * 60 * 60 * 1000, Number(process.env.PLATE_CACHE_MS || 6 * 60 * 60 * 1000)));
+function getCachedVehicle(plate) {
+  const hit = plateCache.get(plate);
+  if (!hit) return null;
+  if (Date.now() - hit.at > PLATE_CACHE_MS) { plateCache.delete(plate); return null; }
+  return hit.vehicle;
+}
+
+function geminiConfig() {
+  return {
+    apiKey: String(process.env.GEMINI_API_KEY || '').trim(),
+    model: String(process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim()
+  };
+}
+
+function validateGeminiBody(input) {
+  if (!input || typeof input !== 'object' || !Array.isArray(input.contents) || !input.contents.length) return null;
+  const contents = input.contents.slice(-16).map((content) => {
+    const role = content && content.role === 'model' ? 'model' : 'user';
+    const parts = Array.isArray(content && content.parts) ? content.parts.slice(0, 4).map((part) => {
+      if (part && typeof part.text === 'string') return { text: part.text.slice(0, 20_000) };
+      const inline = part && (part.inline_data || part.inlineData);
+      if (inline && inline.mime_type === 'image/jpeg' && typeof inline.data === 'string' && inline.data.length <= 2_200_000) {
+        return { inline_data: { mime_type: 'image/jpeg', data: inline.data } };
+      }
+      return null;
+    }).filter(Boolean) : [];
+    return { role, parts };
+  }).filter((c) => c.parts.length);
+  if (!contents.length) return null;
+  const out = { contents };
+  if (input.systemInstruction && Array.isArray(input.systemInstruction.parts)) {
+    const text = input.systemInstruction.parts.map((p) => p && p.text || '').join('\n').slice(0, 18_000);
+    if (text) out.systemInstruction = { parts: [{ text }] };
   }
-}, 15_000).unref();
+  const cfg = input.generationConfig && typeof input.generationConfig === 'object' ? input.generationConfig : {};
+  out.generationConfig = {
+    temperature: Number.isFinite(Number(cfg.temperature)) ? Math.max(0, Math.min(1.5, Number(cfg.temperature))) : 0.3
+  };
+  if (cfg.responseMimeType === 'application/json') out.generationConfig.responseMimeType = 'application/json';
+  return out;
+}
+
+function geminiErrorMessage(status, payload) {
+  const raw = payload && payload.error && payload.error.message ? String(payload.error.message) : '';
+  if (status === 400) return 'Gemini no aceptó la solicitud.' + (raw ? ' ' + raw.slice(0, 180) : '');
+  if (status === 401 || status === 403) return 'Gemini rechazó GEMINI_API_KEY en Render.';
+  if (status === 404) return 'El modelo configurado en GEMINI_MODEL no está disponible.';
+  if (status === 429) return 'Gemini alcanzó su límite temporal. Intenta nuevamente en un momento.';
+  if (status >= 500) return 'Gemini no está disponible en este momento.';
+  return 'No se pudo completar la consulta a Gemini.';
+}
+
+async function googleGeminiFetch(mode, input, signal) {
+  const { apiKey, model } = geminiConfig();
+  if (!apiKey) {
+    const error = new Error('Falta configurar GEMINI_API_KEY en Render.');
+    error.status = 503; error.code = 'GEMINI_NOT_CONFIGURED'; throw error;
+  }
+  const body = validateGeminiBody(input);
+  if (!body) {
+    const error = new Error('Solicitud de IA inválida.'); error.status = 400; error.code = 'AI_BAD_REQUEST'; throw error;
+  }
+  const suffix = mode === 'stream' ? ':streamGenerateContent?alt=sse' : ':generateContent';
+  const response = await fetch(`${GEMINI_BASE}/models/${encodeURIComponent(model)}${suffix}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-Taller/4.2.0' },
+    body: JSON.stringify(body), signal
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const error = new Error(geminiErrorMessage(response.status, payload));
+    error.status = response.status === 429 ? 429 : 502;
+    error.code = response.status === 429 ? 'GEMINI_RATE_LIMIT' : 'GEMINI_API_ERROR';
+    throw error;
+  }
+  return response;
+}
 
 app.get('/healthz', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
+  const tokenReady = String(process.env.APP_TOKEN || '').trim().length >= 32;
   res.json({
     ok: true,
     app: 'THOKAR Taller',
     vehicleLookup: 'boostr',
     configured: Boolean(String(process.env.BOOSTR_API_KEY || '').trim()),
+    geminiConfigured: Boolean(geminiConfig().apiKey),
+    model: geminiConfig().model,
     layout: 'flat',
-    protected: Boolean(String(process.env.APP_TOKEN || '').trim()),
-    build: '4.1.0-ux'
+    protected: tokenReady,
+    build: '4.2.0-polish'
   });
 });
 
-app.get('/api/vehiculo/:patente', requireAppToken, rateLimit, async (req, res) => {
+app.use('/api', sameOriginOnly, requireAppToken);
+
+app.get('/api/vehiculo/:patente', plateRateLimit, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const plate = cleanPlate(req.params.patente);
-
   if (!/^[A-Z0-9]{5,6}$/.test(plate)) {
-    return res.status(400).json({
-      ok: false,
-      error: { code: 'INVALID_PLATE', message: 'Patente inválida.' }
-    });
+    return res.status(400).json({ ok: false, error: { code: 'INVALID_PLATE', message: 'Patente inválida.' } });
   }
-
+  const cached = getCachedVehicle(plate);
+  if (cached) return res.json({ ok: true, source: 'Boostr API · caché THOKAR', cached: true, vehicle: cached });
   try {
     const vehicle = await lookupVehicle(plate);
-    return res.json({ ok: true, source: 'Boostr API', vehicle });
+    plateCache.set(plate, { at: Date.now(), vehicle });
+    return res.json({ ok: true, source: 'Boostr API', cached: false, vehicle });
   } catch (error) {
     const status = Number(error.status || 502);
-    return res.status(status).json({
-      ok: false,
-      error: {
-        code: error.code || 'LOOKUP_FAILED',
-        message: error.message || 'No fue posible consultar la patente.'
-      }
-    });
+    return res.status(status).json({ ok: false, error: { code: error.code || 'LOOKUP_FAILED', message: error.message || 'No fue posible consultar la patente.' } });
   }
 });
 
-// Estructura plana: sólo estos archivos de la raíz se publican.
-// boostrProvider.js, server.js, .env y el resto del backend NO se sirven al navegador.
+app.post('/api/ai/json', aiRateLimit, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 60_000);
+  try {
+    const response = await googleGeminiFetch('json', req.body, ctl.signal);
+    const payload = await response.json();
+    const parts = payload && payload.candidates && payload.candidates[0] && payload.candidates[0].content && payload.candidates[0].content.parts;
+    const text = Array.isArray(parts) ? parts.map((p) => p.text || '').join('').trim() : '';
+    if (!text) return res.status(502).json({ ok: false, error: { code: 'GEMINI_EMPTY', message: 'Gemini no devolvió texto.' } });
+    return res.json({ ok: true, text });
+  } catch (error) {
+    const status = error.name === 'AbortError' ? 504 : Number(error.status || 502);
+    const code = error.name === 'AbortError' ? 'GEMINI_TIMEOUT' : (error.code || 'GEMINI_FAILED');
+    return res.status(status).json({ ok: false, error: { code, message: error.name === 'AbortError' ? 'Gemini tardó demasiado en responder.' : error.message } });
+  } finally { clearTimeout(timer); }
+});
+
+app.post('/api/ai/stream', aiRateLimit, async (req, res) => {
+  const ctl = new AbortController();
+  res.on('close', () => { if (!res.writableEnded) ctl.abort(); });
+  const timer = setTimeout(() => ctl.abort(), 90_000);
+  try {
+    const response = await googleGeminiFetch('stream', req.body, ctl.signal);
+    res.status(200);
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split(/\r?\n\r?\n/);
+      buffer = events.pop() || '';
+      for (const event of events) {
+        const dataLines = event.split(/\r?\n/).filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trim());
+        for (const raw of dataLines) {
+          if (!raw || raw === '[DONE]') continue;
+          try {
+            const payload = JSON.parse(raw);
+            const parts = payload && payload.candidates && payload.candidates[0] && payload.candidates[0].content && payload.candidates[0].content.parts;
+            const text = Array.isArray(parts) ? parts.map((p) => p.text || '').join('') : '';
+            if (text) res.write(text);
+          } catch (_) {}
+        }
+      }
+    }
+    res.end();
+  } catch (error) {
+    if (!res.headersSent) {
+      const status = error.name === 'AbortError' ? 504 : Number(error.status || 502);
+      return res.status(status).json({ ok: false, error: { code: error.code || 'GEMINI_FAILED', message: error.name === 'AbortError' ? 'Gemini tardó demasiado en responder.' : error.message } });
+    }
+    res.end();
+  } finally { clearTimeout(timer); }
+});
+
 const PUBLIC_FILES = new Set([
-  'index.html',
-  'app.js',
-  'lib.js',
-  'styles.css',
-  'sw.js',
-  'manifest.webmanifest',
-  'apple-touch-icon.png',
-  'icon-192.png',
-  'icon-512.png',
-  'icon-maskable-512.png',
-  'thokar-logo-original.jpg'
+  'index.html', 'app.js', 'lib.js', 'styles.css', 'sw.js', 'manifest.webmanifest',
+  'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'
 ]);
 
 function sendPublicFile(req, res, filename) {
   if (!PUBLIC_FILES.has(filename)) return res.status(404).end();
-  if (/\.(?:html|js|css|webmanifest)$/i.test(filename)) {
-    res.setHeader('Cache-Control', 'no-cache');
-  } else {
-    res.setHeader('Cache-Control', process.env.NODE_ENV === 'production' ? 'public, max-age=3600' : 'no-cache');
-  }
+  if (/\.(?:html|js|css|webmanifest)$/i.test(filename)) res.setHeader('Cache-Control', 'no-cache');
+  else res.setHeader('Cache-Control', process.env.NODE_ENV === 'production' ? 'public, max-age=3600' : 'no-cache');
   return res.sendFile(path.join(ROOT, filename));
 }
 
@@ -136,23 +279,17 @@ for (const filename of PUBLIC_FILES) {
 }
 
 app.get('/{*splat}', (req, res) => {
-  if (req.path.startsWith('/api/')) {
-    return res.status(404).json({
-      ok: false,
-      error: { code: 'NOT_FOUND', message: 'Endpoint no encontrado.' }
-    });
-  }
+  if (req.path.startsWith('/api/')) return res.status(404).json({ ok: false, error: { code: 'NOT_FOUND', message: 'Endpoint no encontrado.' } });
   return sendPublicFile(req, res, 'index.html');
 });
 
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`THOKAR escuchando en puerto ${PORT} · proveedor Boostr`);
+  console.log(`THOKAR escuchando en puerto ${PORT} · Boostr + Gemini backend`);
 });
 
 function shutdown() {
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(1), 10_000).unref();
 }
-
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);

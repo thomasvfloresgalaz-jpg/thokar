@@ -250,7 +250,9 @@
   function formatDate(iso) {
     if (!iso) return '';
     const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    return m ? m[3] + '-' + m[2] + '-' + m[1] : iso;
+    if (!m) return iso;
+    const months = ['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'];
+    return Number(m[3]) + ' ' + months[Number(m[2]) - 1] + ' ' + m[1];
   }
 
   function reminderText(v, entry) {

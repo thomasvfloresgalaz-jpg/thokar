@@ -1,18 +1,12 @@
-:root {
-  --bg: #000000;
-  --surface: #15171b;
-  --surface-2: #1d2026;
-  --line: #374151;
-  --text: #e5e7eb;
-  --muted: #9ca3af;
-  --red: #ff1e27;
-  --red-press: #d91820;
-  --ok: #34d399;
-  --warn: #fbbf24;
-  --radius: 12px;
-  --tabs-h: 64px;
-  --font: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", var(--font);
+ :root {
+  --bg:#0B0C0E; --surface:#121418; --surface-2:#181B20; --surface-3:#1F2329;
+  --line:rgba(255,255,255,.08); --text:#ECEEF1; --muted:#A3A9B3;
+  --red:#E11D2A; --red-press:#C41520; --amber:#F5B83D; --ok:#34D399;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --radius:12px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-6:24px;
+  --tabs-h:64px; --ease:cubic-bezier(.2,.8,.2,1);
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --font-display:"Arial Narrow","Roboto Condensed",var(--font);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -79,7 +73,7 @@ p { margin: 0; }
 /* ---------- Botones ---------- */
 
 .btn {
-  min-height: 48px;
+  min-height: 52px;
   padding: 10px 16px;
   border-radius: var(--radius);
   border: 1px solid var(--line);
@@ -88,7 +82,7 @@ p { margin: 0; }
   text-align: center;
 }
 .btn:active { background: var(--surface-2); }
-.btn.primary { background: var(--red); border-color: var(--red); color: #000; font-weight: 700; }
+.btn.primary { background: var(--red); border-color: var(--red); color: #fff; font-weight: 700; }
 .btn.primary:active { background: var(--red-press); }
 .btn.danger { color: var(--red); border-color: var(--red); background: transparent; }
 .btn.block { display: block; width: 100%; }
@@ -139,8 +133,8 @@ p { margin: 0; }
 
 .thread { margin: 12px 0; }
 .msg { max-width: 92%; padding: 10px 14px; border-radius: 14px; margin: 8px 0; overflow-wrap: anywhere; }
-.msg.user { margin-left: auto; background: var(--red); color: #000; border-bottom-right-radius: 4px; font-weight: 500; }
-.msg.model { background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.msg.user { margin-left:auto; background:#3A1418; color:var(--text); border:1px solid rgba(225,29,42,.55); border-radius:18px 18px 6px 18px; font-weight:500; }
+.msg.model { background:#20252B; border:1px solid var(--line); border-radius:18px 18px 18px 6px; }
 .msg.model ul { margin: 6px 0; padding-left: 20px; }
 .msg.model li + li { margin-top: 3px; }
 .msg.error { border-color: var(--red); }
@@ -171,7 +165,7 @@ p { margin: 0; }
   border: 1px solid #2a3942;
   border-radius: 16px;
   background: #0b141a;
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
 }
 
 .whatsapp-head {
@@ -267,26 +261,27 @@ p { margin: 0; }
 }
 
 .whatsapp-thread .msg {
-  max-width: 86%;
-  margin: 5px 0;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 9px;
+  max-width:85%;
+  margin:5px 0;
+  padding:9px 11px;
+  border:1px solid var(--line);
+  border-radius:18px;
   box-shadow: 0 1px 1px rgba(0,0,0,.22);
   font-size: 15px;
   line-height: 1.38;
 }
 .whatsapp-thread .msg.user {
-  margin-left: auto;
-  color: #f4f6f7;
-  background: #5f171b;
-  border-bottom-right-radius: 2px;
-  font-weight: 400;
+  margin-left:auto;
+  color:#f4f6f7;
+  background:#3A1418;
+  border-color:rgba(225,29,42,.55);
+  border-radius:18px 18px 6px 18px;
+  font-weight:400;
 }
 .whatsapp-thread .msg.model {
-  color: #e9edef;
-  background: #202c33;
-  border-bottom-left-radius: 2px;
+  color:#e9edef;
+  background:#20252B;
+  border-radius:18px 18px 18px 6px;
 }
 .whatsapp-thread .msg.error { outline: 1px solid var(--red); }
 
@@ -340,7 +335,7 @@ p { margin: 0; }
 .whatsapp-send {
   padding: 0 16px;
   background: var(--red);
-  color: #070707;
+  color: #fff;
 }
 .whatsapp-send:disabled { opacity: .55; }
 
@@ -482,7 +477,7 @@ p { margin: 0; }
   font-size: 14px;
 }
 .update-banner span { flex: 1; }
-.update-banner button { min-height: 40px; border: 0; border-radius: 9px; padding: 0 13px; background: var(--red); color: #000; font-weight: 700; }
+.update-banner button { min-height:44px; border:0; border-radius:var(--r-md); padding:0 13px; background:var(--red); color:#fff; font-weight:700; }
 
 /* Vehículo compacto */
 .vehicle-summary-card {
@@ -502,8 +497,8 @@ p { margin: 0; }
 .vehicle-details { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
 .vehicle-details summary { min-height: 52px; display: flex; align-items: center; padding: 0 15px; font-weight: 700; cursor: pointer; list-style: none; }
 .vehicle-details summary::-webkit-details-marker { display:none; }
-.vehicle-details summary::after { content: '⌄'; margin-left: auto; color: var(--muted); font-size: 20px; }
-.vehicle-details[open] summary::after { transform: rotate(180deg); }
+.vehicle-details summary::after { content:''; width:8px; height:8px; margin-left:auto; border-right:2px solid var(--muted); border-bottom:2px solid var(--muted); transform:rotate(45deg); transition:transform 160ms var(--ease); }
+.vehicle-details[open] summary::after { transform:rotate(225deg); }
 .details-card { border: 0; border-top: 1px solid var(--line); border-radius: 0; }
 .recent-vehicles { display: flex; gap: 9px; overflow-x: auto; padding: 8px 0 4px; scrollbar-width: none; }
 .recent-vehicles::-webkit-scrollbar { display:none; }
@@ -608,3 +603,143 @@ body.keyboard-open .update-banner { display:none; }
   .starter-grid { gap:7px; }
   .starter-grid button { min-height:50px; font-size:14px; }
 }
+
+
+/* ---------- THOKAR 4.2 · acabado móvil ---------- */
+button, .btn, a { touch-action: manipulation; }
+button, .tab, .chip, .recent-chip, .action-sheet-item { -webkit-user-select:none; user-select:none; }
+body { font-variant-numeric: tabular-nums; }
+.card {
+  background:var(--s1);
+  border:1px solid var(--line);
+  border-radius:var(--r-lg);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+}
+.btn {
+  min-height:52px;
+  border-radius:var(--r-md);
+  transition:transform 120ms var(--ease), background 120ms var(--ease), border-color 120ms var(--ease);
+}
+.btn:active { transform:scale(.98); }
+.icon-button { display:inline-grid; place-items:center; }
+.icon-button svg, .msg-actions svg, .action-icon svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
+.send-button { width:50px; padding:0; }
+.send-button svg { width:21px; height:21px; }
+
+/* Estados visuales */
+.status-dot { width:9px; height:9px; border-radius:50%; background:var(--ok); flex:0 0 auto; }
+.status-dot.waking { background:var(--warn); box-shadow:0 0 0 0 rgba(245,184,61,.5); animation:pulse-dot 1.3s ease-out infinite; }
+.status-dot.offline { background:var(--red); }
+@keyframes pulse-dot { 70% { box-shadow:0 0 0 7px rgba(245,184,61,0); } 100% { box-shadow:0 0 0 0 rgba(245,184,61,0); } }
+.skeleton { overflow:hidden; position:relative; background:var(--s2); border-radius:var(--r-sm); }
+.skeleton::after { content:''; position:absolute; inset:0; transform:translateX(-100%); background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent); animation:shimmer 1.25s infinite; }
+@keyframes shimmer { to { transform:translateX(100%); } }
+
+/* Chat */
+.assistant-chat-window { border-radius:var(--r-lg); box-shadow:none; border-color:var(--line); background:#0E1317; }
+.whatsapp-head { min-height:78px; background:var(--s2); border-color:var(--line); }
+.assistant-avatar { background:var(--s1); border-color:var(--line); }
+.whatsapp-thread .msg { max-width:85%; border-radius:18px; padding:9px 11px; box-shadow:none; }
+.whatsapp-thread .msg.user { background:#3A1418; border:1px solid rgba(225,29,42,.35); border-radius:18px 18px 6px 18px; }
+.whatsapp-thread .msg.model { background:var(--s2); border:1px solid var(--line); border-radius:18px 18px 18px 6px; }
+.whatsapp-composer { background:var(--s2); border-color:var(--line); padding:8px; }
+.whatsapp-composer textarea { background:var(--s3); min-height:52px; border-radius:18px; }
+.composer-action-btn { min-height:52px; width:48px; border-radius:16px; background:var(--s3); }
+.assistant-action-btn { color:var(--warn); }
+.msg-actions { min-height:44px; gap:2px; flex-wrap:wrap; }
+.msg-actions button { min-height:44px; display:inline-flex; align-items:center; gap:5px; padding:6px 9px; border-radius:9px; font-size:12px; }
+.msg-actions svg { width:17px; height:17px; }
+.typing-dots { min-width:42px; min-height:20px; display:inline-flex; align-items:center; gap:4px; }
+.typing-dots i { width:6px; height:6px; border-radius:50%; background:#9EABB3; animation:typing-bounce 1s infinite ease-in-out; }
+.typing-dots i:nth-child(2){animation-delay:.12s}.typing-dots i:nth-child(3){animation-delay:.24s}
+@keyframes typing-bounce { 0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-4px);opacity:1} }
+.streaming-placeholder { min-width:44px; }
+
+/* Acciones rápidas */
+.sheet { background:var(--s1); border-color:var(--line); box-shadow:0 -12px 40px rgba(0,0,0,.45); transition:transform 160ms var(--ease); }
+.sheet-grabber { height:22px; display:grid; place-items:center; margin:-12px 0 4px; touch-action:none; cursor:grab; }
+.sheet-grabber span { width:42px; height:4px; border-radius:999px; background:rgba(255,255,255,.24); }
+.sheet-x { display:grid; place-items:center; font-size:0; }
+.sheet-x svg { width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:1.75; stroke-linecap:round; }
+.action-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.action-sheet-item { min-height:76px; padding:12px; border-radius:var(--r-md); background:var(--s2); display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:8px; border-color:var(--line); }
+.action-sheet-item .action-icon { color:var(--red); display:grid; place-items:center; }
+.action-sheet-item .action-icon svg { width:23px; height:23px; }
+.action-sheet-item:active { transform:scale(.985); background:var(--s3); }
+
+/* Vehículo */
+.vehicle-summary-card { background:var(--s1); border-radius:var(--r-lg); box-shadow:inset 0 1px 0 rgba(255,255,255,.035); }
+.recent-chip { border-radius:var(--r-md); background:var(--s1); min-height:62px; }
+.recent-chip.active { border-color:rgba(225,29,42,.8); box-shadow:inset 0 0 0 1px rgba(225,29,42,.28); }
+.vehicle-details { border-radius:var(--r-lg); background:var(--s1); }
+
+/* Ajustes */
+.settings-status-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.status-badge { padding:5px 9px; border-radius:999px; font-size:12px; font-weight:700; border:1px solid var(--line); }
+.status-badge.ok { color:var(--ok); background:rgba(52,211,153,.07); }
+.status-badge.warn { color:var(--warn); background:rgba(245,184,61,.08); }
+.settings-status-list { margin-top:14px; display:grid; gap:8px; }
+.settings-status-list > div { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--line); }
+.ok-text{color:var(--ok)}.warn-text{color:var(--warn)}
+.setting-toggle { min-height:58px; display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:10px; }
+.setting-toggle span { display:grid; gap:2px; }
+.setting-toggle small { color:var(--muted); }
+.setting-toggle input { width:24px; height:24px; accent-color:var(--red); }
+
+/* Snackbar */
+.toast { background:var(--s3); color:var(--text); display:flex; align-items:center; gap:12px; border:1px solid var(--line); box-shadow:0 10px 32px rgba(0,0,0,.45); }
+.toast span { flex:1; }
+.toast button { min-height:40px; border:0; background:transparent; color:var(--warn); font-weight:700; padding:4px 8px; }
+
+/* Checklists */
+.saved-checklist label { min-height:48px; grid-template-columns:32px 1fr; align-items:center; }
+.saved-checklist input { width:28px; height:28px; margin:0; }
+
+/* Teclado Android: visualViewport se publica como --vvh desde JS. */
+body.keyboard-open .assistant-chat-window { height:calc(var(--vvh, 100dvh) - env(safe-area-inset-top) - 54px); }
+
+@media (prefers-reduced-motion:reduce) {
+  *, *::before, *::after { animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; scroll-behavior:auto!important; }
+}
+
+
+/* ---------- THOKAR 4.2 POLISH ---------- */
+body{font-variant-numeric:tabular-nums}
+button,.btn,.tab,.chip,.recent-chip,.action-sheet-item,.icon-button{touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.btn{border-radius:var(--r-md);transition:transform 120ms var(--ease),background 120ms var(--ease),border-color 120ms var(--ease)}
+.btn:active{transform:scale(.98)}
+.card,.vehicle-summary-card,.vehicle-details{border-color:var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.icon-button{display:grid;place-items:center;border:0;background:transparent;color:inherit}
+.icon-button svg,.tab svg,.msg-actions svg,.action-icon svg,.vehicle-details summary svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.tab svg{width:24px;height:24px}
+.assistant-clear-icon{font-size:0}
+.action-sheet-item{min-height:76px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:8px;padding:12px;border-radius:var(--r-md)}
+.action-icon{display:grid;place-items:center;color:var(--muted)}
+.action-grid.one-col{grid-template-columns:1fr}
+.msg-actions{min-height:44px;align-items:center;flex-wrap:wrap}
+.msg-actions button{min-height:44px;display:inline-flex;align-items:center;gap:5px;padding:7px 8px;border-radius:var(--r-sm)}
+.msg-actions svg{width:18px;height:18px}
+.msg-time{margin-top:5px;text-align:right;color:#7f8b92;font-size:11px;line-height:1}
+.model-wrap .msg-time{text-align:left}
+.jump-latest{position:absolute;right:14px;bottom:76px;width:44px;height:44px;border-radius:50%;background:var(--surface-3);border:1px solid var(--line);color:var(--text);z-index:4;box-shadow:0 8px 20px rgba(0,0,0,.32)}
+.whatsapp-chat{position:relative}
+.typing-dots{display:inline-flex;gap:4px;align-items:center;min-height:18px}
+.typing-dots i{width:7px;height:7px;border-radius:50%;background:#8d9aa2;animation:dotpulse 1.1s infinite ease-in-out}
+.typing-dots i:nth-child(2){animation-delay:.15s}.typing-dots i:nth-child(3){animation-delay:.3s}
+@keyframes dotpulse{0%,60%,100%{opacity:.35;transform:translateY(0)}30%{opacity:1;transform:translateY(-2px)}}
+.skeleton{background:linear-gradient(90deg,var(--surface-2),var(--surface-3),var(--surface-2));background-size:200% 100%;animation:sh 1.2s linear infinite;border-radius:var(--r-sm)}
+@keyframes sh{to{background-position:-200% 0}}
+.lookup-skeleton{display:grid;gap:9px;padding:12px 0}.lookup-skeleton span{display:block;height:14px}.lookup-skeleton span:nth-child(1){width:66%}.lookup-skeleton span:nth-child(2){width:92%}.lookup-skeleton span:nth-child(3){width:54%}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(52,211,153,.12)}
+.status-dot.waking{background:var(--amber);animation:dotpulse 1.1s infinite}.status-dot.offline{background:var(--red)}
+.settings-status-head{display:flex;align-items:flex-start;gap:12px}.settings-status-head>div{flex:1}.status-badge{padding:5px 8px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid var(--line)}.status-badge.ok{color:var(--ok)}.status-badge.warn{color:var(--amber)}
+.settings-status-list{margin-top:12px;border-top:1px solid var(--line)}.settings-status-list>div{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}.ok-text{color:var(--ok)}.warn-text{color:var(--amber)}
+.setting-toggle{min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:14px}.setting-toggle span{display:grid;gap:2px}.setting-toggle small{color:var(--muted)}.setting-toggle input{width:24px;height:24px;accent-color:var(--red)}
+.check-progress{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:7px 9px;background:var(--surface-2);border-radius:var(--r-sm);font-size:13px}.check-progress strong{color:var(--ok)}
+.saved-checklist label{min-height:48px;grid-template-columns:32px 1fr;align-items:center}.saved-checklist input{width:28px;height:28px}
+.recent-chip.active{border-color:rgba(225,29,42,.8);box-shadow:inset 0 0 0 1px rgba(225,29,42,.35)}
+.assistant-thread{scrollbar-gutter:stable}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+.lookup-loading{display:grid;gap:7px;margin-top:4px}.lookup-loading .skeleton{display:block;height:10px}.lookup-loading .sk1{width:82%}.lookup-loading .sk2{width:54%}
+
+.service-due-list{display:grid;gap:7px;margin-top:12px}.service-due{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2)}.service-due span{display:grid;gap:1px;min-width:0}.service-due strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.service-due small{color:var(--muted);font-size:12px}.service-due b{font-size:12px;padding:4px 7px;border-radius:999px}.service-due.ok b{color:var(--ok);background:rgba(52,211,153,.1)}.service-due.soon b{color:var(--amber);background:rgba(245,184,61,.1)}.service-due.due b{color:#ff8a90;background:rgba(225,29,42,.12)}

@@ -1,59 +1,48 @@
-# THOKAR 4.1.0 — UX móvil / taller
+# THOKAR 4.2.0 — POLISH / PWA
 
-Esta versión mantiene la arquitectura plana, Render, Boostr y la PWA, pero mejora la experiencia móvil.
+Esta versión aplica el rediseño UX/UI y los cambios técnicos de prioridad alta sin cambiar la arquitectura plana.
 
-## Cambios principales
+## Variables OBLIGATORIAS en Render
 
-- Asistente tipo chat con `100dvh` y mejor manejo del teclado móvil.
-- La barra inferior se oculta mientras escribes para dejar más espacio al chat.
-- Botón ⚡ junto al cuadro de mensaje: abre Mantención, Diagnóstico y búsquedas de repuestos/catálogos.
-- Cuando el chat está vacío aparecen 6 accesos grandes como punto de partida.
-- La cabecera del chat es tocable y abre la ficha resumida del vehículo.
-- Cada respuesta de IA tiene: **Copiar**, **Guardar** y **Checklist**.
-- Guardar lleva la respuesta directamente a la Libreta del vehículo.
-- Checklist convierte pasos de la IA en casillas marcables dentro de la Libreta.
-- Respuestas largas se contraen con **Ver más / Ver menos**.
-- La IA recibe instrucciones para responder con Resumen, Pasos y Verificar cuando corresponde.
-- La app despierta/comprueba el backend al abrir y muestra `Conectando…` mientras Render responde.
-- Aviso visible si hay una versión nueva de la PWA.
-- Pantalla despierta mientras estás en Asistente, cuando el navegador lo permite.
-- Ficha Vehículo: resumen compacto, kilometraje visible, botones Consultar IA/Libreta y datos técnicos desplegables.
-- Vehículos recientes como accesos horizontales.
-- Controles táctiles de 48 px o más en acciones principales.
-- Build: `4.1.0-ux`.
+En **Render → Environment** define:
 
-## Seguridad opcional para las consultas Boostr
+- `APP_TOKEN`: inventa una cadena privada de **32 caracteres o más**. La app ahora **falla cerrado** si falta.
+- `BOOSTR_API_KEY`: tu clave de Boostr.
+- `GEMINI_API_KEY`: tu clave de Google AI Studio/Gemini.
+- `GEMINI_MODEL`: opcional; por defecto `gemini-3.8-flash`.
 
-La API de patente ya tenía rate-limit. Esta versión añade protección opcional con `APP_TOKEN`.
+En el teléfono abre **THOKAR → Ajustes → Token THOKAR** y pega exactamente el mismo `APP_TOKEN`. Las claves de Boostr y Gemini nunca se guardan en el teléfono.
 
-En Render → Environment puedes crear:
+## Cambios 4.2
 
-- `APP_TOKEN`: una cadena larga que inventes tú.
+- Sistema visual consistente: escala de superficies, radios, espacios y botones de 52 px.
+- Iconos SVG consistentes; se eliminaron iconos-emoji de las acciones principales.
+- Chat tipo WhatsApp con `interactive-widget=resizes-content`, control del teclado y navegación inferior oculta al escribir.
+- Botón Atrás de Android cierra primero hojas inferiores.
+- Streaming de Gemini desde el backend: la respuesta aparece mientras se genera.
+- Indicador de escritura con tres puntos y botón para volver al último mensaje.
+- Mensajes del usuario en rojo oscuro tintado para no saturar la interfaz.
+- Copiar, Guardar, Checklist y Compartir en respuestas de IA.
+- Guardar en Libreta es de un toque, con título automático y `Deshacer`.
+- Checklist se estructura con Gemini en JSON y muestra vista previa editable.
+- Checklist guardado muestra progreso `3/5` y casillas grandes.
+- `APP_TOKEN` obligatorio y comparación segura; rate limit para patente e IA.
+- Caché en memoria de consultas de patente (6 h por defecto) para no gastar consultas repetidas.
+- Gemini y Boostr viven solo en Render.
+- PWA: actualización manual segura. La versión nueva espera hasta que pulses **Actualizar**.
+- Ajustes incluye **Buscar actualización** y **Forzar actualización**.
+- Wake Lock reactivado al volver al Asistente; se puede desactivar en Ajustes.
+- Los borradores del chat se guardan localmente para no perder texto en una actualización/reinicio.
+- Manifest con atajos `Nueva consulta` y `Libreta` al mantener pulsado el icono (si Android lo admite).
+- Fechas amigables (`31 oct 2026`) y miles con punto.
 
-Luego en THOKAR → Ajustes → **Token THOKAR**, pega exactamente el mismo valor. El token se guarda solo en ese teléfono.
+## Subir
 
-Si NO configuras `APP_TOKEN` en Render, la app sigue funcionando como antes; la protección es opcional.
+1. Reemplaza en GitHub todos los archivos por los de este ZIP.
+2. Render → **Manual Deploy → Clear build cache & deploy**.
+3. Abre `/healthz`. Debe mostrar `build: "4.2.0-polish"`, `configured: true`, `geminiConfigured: true` y `protected: true`.
+4. En THOKAR → Ajustes pega el mismo `APP_TOKEN` de Render y pulsa **Probar conexión completa**.
 
-`BOOSTR_API_KEY` continúa guardándose solo en Render.
+## Importante
 
-## Actualizar en GitHub / Render
-
-1. Reemplaza los archivos del repositorio con los de este ZIP.
-2. En Render: **Manual Deploy → Clear build cache & deploy**.
-3. Comprueba `/healthz`. Debe mostrar:
-
-```json
-{
-  "ok": true,
-  "vehicleLookup": "boostr",
-  "configured": true,
-  "layout": "flat",
-  "build": "4.1.0-ux"
-}
-```
-
-Si usas `APP_TOKEN`, `/healthz` además mostrará `"protected": true`.
-
-## PWA instalada
-
-El Service Worker usa una caché nueva (`v12-ux`). Si Android mantiene una versión anterior, cierra y vuelve a abrir THOKAR. Si persiste, desinstala la PWA y vuelve a instalarla desde Chrome.
+El Service Worker usa `thokar-taller-v13-polish`. Ya no ejecuta `skipWaiting()` automáticamente durante la instalación; por eso no debería recargar la PWA mientras estás escribiendo.
