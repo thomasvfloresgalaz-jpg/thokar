@@ -1,28 +1,26 @@
-# THOKAR Taller — versión 3.2 FLEX
+# THOKAR Taller — parche PatenteChile 3.3.0-inputfix
 
-Versión para Render/GitHub con estructura plana.
+Esta versión mantiene la estructura plana de GitHub/Render y corrige la detección del formulario de PatenteChile.
 
-## Qué cambia
+## Qué cambió
 
-- El extractor ya no depende de una tarjeta/clase concreta de PatenteChile.
-- Lee tablas, listas de definición, pares etiqueta/valor y texto visible de la página completa.
-- Reconoce formatos `Etiqueta: valor`, `Etiqueta valor` y etiqueta/valor en líneas separadas.
-- Además de la ficha técnica, intenta reconocer antecedentes vehiculares como multas, revisión técnica/gases, permiso de circulación, SOAP, kilometraje registrado, transporte público, restricción, sello y siniestro cuando estén disponibles.
-- Los datos personales del propietario (nombre, RUT/RUN, dirección, teléfono, correo, fecha de nacimiento, etc.) se excluyen en el backend y no se envían al navegador.
-- Si vuelve a cambiar la página, el error SOURCE_CHANGED incluye únicamente etiquetas no personales observadas para facilitar el diagnóstico.
+- Busca primero el campo que la web pública muestra actualmente: `Ingrese Patente • Ejemplo AA1122 • BBCC11`.
+- Ya no depende de un único selector: revisa placeholder, aria-label, name, id, maxlength y el formulario cercano.
+- Busca también dentro de iframes si el sitio mueve el buscador.
+- Primero intenta usar el buscador tal como aparece al cargar la portada; solo pulsa `Buscar vehículos` si el campo no apareció.
+- El botón final se identifica como `Buscar`, evitando confundirlo con `Buscar vehículos`, `Buscar motos`, `Buscar por RUT` o `Buscar por VIN`.
+- Usa el user-agent real de Chromium/Playwright, en vez de uno con versión artificial.
+- Si vuelve a fallar, el error incluye únicamente metadatos seguros de los inputs visibles (tipo/placeholder/name), nunca valores escritos ni datos personales.
+- El filtro de datos del propietario se mantiene: no se recopilan nombre, RUT, dirección, teléfono o correo.
 
-## Subir la actualización
+## Actualización en GitHub
 
-1. Descomprime el ZIP.
-2. En GitHub, `Add file` -> `Upload files`.
-3. Reemplaza los archivos de la raíz por los de esta carpeta y confirma el commit.
-4. En Render: `Manual Deploy` -> `Clear build cache & deploy`.
-5. Comprueba `/healthz` y luego realiza una búsqueda desde THOKAR.
+Reemplaza los archivos de la raíz del repositorio con los de este ZIP. Después, en Render usa **Manual Deploy → Clear build cache & deploy**.
 
-## Comprobación local
+Comprueba primero `/healthz`. Debe incluir:
 
-```bash
-npm test
+```json
+{"ok":true,"app":"THOKAR Taller","vehicleLookup":"backend","layout":"flat","build":"3.3.0-inputfix"}
 ```
 
-Las pruebas verifican extracción en distintos formatos y que los campos de identidad del propietario se descartan.
+Después prueba la búsqueda desde la interfaz.

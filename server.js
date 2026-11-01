@@ -53,7 +53,7 @@ setInterval(() => {
 
 app.get('/healthz', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  res.json({ ok: true, app: 'THOKAR Taller', vehicleLookup: 'backend', layout: 'flat' });
+  res.json({ ok: true, app: 'THOKAR Taller', vehicleLookup: 'backend', layout: 'flat', build: '3.3.0-inputfix' });
 });
 
 app.get('/api/vehiculo/:patente', rateLimit, async (req, res) => {

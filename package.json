@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "3.2.0-flex",
+  "version": "3.3.0-inputfix",
   "private": true,
-  "description": "THOKAR Taller con backend robusto de consulta vehicular por patente y estructura plana.",
+  "description": "THOKAR Taller con backend robusto para PatenteChile y deteccion flexible del formulario.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -9,6 +9,7 @@ const {
 
 const SOURCE_URL = process.env.PATENTECHILE_URL || 'https://www.patentechile.com/';
 const SOURCE_TIMEOUT_MS = Math.max(10000, Number(process.env.SOURCE_TIMEOUT_MS || 55000));
+const UI_WAIT_MS = Math.min(18000, Math.max(6000, Number(process.env.SOURCE_UI_WAIT_MS || 12000)));
 
 let browserPromise;
 
@@ -43,62 +44,164 @@ async function detectBlocked(page) {
   }
 }
 
-async function findPlateInput(page) {
-  const preferredSet = page.locator([
-    'input[placeholder*="Patente" i]',
-    'input[placeholder*="AA1122" i]',
+async function isUsableInput(locator) {
+  return Boolean(
+    await locator.isVisible().catch(() => false) &&
+    await locator.isEnabled().catch(() => false)
+  );
+}
+
+async function findInputInFrame(frame) {
+  // 1) Selectores basados en la interfaz pública observada actualmente.
+  const preferredSelectors = [
+    'input[placeholder*="Ingrese Patente" i]',
+    'input[placeholder*="Ejemplo AA1122" i]',
     'input[placeholder*="BBCC11" i]',
+    'input[placeholder*="Patente" i]',
+    'input[aria-label*="patente" i]',
     'input[name*="patente" i]',
-    'input[id*="patente" i]'
-  ].join(', '));
-  const preferredCount = await preferredSet.count();
-  for (let i = 0; i < preferredCount; i += 1) {
-    const preferred = preferredSet.nth(i);
-    if (await preferred.isVisible().catch(() => false)) return preferred;
+    'input[id*="patente" i]',
+    'input[name*="ppu" i]',
+    'input[id*="ppu" i]'
+  ];
+
+  for (const selector of preferredSelectors) {
+    const matches = frame.locator(selector);
+    const count = await matches.count().catch(() => 0);
+    for (let i = 0; i < count; i += 1) {
+      const candidate = matches.nth(i);
+      if (await isUsableInput(candidate)) return candidate;
+    }
   }
 
-  const inputs = page.locator('input[type="text"], input[type="search"], input:not([type])');
-  const n = await inputs.count();
-  for (let i = 0; i < n; i += 1) {
+  // 2) Heurística: puntúa inputs visibles. Esto evita depender de una clase/ID concreto.
+  const inputs = frame.locator('input');
+  const count = await inputs.count().catch(() => 0);
+  let best = null;
+  let bestScore = -Infinity;
+
+  for (let i = 0; i < count; i += 1) {
     const el = inputs.nth(i);
-    if (!(await el.isVisible().catch(() => false))) continue;
-    const hint = [await el.getAttribute('placeholder'), await el.getAttribute('aria-label'), await el.getAttribute('name')]
-      .filter(Boolean).join(' ');
-    if (/patente|ppu|placa|AA1122|BBCC11/i.test(hint)) return el;
+    if (!(await isUsableInput(el))) continue;
+
+    const type = String(await el.getAttribute('type').catch(() => '') || 'text').toLowerCase();
+    if (['hidden', 'email', 'password', 'checkbox', 'radio', 'file', 'submit', 'button'].includes(type)) continue;
+
+    const placeholder = String(await el.getAttribute('placeholder').catch(() => '') || '');
+    const aria = String(await el.getAttribute('aria-label').catch(() => '') || '');
+    const name = String(await el.getAttribute('name').catch(() => '') || '');
+    const id = String(await el.getAttribute('id').catch(() => '') || '');
+    const maxLengthRaw = await el.getAttribute('maxlength').catch(() => null);
+    const maxLength = maxLengthRaw ? Number(maxLengthRaw) : NaN;
+    const hint = `${placeholder} ${aria} ${name} ${id}`;
+
+    let score = 0;
+    if (/ingrese\s+patente|patente|ppu|placa/i.test(hint)) score += 16;
+    if (/AA1122|BBCC11/i.test(hint)) score += 12;
+    if (Number.isFinite(maxLength) && maxLength >= 5 && maxLength <= 8) score += 6;
+    if (['text', 'search', 'tel'].includes(type)) score += 2;
+    if (/correo|email|nombre|coment|buscar\s+en\s+el\s+sitio|search\s+site/i.test(hint)) score -= 20;
+
+    const formText = await el.locator('xpath=ancestor::form[1]').innerText({ timeout: 1000 }).catch(() => '');
+    if (/buscar/i.test(formText)) score += 5;
+    if (/veh[ií]cul|moto|vin|rut/i.test(formText)) score += 2;
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = el;
+    }
   }
-  throw sourceError('SOURCE_CHANGED', 'No pude localizar el campo de patente en PatenteChile.', 502);
+
+  // Un score alto identifica el buscador aunque cambien clases/IDs.
+  if (best && bestScore >= 7) return best;
+  return null;
+}
+
+async function collectSafeInputHints(page) {
+  const hints = [];
+  for (const frame of page.frames()) {
+    const inputs = frame.locator('input');
+    const count = Math.min(12, await inputs.count().catch(() => 0));
+    for (let i = 0; i < count; i += 1) {
+      const el = inputs.nth(i);
+      if (!(await el.isVisible().catch(() => false))) continue;
+      const type = String(await el.getAttribute('type').catch(() => '') || 'text').toLowerCase();
+      const placeholder = String(await el.getAttribute('placeholder').catch(() => '') || '').slice(0, 80);
+      const name = String(await el.getAttribute('name').catch(() => '') || '').slice(0, 50);
+      // Solo metadatos del campo; jamás su value.
+      hints.push([type, placeholder, name].filter(Boolean).join('/'));
+      if (hints.length >= 8) return hints;
+    }
+  }
+  return hints;
+}
+
+async function findPlateInput(page, { soft = false } = {}) {
+  const deadline = Date.now() + UI_WAIT_MS;
+  do {
+    // El buscador podría estar en el documento principal o dentro de un iframe.
+    for (const frame of page.frames()) {
+      const candidate = await findInputInFrame(frame);
+      if (candidate) return candidate;
+    }
+    await page.waitForTimeout(300);
+  } while (Date.now() < deadline);
+
+  if (soft) return null;
+  const hints = await collectSafeInputHints(page);
+  const suffix = hints.length ? ` Inputs visibles: ${hints.join(', ')}.` : ' No había inputs visibles.';
+  throw sourceError(
+    'SOURCE_CHANGED',
+    'No pude localizar el campo de patente en PatenteChile.' + suffix,
+    502
+  );
 }
 
 async function clickVehicleMode(page) {
   const candidates = [
-    page.getByRole('button', { name: /buscar veh[ií]culos/i }).first(),
-    page.getByText(/buscar veh[ií]culos/i, { exact: true }).first()
+    page.getByRole('button', { name: /^\s*Buscar veh[ií]culos\s*$/i }).first(),
+    page.getByText(/^\s*Buscar veh[ií]culos\s*$/i, { exact: true }).first()
   ];
   for (const el of candidates) {
-    if (await el.count() && await el.isVisible().catch(() => false)) {
+    if (await el.count().catch(() => 0) && await el.isVisible().catch(() => false)) {
       await el.click({ timeout: 5000 }).catch(() => {});
-      return;
+      await page.waitForTimeout(250);
+      return true;
     }
   }
+  return false;
 }
 
 async function submitSearch(page, input) {
+  // Preferir el botón submit del mismo formulario.
   const form = input.locator('xpath=ancestor::form[1]');
-  if (await form.count()) {
-    const button = form.getByRole('button', { name: /buscar/i }).first();
-    if (await button.count() && await button.isVisible().catch(() => false)) {
-      await button.click();
-      return;
+  if (await form.count().catch(() => 0)) {
+    const exactButtons = form.locator('button, input[type="submit"]');
+    const count = await exactButtons.count().catch(() => 0);
+    for (let i = 0; i < count; i += 1) {
+      const btn = exactButtons.nth(i);
+      if (!(await btn.isVisible().catch(() => false))) continue;
+      const text = `${await btn.innerText().catch(() => '')} ${await btn.getAttribute('value').catch(() => '')}`
+        .replace(/[^a-záéíóúüñ]+/gi, ' ').trim();
+      if (/^buscar$/i.test(text) || /buscar/i.test(text)) {
+        await btn.click();
+        return;
+      }
     }
     await input.press('Enter');
     return;
   }
 
-  const visibleButtons = page.getByRole('button', { name: /buscar/i });
-  const n = await visibleButtons.count();
-  for (let i = n - 1; i >= 0; i -= 1) {
-    const btn = visibleButtons.nth(i);
-    if (await btn.isVisible().catch(() => false)) {
+  // Fuera de form: escoger el botón cuyo nombre sea exactamente "Buscar",
+  // no los tabs "Buscar vehículos / motos / RUT / VIN".
+  const buttons = page.getByRole('button');
+  const n = await buttons.count().catch(() => 0);
+  for (let i = 0; i < n; i += 1) {
+    const btn = buttons.nth(i);
+    if (!(await btn.isVisible().catch(() => false))) continue;
+    const name = String(await btn.innerText().catch(() => '') || '')
+      .replace(/[^a-záéíóúüñ]+/gi, ' ').trim();
+    if (/^buscar$/i.test(name)) {
       await btn.click();
       return;
     }
@@ -123,20 +226,17 @@ async function extractPageSnapshot(page) {
       rows.push([label, value]);
     };
 
-    // Tablas actuales o futuras.
     document.querySelectorAll('tr').forEach((tr) => {
       const cells = Array.from(tr.querySelectorAll(':scope > th, :scope > td'))
         .map((cell) => clean(cell.innerText, 260)).filter(Boolean);
       if (cells.length >= 2) add(cells[0], cells.slice(1).join(' '));
     });
 
-    // Listas de definición.
     document.querySelectorAll('dt').forEach((dt) => {
       const dd = dt.nextElementSibling;
       if (dd && dd.tagName && dd.tagName.toLowerCase() === 'dd') add(dt.innerText, dd.innerText);
     });
 
-    // Contenedores de dos columnas/card: etiqueta + valor.
     document.querySelectorAll('li, p, div, section').forEach((el) => {
       const children = Array.from(el.children || []).filter((c) => clean(c.innerText, 300));
       if (children.length !== 2) return;
@@ -145,11 +245,10 @@ async function extractPageSnapshot(page) {
       if (a && b && a.length <= 100 && b.length <= 220) add(a, b);
     });
 
-    // Etiquetas comunes seguidas por un hermano con valor.
     document.querySelectorAll('label, strong, b, th, [class*="label" i], [class*="title" i]').forEach((el) => {
       const a = clean(el.innerText, 120);
       if (!a || a.length > 100) return;
-      let sib = el.nextElementSibling;
+      const sib = el.nextElementSibling;
       if (sib) {
         const b = clean(sib.innerText, 240);
         if (b && b.length <= 220) add(a, b);
@@ -157,7 +256,6 @@ async function extractPageSnapshot(page) {
     });
 
     const text = clean(document.body && document.body.innerText, 30000);
-    // Mantener saltos para el parser línea-a-línea.
     const rawText = String((document.body && document.body.innerText) || '').slice(0, 30000);
     return { text: rawText, compactText: text, rows: rows.slice(0, 800) };
   });
@@ -178,7 +276,9 @@ async function lookupVehicle(requestedPlate) {
   const browser = await getBrowser();
   const context = await browser.newContext({
     locale: 'es-CL',
-    userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156 Safari/537.36'
+    viewport: { width: 1440, height: 1000 }
+    // Se usa el user-agent real del Chromium incluido con Playwright. Evita inconsistencias
+    // entre la versión del navegador y un UA inventado que algunos sitios pueden detectar.
   });
   const page = await context.newPage();
   page.setDefaultTimeout(SOURCE_TIMEOUT_MS);
@@ -192,10 +292,17 @@ async function lookupVehicle(requestedPlate) {
 
   try {
     await page.goto(SOURCE_URL, { waitUntil: 'domcontentloaded', timeout: SOURCE_TIMEOUT_MS });
+    await page.waitForLoadState('networkidle', { timeout: 7000 }).catch(() => {});
     await detectBlocked(page);
-    await clickVehicleMode(page);
 
-    const input = await findPlateInput(page);
+    // En la interfaz pública actual el modo vehículos ya muestra el input. Primero lo buscamos
+    // sin tocar tabs; solo si no aparece intentamos seleccionar "Buscar vehículos" y reintentar.
+    let input = await findPlateInput(page, { soft: true });
+    if (!input) {
+      await clickVehicleMode(page);
+      input = await findPlateInput(page);
+    }
+
     await input.fill(plate);
     await submitSearch(page, input);
 
@@ -215,7 +322,6 @@ async function lookupVehicle(requestedPlate) {
 
       vehicle = mergeVehicle(lastSnapshot, plate);
       if (hasUsefulVehicleData(vehicle)) {
-        // Un pequeño segundo muestreo permite que aparezcan bloques que cargan después del resumen principal.
         await page.waitForTimeout(900);
         const finalSnapshot = await extractPageSnapshot(page).catch(() => lastSnapshot);
         vehicle = mergeVehicle({
@@ -226,7 +332,6 @@ async function lookupVehicle(requestedPlate) {
       }
     }
 
-    // Diagnóstico seguro: solo etiquetas reconocibles, nunca contenido personal ni HTML bruto.
     const observed = [];
     for (const row of lastSnapshot.rows || []) {
       const label = String(row && row[0] || '').replace(/\s+/g, ' ').trim();
