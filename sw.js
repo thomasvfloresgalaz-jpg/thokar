@@ -1,6 +1,6 @@
-/* THOKAR 6.0.1 · network-first y actualización manual */
-const CACHE='thokar-taller-v34-android-recovery';
-const SHELL=['./','index.html','styles.css?v=621','lib.js?v=621','app.js?v=621','manifest.webmanifest?v=621','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
+/* THOKAR 6.2.2 · network-first y actualización manual */
+const CACHE='thokar-taller-v35-android-fix';
+const SHELL=['./','index.html','styles.css?v=622','lib.js?v=622','app.js?v=622','manifest.webmanifest?v=622','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)))});
 self.addEventListener('message',event=>{if(event.data&&event.data.type==='SKIP_WAITING')self.skipWaiting()});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
