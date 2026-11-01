@@ -2,7 +2,7 @@
 (function(){
 'use strict';
 var L=window.ThokarLib;
-var APP_BUILD='6.0.0-cabina';
+var APP_BUILD='6.0.1-cabina-hotfix';
 var K={settings:'thokar.settings',vehicles:'thokar.vehicles',chats:'thokar.chats',log:'thokar.log',draft:'thokar.draft'};
 var $=function(s,r){return (r||document).querySelector(s)};
 var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
@@ -153,6 +153,10 @@ function renderSettings(){var s=db.settings,it=s.serviceIntervals||defaults.serv
 function render(){var app=$('#app');app.innerHTML=screen==='home'?renderHome():screen==='workspace'?renderWorkspace():renderSettings();afterRender()}
 function afterRender(){applyTheme();if(screen==='workspace'){setupWorkspaceDrag();if(workspaceView==='talk'){var t=$('#talk-thread');if(t){t.addEventListener('scroll',updateJump,{passive:true});var draft=load(K.draft+'.chat.'+chatKey(),'');var ta=$('#chat-input');if(ta&&draft)ta.value=draft;scrollChatEnd()}}if(workspaceView==='record')hydratePhotos();if(workspaceView==='data'){var rr=cur.recommendations||{};if(!rr.loaded&&!rr.loading&&!rr.error)setTimeout(function(){ensureRecommendations(false)},120)}}else if(screen==='home'){setTimeout(function(){var p=$('#home-plate');if(p&&new URLSearchParams(location.search).get('new')==='1')p.focus()},60)}}
 function setupWorkspaceDrag(){var h=$('#workspace-handle'),s=$('#workspace-sheet');if(!h||!s)return;var y=0,d=0,on=false,base=0;h.addEventListener('pointerdown',function(e){on=true;y=e.clientY;base=s.getBoundingClientRect().height;h.setPointerCapture(e.pointerId)});h.addEventListener('pointermove',function(e){if(!on)return;d=e.clientY-y;var nh=Math.max(104,Math.min(innerHeight*.92,base-d));s.style.height=nh+'px'});h.addEventListener('pointerup',function(){if(!on)return;on=false;s.style.height='';var finalH=base-d,ratio=finalH/innerHeight;sheetLevel=ratio>.72?'full':ratio>.28?'medium':'peek';s.className='workspace-sheet '+sheetLevel;d=0});h.addEventListener('click',function(e){if(e.detail===0)return;sheetLevel=sheetLevel==='peek'?'medium':sheetLevel==='medium'?'full':'peek';s.className='workspace-sheet '+sheetLevel})}
+
+/* ---------- Wake Lock / viewport ---------- */
+async function updateWakeLock(){var need=db.settings.keepAwake!==false&&screen==='workspace'&&workspaceView==='talk'&&document.visibilityState==='visible';if(!need){if(wakeLock)try{await wakeLock.release()}catch(e){}wakeLock=null;return}if(!('wakeLock'in navigator)||wakeLock)return;try{wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',function(){wakeLock=null})}catch(e){}}
+function syncViewport(){var h=window.visualViewport?window.visualViewport.height:window.innerHeight;document.documentElement.style.setProperty('--vh',Math.round(h)+'px')}
 
 /* ---------- Backup ---------- */
 function exportBackup(){var data={app:'thokar-taller',version:2,fecha:new Date().toISOString(),vehicles:db.vehicles,log:db.log,chats:db.chats,settings:{theme:db.settings.theme,keepAwake:db.settings.keepAwake,serviceIntervals:db.settings.serviceIntervals}};var b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='thokar-respaldo-'+todayISO()+'.json';a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},500)}

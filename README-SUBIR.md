@@ -1,4 +1,4 @@
-# THOKAR 6.0.0 · Cabina / Sol
+# THOKAR 6.0.1.0 · Cabina / Sol
 
 Versión rediseñada de THOKAR sobre la misma arquitectura plana GitHub → Render → PWA Android.
 
@@ -37,7 +37,7 @@ No es necesario configurar el modelo de respaldo: THOKAR usa internamente `gemin
 
 ```json
 {
-  "build": "6.0.0-cabina",
+  "build": "6.0.1-cabina-hotfix",
   "configured": true,
   "geminiConfigured": true,
   "protected": true
