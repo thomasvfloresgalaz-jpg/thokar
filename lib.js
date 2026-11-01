@@ -196,30 +196,57 @@
 
   /* ---------- Textos para la IA, catálogos y recordatorios ---------- */
 
+  function identityValue(v, key) {
+    const m = (v && v.manualIdentity) || {};
+    const manual = tidy(m[key] || '');
+    if (manual) return manual;
+    return tidy((v && v[key]) || '');
+  }
+
   function vehicleLine(v) {
     const parts = [];
-    const base = [v.marca, v.modelo, v.version].filter(Boolean).join(' ');
+    const version = identityValue(v, 'version');
+    const motor = identityValue(v, 'motor');
+    const chasis = identityValue(v, 'chasis');
+    const cilindrada = identityValue(v, 'cilindrada');
+    const transmision = identityValue(v, 'transmision');
+    const codigoMotor = tidy(((v && v.manualIdentity) || {}).codigoMotor || '');
+    const base = [v.marca, v.modelo, version].filter(Boolean).join(' ');
     if (base) parts.push(base);
     if (v.anio) parts.push('año ' + v.anio);
     if (v.combustible) parts.push('combustible: ' + v.combustible);
-    if (v.motor) parts.push('n.° de motor: ' + v.motor);
-    if (v.chasis) parts.push('VIN/chasis: ' + v.chasis);
+    if (cilindrada) parts.push('cilindrada confirmada/disponible: ' + cilindrada);
+    if (codigoMotor) parts.push('código de motor confirmado por el usuario: ' + codigoMotor);
+    if (motor) parts.push('n.°/identificador de motor: ' + motor);
+    if (chasis) parts.push('VIN/chasis: ' + chasis);
+    if (transmision) parts.push('transmisión: ' + transmision);
     if (v.km) parts.push('kilometraje actual: ' + v.km + ' km');
     return parts.join('; ');
   }
 
+  function confirmedIdentityLine(v) {
+    const m = (v && v.manualIdentity) || {};
+    const labels = { chasis:'VIN/chasis', codigoMotor:'código de motor', motor:'n.° de motor', cilindrada:'cilindrada', version:'versión/motorización', transmision:'transmisión' };
+    return Object.keys(labels).filter(function(k){ return tidy(m[k] || ''); }).map(function(k){ return labels[k] + ': ' + tidy(m[k]); }).join('; ');
+  }
+
   function buildSystemPrompt(v) {
+    const confirmed = confirmedIdentityLine(v);
     return [
       'Eres el asistente técnico de THOKAR para un mecánico automotriz que trabaja a domicilio en Chile. Hablas de colega a colega, en español de Chile, directo y práctico.',
       'CONTEXTO ACTIVO ÚNICO: ' + (vehicleLine(v) || 'vehículo no identificado') + '.',
       'La patente activa es: ' + (v.plate || 'sin patente') + '.',
-      'IMPORTANTE: responde únicamente sobre el vehículo activo indicado arriba. No reutilices, mezcles ni supongas datos de otro vehículo mencionado en conversaciones anteriores. Si un dato del vehículo activo falta, dilo y pregunta por él.',
+      confirmed ? 'DATOS CONFIRMADOS POR EL USUARIO (AUTORIDAD MÁXIMA): ' + confirmed + '.' : 'No hay datos de identificación confirmados manualmente por el usuario.',
+      'IMPORTANTE: responde únicamente sobre el vehículo activo indicado arriba. No reutilices, mezcles ni supongas datos de otro vehículo mencionado en conversaciones anteriores.',
+      'Los datos confirmados por el usuario tienen prioridad absoluta sobre inferencias, recuerdos del modelo o datos genéricos de una familia de vehículos.',
+      'NO deduzcas una cilindrada exacta solo por marca/modelo, patente o número/serial de motor. Un número de motor puede ser un serial y no un código de familia. Si la cilindrada no aparece en el contexto ni está confirmada manualmente, di literalmente "cilindrada no confirmada" y pide VIN/código de motor o confirmación de catálogo.',
+      'Si existe un código de motor confirmado, úsalo como identificador técnico; aun así, si una especificación de repuesto no es inequívoca, indica que debe confirmarse por VIN/catálogo.',
       'Sirves para diagnóstico de fallas, procedimientos, repuestos y especificaciones, aceites y fluidos, sistema eléctrico, códigos OBD-II, reaprendizajes/adaptaciones, torques y herramientas.',
       'Reglas:',
       '1. Ante una falla, pregunta solo lo indispensable y ordena las causas de más probable/fácil de verificar a menos probable/difícil.',
       '2. Explica cómo comprobar cada causa: qué inspeccionar o medir, con qué herramienta y qué resultado esperar.',
-      '3. Para repuestos y especificaciones da primero la especificación y luego referencias o marcas solo cuando tengas certeza suficiente.',
-      '4. Nunca inventes números de parte, torques, capacidades, valores de medición ni procedimientos específicos. Si no puedes confirmarlos, dilo.',
+      '3. Para repuestos y especificaciones usa primero VIN, código de motor y datos confirmados. Da referencias o marcas solo cuando tengas certeza suficiente.',
+      '4. Nunca inventes cilindrada, números de parte, torques, capacidades, valores de medición ni procedimientos específicos. Si no puedes confirmarlos, dilo.',
       '5. Advierte riesgos relevantes de seguridad de forma breve.',
       '6. Empieza SIEMPRE con una línea exacta: Certeza: Alta, Certeza: Media o Certeza: Baja.',
       '7. Después usa, cuando corresponda: Resumen: (1-2 líneas), Pasos: (lista numerada corta) y Verificar: (fuente o medición que confirma el diagnóstico).',
@@ -233,7 +260,7 @@
     const mk = function (label, q) {
       return { label: label, url: 'https://www.google.com/search?q=' + encodeURIComponent(q) };
     };
-    const detail = [base, v.version, v.motor].filter(Boolean).join(' ').trim();
+    const detail = [base, identityValue(v, 'version'), ((v.manualIdentity||{}).codigoMotor||''), identityValue(v, 'motor'), identityValue(v, 'chasis')].filter(Boolean).join(' ').trim();
     return [
       mk('Aceite y filtro', detail + ' aceite motor viscosidad capacidad filtro aceite equivalencias'),
       mk('Bujías', detail + ' bujías NGK Denso equivalencias'),

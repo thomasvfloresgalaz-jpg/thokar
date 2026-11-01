@@ -37,7 +37,7 @@ No es necesario configurar el modelo de respaldo: THOKAR usa internamente `gemin
 
 ```json
 {
-  "build": "6.0.1-cabina-hotfix",
+  "build": "6.2.0-identity-fix",
   "configured": true,
   "geminiConfigured": true,
   "protected": true
@@ -50,3 +50,10 @@ No es necesario configurar el modelo de respaldo: THOKAR usa internamente `gemin
 ## Nota visual
 
 La V6 no carga fuentes ni recursos desde CDNs. Usa pilas tipográficas locales del sistema para mantener la PWA liviana y disponible sin conexión.
+
+
+## Cambios 6.2
+- VIN, código/número de motor, cilindrada, versión y transmisión pueden confirmarse manualmente.
+- Los datos manuales tienen prioridad para Gemini, catálogos y recomendaciones.
+- Gemini no puede inventar cilindrada si no está confirmada.
+- Cambiar Estado del caso ya no re-renderiza Datos ni devuelve el scroll arriba.

@@ -341,3 +341,34 @@ html[data-theme="sol"] .boot-sequence{background:#F3ECE6;color:#171110}
 html[data-theme="sol"] .boot-sequence strong{color:#8C0F17;text-shadow:none}
 html[data-theme="sol"] .boot-sequence .boot-code,html[data-theme="sol"] .boot-sequence small{color:#67504D}
 html[data-theme="sol"] .boot-sequence i{background:linear-gradient(90deg,transparent,#8C0F17,transparent)}
+
+
+/* ===== THOKAR 6.1 soft cabina ===== */
+:root{--soft-r:18px;--soft-r2:24px;--soft-r3:28px}
+.hud-panel,.card,.case-card,.modal-sheet,.action-tile,.quick-card,.zone-btn,.btn,.icon-btn,.search-dock,.data-section,.timeline-item,.service-item,.field input,.field textarea,.field select,.chat-input,.search-submit,.composer,.composer-wrap,.vehicle-hero,.workspace-sheet{border-radius:var(--soft-r)!important;clip-path:none!important}
+.field input,.field textarea,.field select,.chat-input{border-radius:16px!important}
+.plate-chip,.workspace-plate,.active-plate{border-radius:18px!important;clip-path:none!important}
+.btn,.icon-btn,.search-submit,.zone-btn,.quick-card,.action-tile,.search-dock,.hud-panel,.vehicle-hero{box-shadow:0 0 0 1px color-mix(in srgb,var(--line) 80%, transparent),0 10px 22px rgba(0,0,0,.12)}
+.home-top .tech-code{font-family:var(--font-head);letter-spacing:.08em;font-size:13px;color:var(--accent-2)}
+.home-top .screen-title{letter-spacing:.04em}
+.search-code{min-width:auto;padding:0 4px 0 0;color:var(--accent-2);font-family:var(--font-head);font-size:12px;letter-spacing:.08em}
+.hud-search{grid-template-columns:auto 1fr auto;gap:10px;padding:10px 10px 10px 14px}
+.hud-search input{font-family:var(--font-mono);font-size:16px}
+.car-panel{margin:16px 0 20px}.car-illustration.detailed{background:linear-gradient(180deg,color-mix(in srgb,var(--surface-2) 88%, transparent),var(--surface));border:1px solid color-mix(in srgb,var(--accent) 22%, var(--line));border-radius:24px!important;clip-path:none!important;overflow:hidden;position:relative;padding:18px 14px 16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 14px 28px rgba(0,0,0,.12)}
+.car-illustration.detailed:before{content:'';position:absolute;inset:0;background:linear-gradient(transparent 0,transparent 92%,rgba(255,255,255,.03) 100%);pointer-events:none}
+.car-figure.realistic{position:relative;max-width:520px;margin:0 auto;padding-bottom:10px}
+.car-figure.realistic svg{display:block;width:100%;height:auto}.car-silhouette{fill:color-mix(in srgb,var(--accent) 6%, var(--surface));stroke:none}.car-outline,.door-line,.hood-line,.rear-line,.susp-link{fill:none;stroke:color-mix(in srgb,var(--accent) 80%, var(--text-2));stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}.car-window-fill{fill:color-mix(in srgb,var(--text) 4%, transparent)}.car-window-line{fill:none;stroke:color-mix(in srgb,var(--accent) 55%, var(--text-2));stroke-width:2}.wheel-outer{fill:color-mix(in srgb,var(--surface-3) 70%, transparent);stroke:color-mix(in srgb,var(--accent) 70%, var(--text));stroke-width:2.6}.wheel-inner{fill:color-mix(in srgb,var(--accent) 8%, var(--surface));stroke:color-mix(in srgb,var(--accent) 70%, var(--text));stroke-width:1.8}.headlamp,.taillamp{fill:color-mix(in srgb,var(--accent) 35%, transparent);stroke:var(--accent);stroke-width:1.6}
+.hotspot.soft{position:absolute;border:1px solid color-mix(in srgb,var(--accent) 32%, var(--line));background:rgba(14,7,9,.88);color:var(--text);border-radius:999px!important;clip-path:none!important;padding:8px 12px;font:700 12px/1 var(--font-head);letter-spacing:.02em;display:flex;align-items:center;gap:8px;box-shadow:0 10px 18px rgba(0,0,0,.16),0 0 0 1px rgba(255,90,79,.05) inset}
+.hotspot.soft::before{content:'';width:8px;height:8px;border-radius:999px;background:var(--accent);box-shadow:0 0 10px rgba(255,90,79,.6)}.hotspot.soft:active{transform:scale(.98)}
+.hs-engine{left:39%;top:47%}.hs-brakes{right:7%;bottom:13%}.hs-wheel{left:9%;bottom:13%}.hs-susp{left:7%;top:58%}.hs-battery{right:17%;top:43%}.hs-cabin{left:42%;top:24%}
+.zone-list.enhanced{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}.zone-btn.soft{text-transform:none;font-family:var(--font-head);font-size:15px;font-weight:700;letter-spacing:.01em;padding:0 14px;background:linear-gradient(180deg,color-mix(in srgb,var(--surface-2) 90%, transparent),var(--surface));min-height:54px}.zone-help{font-family:var(--font-body);font-size:13px;color:var(--text-2)}
+body.theme-solar .car-illustration.detailed{background:linear-gradient(180deg,#fff,#f7f0ea);box-shadow:none}body.theme-solar .hotspot.soft{background:rgba(255,255,255,.96);color:#260609}body.theme-solar .hotspot.soft::before{box-shadow:none}
+@media (max-width:720px){.hotspot.soft{padding:7px 10px;font-size:11px}.hs-engine{left:36%;top:48%}.hs-cabin{left:39%;top:25%}.hs-battery{right:14%;top:44%}.hs-wheel{left:4%;bottom:12%}.hs-brakes{right:4%;bottom:12%}.hs-susp{left:5%;top:59%}}
+
+/* ===== THOKAR 6.2 · identificación técnica confirmable ===== */
+.identity-field{margin-top:14px}
+.identity-field:first-of-type{margin-top:10px}
+.identity-source{display:block;margin-top:6px;color:var(--text-2);font-size:12px;line-height:1.35}
+.identity-source.confirmed{color:var(--ok)}
+.identity-warning{margin-top:16px;padding:12px 14px;border:1px solid color-mix(in srgb,var(--warn) 38%,var(--line));background:color-mix(in srgb,var(--warn) 8%,var(--surface));border-radius:16px;color:var(--text-2);font-size:13px;line-height:1.45}
+html[data-theme="sol"] .identity-warning{background:#fff7e8;border-color:#c58a2b;color:#4a3520}
