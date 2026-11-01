@@ -213,7 +213,7 @@ app.get('/healthz', (req, res) => {
     model: geminiConfig().model,
     layout: 'flat',
     protected: tokenReady,
-    build: '6.2.2-android-fix'
+    build: '6.2.3-plates-zones'
   });
 });
 

@@ -37,7 +37,7 @@ No es necesario configurar el modelo de respaldo: THOKAR usa internamente `gemin
 
 ```json
 {
-  "build": "6.2.2-android-fix",
+  "build": "6.2.3-plates-zones",
   "configured": true,
   "geminiConfigured": true,
   "protected": true
