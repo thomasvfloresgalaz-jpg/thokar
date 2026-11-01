@@ -1,6 +1,8 @@
 const path = require('path');
 const express = require('express');
-const { lookupVehicle, cleanPlate } = require('./autoRiesgoProvider');
+const { lookupVehicle, closeBrowser } = require('./patenteChileProvider');
+const { cleanPlate } = require('./vehicleParser');
+const { probePatenteChile } = require('./patenteChileProbe');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -18,12 +20,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// Límite local conservador para evitar abuso del endpoint gratuito.
+// Límite simple por IP para proteger la fuente y evitar consultas masivas.
 const buckets = new Map();
 function rateLimit(req, res, next) {
   const now = Date.now();
   const windowMs = 60_000;
-  const limit = Math.max(1, Math.min(10, Number(process.env.PLATE_REQUESTS_PER_MINUTE || 4)));
+  const limit = Math.max(1, Number(process.env.PLATE_REQUESTS_PER_MINUTE || 8));
   const key = req.ip || req.socket.remoteAddress || 'unknown';
   const previous = buckets.get(key) || [];
   const active = previous.filter((ts) => now - ts < windowMs);
@@ -32,7 +34,7 @@ function rateLimit(req, res, next) {
     res.setHeader('Retry-After', '60');
     return res.status(429).json({
       ok: false,
-      error: { code: 'RATE_LIMIT', message: 'Demasiadas consultas. Espera un minuto e intenta nuevamente.' }
+      error: { code: 'RATE_LIMIT', message: 'Demasiadas consultas. Intenta de nuevo en un minuto.' }
     });
   }
 
@@ -48,18 +50,25 @@ setInterval(() => {
     if (active.length) buckets.set(key, active);
     else buckets.delete(key);
   }
-}, 15_000).unref();
+}, 60_000).unref();
 
 app.get('/healthz', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  res.json({
-    ok: true,
-    app: 'THOKAR Taller',
-    vehicleLookup: 'autoriesgo-agent',
-    configured: true,
-    layout: 'flat',
-    build: '4.1.0-autoriesgo'
-  });
+  res.json({ ok: true, app: 'THOKAR Taller', vehicleLookup: 'patentechile-probe', layout: 'flat', build: '3.4.0-bridge-probe' });
+});
+
+app.get('/api/diagnostico/patentechile', rateLimit, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const result = await probePatenteChile();
+    return res.json(result);
+  } catch (error) {
+    return res.status(502).json({
+      ok: false,
+      stage: 'probe',
+      message: error.message || 'No se pudo ejecutar la sonda de PatenteChile.'
+    });
+  }
 });
 
 app.get('/api/vehiculo/:patente', rateLimit, async (req, res) => {
@@ -75,7 +84,7 @@ app.get('/api/vehiculo/:patente', rateLimit, async (req, res) => {
 
   try {
     const vehicle = await lookupVehicle(plate);
-    return res.json({ ok: true, source: 'AutoRiesgo', vehicle });
+    return res.json({ ok: true, source: 'patentechile.com', vehicle });
   } catch (error) {
     const status = Number(error.status || 502);
     return res.status(status).json({
@@ -88,8 +97,8 @@ app.get('/api/vehiculo/:patente', rateLimit, async (req, res) => {
   }
 });
 
-// Estructura plana: sólo estos archivos de la raíz se publican.
-// autoRiesgoProvider.js, server.js, .env y el resto del backend NO se sirven al navegador.
+// Estructura plana: solo estos archivos de la raíz se pueden descargar.
+// Así server.js, patenteChileProvider.js, vehicleParser.js, .env, etc. NO quedan públicos.
 const PUBLIC_FILES = new Set([
   'index.html',
   'app.js',
@@ -119,6 +128,8 @@ for (const filename of PUBLIC_FILES) {
   app.get(`/${filename}`, (req, res) => sendPublicFile(req, res, filename));
 }
 
+// SPA fallback: cualquier ruta de interfaz vuelve a index.html.
+// Las APIs inexistentes siguen devolviendo JSON 404.
 app.get('/{*splat}', (req, res) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({
@@ -130,11 +141,14 @@ app.get('/{*splat}', (req, res) => {
 });
 
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`THOKAR escuchando en puerto ${PORT} · proveedor AutoRiesgo agent`);
+  console.log(`THOKAR escuchando en puerto ${PORT} (estructura plana)`);
 });
 
-function shutdown() {
-  server.close(() => process.exit(0));
+async function shutdown() {
+  server.close(async () => {
+    await closeBrowser();
+    process.exit(0);
+  });
   setTimeout(() => process.exit(1), 10_000).unref();
 }
 

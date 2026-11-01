@@ -5,7 +5,7 @@ services:
     healthCheckPath: /healthz
     autoDeploy: true
     envVars:
-      - key: AUTORIESGO_TIMEOUT_MS
-        value: 12000
+      - key: SOURCE_TIMEOUT_MS
+        value: 45000
       - key: PLATE_REQUESTS_PER_MINUTE
-        value: 4
+        value: 8
