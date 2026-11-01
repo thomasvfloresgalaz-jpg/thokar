@@ -1,19 +1,19 @@
-# THOKAR 6.0.1.0 · Cabina / Sol
+# THOKAR 6.2.3 · Control de consultas IA
 
-Versión rediseñada de THOKAR sobre la misma arquitectura plana GitHub → Render → PWA Android.
+Hotfix sobre la rama Cabina / Sol para evitar consultas innecesarias y avisos 429 confusos.
 
 ## Cambios principales
 
-- Nuevo sistema visual **Cabina** (oscuro retrofuturista rojo) y **Sol** (alto contraste para trabajo exterior).
-- Inicio renombrado visualmente a **Registro de unidades**.
-- Vehículos/casos con patente, datos, actividad y estado LED.
-- Espacio de trabajo por vehículo con ficha superior y hoja inferior en 3 alturas: asomada, media y completa.
-- Vistas **Hablar / Registro / Datos** dentro de la hoja.
-- Al consultar una patente nueva se abre primero **Datos**, para confirmar marca/modelo/motor antes de usar el chat.
-- `Guardar vehículo` y `Estado del caso` quedan al final de Datos.
-- Datos confirmados ahora muestran recomendaciones automáticas de Gemini para aceite, filtro, bujías y refrigerante. La sugerencia se presenta como orientación y se puede copiar al campo confirmado.
-- Gemini incorpora reintentos automáticos y fallback interno a un modelo Flash estable para errores transitorios/timeouts.
-- Se mantiene separación de chats por patente, eliminación de vehículo, informe de servicio, checklists, fotos, Wake Lock, respaldo, Boostr y seguridad con APP_TOKEN.
+- **Datos ya no consulta Gemini automáticamente** al abrir la pestaña.
+- Las recomendaciones de aceite, filtro, bujías y refrigerante se consultan solo cuando tú presionas **Consultar / actualizar recomendaciones IA**.
+- Las recomendaciones quedan guardadas por patente.
+- Si cambias VIN, motor, cilindrada, versión o transmisión, la recomendación anterior queda marcada como desactualizada, pero THOKAR **no vuelve a consultar por sí solo**.
+- Bloqueo de consultas duplicadas y cooldown corto para evitar dobles toques.
+- El backend hace como máximo **dos intentos externos** a Gemini por una acción del usuario.
+- Los errores 429 ahora distinguen: límite de THOKAR, límite temporal de Gemini o límite de búsquedas de patente.
+- Si el servidor informa `Retry-After`, THOKAR muestra cuántos segundos hay que esperar.
+- `AI_REQUESTS_PER_MINUTE` queda en 30 como margen de seguridad, pero el cambio principal es que ya no se generan solicitudes automáticas.
+- Se mantienen Cabina/Sol, chats por patente, identificación técnica confirmable, Registro, fotos, Boostr, Wake Lock y APP_TOKEN.
 
 ## Variables de Render
 
@@ -23,11 +23,11 @@ Obligatorias:
 - `BOOSTR_API_KEY`
 - `GEMINI_API_KEY`
 
-Opcional:
+Configuración incluida:
 
-- `GEMINI_MODEL` (por defecto `gemini-3.8-flash`)
-
-No es necesario configurar el modelo de respaldo: THOKAR usa internamente `gemini-3.6-flash` si el modelo principal falla de forma transitoria.
+- `GEMINI_MODEL=gemini-3.8-flash`
+- `PLATE_REQUESTS_PER_MINUTE=12`
+- `AI_REQUESTS_PER_MINUTE=30`
 
 ## Despliegue
 
@@ -37,23 +37,15 @@ No es necesario configurar el modelo de respaldo: THOKAR usa internamente `gemin
 
 ```json
 {
-  "build": "6.2.4-data-order",
+  "build": "6.2.3-rate-fix",
   "configured": true,
   "geminiConfigured": true,
   "protected": true
 }
 ```
 
-4. En THOKAR → Ajustes, pega el mismo `APP_TOKEN` de Render.
-5. Si la PWA conserva una versión anterior, usa **Forzar actualización**.
+4. Si el teléfono conserva archivos anteriores, usa **Forzar actualización** una vez.
 
-## Nota visual
+## Comportamiento esperado
 
-La V6 no carga fuentes ni recursos desde CDNs. Usa pilas tipográficas locales del sistema para mantener la PWA liviana y disponible sin conexión.
-
-
-## Cambios 6.2
-- VIN, código/número de motor, cilindrada, versión y transmisión pueden confirmarse manualmente.
-- Los datos manuales tienen prioridad para Gemini, catálogos y recomendaciones.
-- Gemini no puede inventar cilindrada si no está confirmada.
-- Cambiar Estado del caso ya no re-renderiza Datos ni devuelve el scroll arriba.
+Abrir **Datos** no consume IA. Ver o editar VIN/motor/cilindrada tampoco consume IA. Solo se consulta Gemini al enviar un mensaje de chat, probar la conexión o pulsar expresamente el botón de recomendaciones.

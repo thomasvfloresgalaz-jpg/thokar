@@ -73,14 +73,14 @@ function makeRateLimit({ windowMs, limit, code = 'RATE_LIMIT' }) {
     if (active.length >= limit) {
       const retry = Math.max(1, Math.ceil((windowMs - (now - active[0])) / 1000));
       res.setHeader('Retry-After', String(retry));
-      return res.status(429).json({ ok: false, error: { code, message: 'Demasiadas solicitudes. Espera un momento e intenta nuevamente.' } });
+      return res.status(429).json({ ok: false, retryAfter: retry, error: { code, retryAfter: retry, message: 'Demasiadas solicitudes. Espera un momento e intenta nuevamente.' } });
     }
     active.push(now); buckets.set(key, active); next();
   };
 }
 
-const plateRateLimit = makeRateLimit({ windowMs: 60_000, limit: Math.max(2, Math.min(30, Number(process.env.PLATE_REQUESTS_PER_MINUTE || 12))) });
-const aiRateLimit = makeRateLimit({ windowMs: 60_000, limit: Math.max(2, Math.min(60, Number(process.env.AI_REQUESTS_PER_MINUTE || 20))), code: 'AI_RATE_LIMIT' });
+const plateRateLimit = makeRateLimit({ windowMs: 60_000, limit: Math.max(2, Math.min(30, Number(process.env.PLATE_REQUESTS_PER_MINUTE || 12))), code: 'PLATE_RATE_LIMIT' });
+const aiRateLimit = makeRateLimit({ windowMs: 60_000, limit: Math.max(2, Math.min(60, Number(process.env.AI_REQUESTS_PER_MINUTE || 30))), code: 'AI_RATE_LIMIT' });
 
 const plateCache = new Map();
 const PLATE_CACHE_MS = Math.max(60_000, Math.min(24 * 60 * 60 * 1000, Number(process.env.PLATE_CACHE_MS || 6 * 60 * 60 * 1000)));
@@ -151,14 +151,16 @@ async function googleGeminiFetch(mode, input, signal, modelOverride) {
   const suffix = mode === 'stream' ? ':streamGenerateContent?alt=sse' : ':generateContent';
   const response = await fetch(`${GEMINI_BASE}/models/${encodeURIComponent(selectedModel)}${suffix}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-Taller/6.0.1' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-Taller/6.2.3' },
     body: JSON.stringify(body), signal
   });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
     const error = new Error(geminiErrorMessage(response.status, payload));
-    error.status = response.status === 429 ? 429 : 502;
+    error.status = response.status === 429 ? 429 : response.status;
     error.code = response.status === 429 ? 'GEMINI_RATE_LIMIT' : 'GEMINI_API_ERROR';
+    const retryAfter = Number(response.headers.get('retry-after') || 0);
+    if (Number.isFinite(retryAfter) && retryAfter > 0) error.retryAfter = Math.ceil(retryAfter);
     throw error;
   }
   return response;
@@ -174,28 +176,26 @@ function geminiRetryable(error) {
 async function googleGeminiFetchResilient(mode, input, outerSignal) {
   const cfg = geminiConfig();
   const models = [cfg.model, cfg.fallbackModel].filter((v, i, a) => v && a.indexOf(v) === i);
-  const delays = [0, 1400];
+  const attempts = models.slice(0, 2); // máximo dos llamadas externas por acción del usuario
   let lastError;
-  for (let m = 0; m < models.length; m++) {
-    for (let attempt = 0; attempt < delays.length; attempt++) {
-      if (outerSignal && outerSignal.aborted) { const e = new Error('Solicitud cancelada.'); e.name = 'AbortError'; throw e; }
-      if (delays[attempt]) await new Promise((r) => setTimeout(r, delays[attempt] + Math.floor(Math.random() * 450)));
-      const ctl = new AbortController();
-      const onAbort = () => ctl.abort();
-      if (outerSignal) outerSignal.addEventListener('abort', onAbort, { once: true });
-      const perAttemptMs = mode === 'stream' ? 34_000 : 32_000;
-      const timer = setTimeout(() => ctl.abort(), perAttemptMs);
-      try {
-        const response = await googleGeminiFetch(mode, input, ctl.signal, models[m]);
-        clearTimeout(timer);
-        if (outerSignal) outerSignal.removeEventListener('abort', onAbort);
-        return response;
-      } catch (error) {
-        clearTimeout(timer);
-        if (outerSignal) outerSignal.removeEventListener('abort', onAbort);
-        lastError = error;
-        if (!geminiRetryable(error)) throw error;
-      }
+  for (let attempt = 0; attempt < attempts.length; attempt++) {
+    if (outerSignal && outerSignal.aborted) { const e = new Error('Solicitud cancelada.'); e.name = 'AbortError'; throw e; }
+    if (attempt) await new Promise((r) => setTimeout(r, 1800 + Math.floor(Math.random() * 350)));
+    const ctl = new AbortController();
+    const onAbort = () => ctl.abort();
+    if (outerSignal) outerSignal.addEventListener('abort', onAbort, { once: true });
+    const perAttemptMs = mode === 'stream' ? 42_000 : 38_000;
+    const timer = setTimeout(() => ctl.abort(), perAttemptMs);
+    try {
+      const response = await googleGeminiFetch(mode, input, ctl.signal, attempts[attempt]);
+      clearTimeout(timer);
+      if (outerSignal) outerSignal.removeEventListener('abort', onAbort);
+      return response;
+    } catch (error) {
+      clearTimeout(timer);
+      if (outerSignal) outerSignal.removeEventListener('abort', onAbort);
+      lastError = error;
+      if (!geminiRetryable(error) || attempt === attempts.length - 1) throw error;
     }
   }
   throw lastError || new Error('Gemini no respondió.');
@@ -213,7 +213,7 @@ app.get('/healthz', (req, res) => {
     model: geminiConfig().model,
     layout: 'flat',
     protected: tokenReady,
-    build: '6.2.4-data-order'
+    build: '6.2.3-rate-fix'
   });
 });
 
@@ -251,7 +251,9 @@ app.post('/api/ai/json', aiRateLimit, async (req, res) => {
   } catch (error) {
     const status = error.name === 'AbortError' ? 504 : Number(error.status || 502);
     const code = error.name === 'AbortError' ? 'GEMINI_TIMEOUT' : (error.code || 'GEMINI_FAILED');
-    return res.status(status).json({ ok: false, error: { code, message: error.name === 'AbortError' ? 'Gemini tardó demasiado en responder.' : error.message } });
+    const retryAfter = Number(error.retryAfter || 0);
+    if (status === 429 && retryAfter > 0) res.setHeader('Retry-After', String(Math.ceil(retryAfter)));
+    return res.status(status).json({ ok: false, retryAfter: retryAfter || undefined, error: { code, retryAfter: retryAfter || undefined, message: error.name === 'AbortError' ? 'Gemini tardó demasiado en responder.' : error.message } });
   } finally { clearTimeout(timer); }
 });
 
@@ -293,7 +295,9 @@ app.post('/api/ai/stream', aiRateLimit, async (req, res) => {
   } catch (error) {
     if (!res.headersSent) {
       const status = error.name === 'AbortError' ? 504 : Number(error.status || 502);
-      return res.status(status).json({ ok: false, error: { code: error.code || 'GEMINI_FAILED', message: error.name === 'AbortError' ? 'Gemini tardó demasiado en responder.' : error.message } });
+      const retryAfter = Number(error.retryAfter || 0);
+      if (status === 429 && retryAfter > 0) res.setHeader('Retry-After', String(Math.ceil(retryAfter)));
+      return res.status(status).json({ ok: false, retryAfter: retryAfter || undefined, error: { code: error.code || 'GEMINI_FAILED', retryAfter: retryAfter || undefined, message: error.name === 'AbortError' ? 'Gemini tardó demasiado en responder.' : error.message } });
     }
     res.end();
   } finally { clearTimeout(timer); }
@@ -301,7 +305,7 @@ app.post('/api/ai/stream', aiRateLimit, async (req, res) => {
 
 const PUBLIC_FILES = new Set([
   'index.html', 'app.js', 'lib.js', 'styles.css', 'sw.js', 'manifest.webmanifest',
-  'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'plate-chile.svg'
+  'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'
 ]);
 
 function sendPublicFile(req, res, filename) {
