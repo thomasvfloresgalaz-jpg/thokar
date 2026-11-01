@@ -1,21 +1,31 @@
-# THOKAR 5.1.0 · Tabs
+# THOKAR 5.2.0 · Chat y Registro
 
-Esta versión corrige la navegación de THOKAR 5.0 a partir del uso real en teléfono.
+Esta versión parte de THOKAR 5.1 y corrige problemas detectados usando la app desde el teléfono.
 
 ## Cambios principales
 
-- Se mantiene **Inicio** como pantalla principal con los vehículos/casos guardados.
-- Las tarjetas de Inicio muestran patente, marca/modelo/año, motor, combustible, kilometraje, última actividad y estado cuando esos datos existen.
-- El buscador de patente ahora es una barra compacta inferior con botón de búsqueda por icono.
-- Al abrir un vehículo se entra a una **pantalla completa**, sin hoja inferior arrastrable.
-- Arriba a la izquierda aparece el botón **Inicio** con icono de casa.
-- La pantalla del vehículo tiene tres pestañas fijas: **Chat / Registro / Datos**.
-- El Chat usa todo el espacio disponible y su historial puede desplazarse normalmente hacia arriba y abajo.
-- Registro y Datos tienen su propio scroll normal de pantalla.
-- Se recupera por defecto la identidad oscura de THOKAR: negro/gris oscuro + rojo.
-- El tema claro sigue disponible manualmente desde Ajustes.
-- Buscar otra patente sigue limpiando el contexto activo y el chat de esa nueva búsqueda para no mezclar vehículos.
-- Se conserva toda la lógica de Boostr, Gemini, Libreta, IndexedDB, APP_TOKEN y Service Worker.
+- El chat ya no se vuelve a renderizar completo al enviar un mensaje. Esto elimina el salto visual hacia arriba y luego hacia abajo.
+- El streaming actualiza únicamente la respuesta que está escribiendo la IA y respeta la posición del usuario si está leyendo mensajes anteriores.
+- Cada historial de chat se guarda automáticamente bajo su **patente**. En Chat aparece una indicación de la patente cuyo historial se está usando.
+- La acción ambigua **Guardar** fue reemplazada por **Registrar diagnóstico**. Esto copia esa respuesta de IA al Registro de la patente actual; no controla el guardado del chat.
+- **Crear checklist** guarda el checklist dentro de Registro para esa misma patente y muestra un botón **Ver checklist** para ir directamente a él.
+- En Registro, **Informe de servicio** y **Registrar** ya no flotan ni tapan información: aparecen únicamente al final de la lista.
+- El formulario Registrar añade un campo opcional **Próximo trabajo / mantención**, además de próxima fecha y próximo kilometraje.
+- El Informe de servicio fue reescrito para el cliente. Separa trabajo realizado, diagnóstico/revisión, repuestos/recomendaciones y próxima mantención.
+- Se mantienen Inicio, pantalla completa del vehículo y pestañas **Chat / Registro / Datos** de la versión 5.1.
+- Se mantiene el cambio automático de contexto por patente para que Gemini no mezcle vehículos.
+
+## Informe de servicio
+
+El texto compartible usa solo información realmente guardada en Registro. Puede incluir:
+
+- trabajo realizado;
+- diagnóstico o revisión;
+- repuestos/recomendaciones;
+- checklists realizados;
+- próxima mantención o trabajo, con fecha y/o kilometraje.
+
+Si completas el nombre del cliente en Datos, el informe también lo usa en el saludo.
 
 ## Render
 
@@ -37,11 +47,11 @@ Comprueba:
 Debe incluir:
 
 ```json
-"build": "5.1.0-tabs"
+"build": "5.2.0-service-log"
 ```
 
 ## Actualización en Android
 
-El Service Worker usa ahora la caché `thokar-taller-v21-tabs`.
+El Service Worker usa la caché `thokar-taller-v22-service-log`.
 
-Si la PWA continúa mostrando el diseño anterior, usa **Ajustes → Forzar actualización**.
+Si la PWA continúa mostrando una versión anterior, usa **Ajustes → Forzar actualización**.

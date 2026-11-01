@@ -187,3 +187,14 @@ html[data-theme="dark"] .status-chip.diagnostico{background:#4C3610;color:#FFD78
   .case-card{grid-template-columns:78px 1fr;align-items:start}
   .case-card .status-chip{grid-column:2;justify-self:start;margin-top:4px}
 }
+
+/* ===== THOKAR 5.2 · registro al final y chat sin saltos ===== */
+.record-actions{
+  position:static!important;
+  bottom:auto!important;
+  margin-top:24px;
+  padding:16px 0 calc(12px + var(--safe-bottom));
+  background:none!important;
+}
+.workspace-scroll{scroll-padding-bottom:24px}
+.chat-autosave{flex:0 0 auto;padding:7px 2px 5px;color:var(--text-2);font-size:12px;text-align:center}

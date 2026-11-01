@@ -1,5 +1,5 @@
-/* THOKAR 5.1 · network-first y actualización manual */
-const CACHE='thokar-taller-v21-tabs';
+/* THOKAR 5.2 · network-first y actualización manual */
+const CACHE='thokar-taller-v22-service-log';
 const SHELL=['./','index.html','styles.css','lib.js','app.js','manifest.webmanifest','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)))});
 self.addEventListener('message',event=>{if(event.data&&event.data.type==='SKIP_WAITING')self.skipWaiting()});
