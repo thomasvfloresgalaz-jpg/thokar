@@ -15,7 +15,7 @@ app.use(express.json({ limit: '3mb' }));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=()');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   next();
@@ -149,7 +149,7 @@ async function googleGeminiFetch(mode, input, signal) {
   const suffix = mode === 'stream' ? ':streamGenerateContent?alt=sse' : ':generateContent';
   const response = await fetch(`${GEMINI_BASE}/models/${encodeURIComponent(model)}${suffix}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-Taller/4.2.0' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-Taller/5.0.0' },
     body: JSON.stringify(body), signal
   });
   if (!response.ok) {
@@ -174,7 +174,7 @@ app.get('/healthz', (req, res) => {
     model: geminiConfig().model,
     layout: 'flat',
     protected: tokenReady,
-    build: '4.2.0-polish'
+    build: '5.0.0-workspace'
   });
 });
 

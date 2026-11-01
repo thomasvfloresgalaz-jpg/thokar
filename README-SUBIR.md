@@ -1,48 +1,78 @@
-# THOKAR 4.2.0 — POLISH / PWA
+# THOKAR 5.0.0 · Workspace
 
-Esta versión aplica el rediseño UX/UI y los cambios técnicos de prioridad alta sin cambiar la arquitectura plana.
+Rediseño completo de la PWA manteniendo el backend Node/Render, Boostr y Gemini.
 
-## Variables OBLIGATORIAS en Render
+## Cambios principales
 
-En **Render → Environment** define:
+- Inicio con casos recientes y buscador de patente fijo abajo.
+- Buscar una patente distinta limpia automáticamente los datos técnicos del vehículo anterior y abre un contexto nuevo de IA.
+- Se eliminó el botón **Vehículo nuevo**. El cambio de vehículo se hace buscando otra patente.
+- Abrir un vehículo guardado desde Inicio conserva el historial propio de ese vehículo.
+- Espacio de trabajo por vehículo con hoja inferior arrastrable y tres vistas: **Hablar / Registro / Datos**.
+- Tema claro de alto contraste como predeterminado, oscuro y automático opcionales.
+- Asistente en formato documento, no burbujas para la IA; mensajes propios en píldoras.
+- Respuestas en streaming, indicador de certeza, pasos marcables, copiar/guardar/checklist/compartir.
+- Acciones rápidas, dictado, cámara y dibujo genérico original con zonas de consulta.
+- Registro por línea de tiempo, fotos nuevas en IndexedDB, checklists con progreso e informe compartible.
+- Datos confirmados, cliente opcional con WhatsApp, km por visita y próximos servicios.
+- Wake Lock solo en Hablar.
+- Service Worker network-first con actualización manual y botón Forzar actualización.
+- `APP_TOKEN` obligatorio en backend, rate limit y caché de patentes se conservan.
 
-- `APP_TOKEN`: inventa una cadena privada de **32 caracteres o más**. La app ahora **falla cerrado** si falta.
-- `BOOSTR_API_KEY`: tu clave de Boostr.
-- `GEMINI_API_KEY`: tu clave de Google AI Studio/Gemini.
-- `GEMINI_MODEL`: opcional; por defecto `gemini-3.8-flash`.
+## Migración
 
-En el teléfono abre **THOKAR → Ajustes → Token THOKAR** y pega exactamente el mismo `APP_TOKEN`. Las claves de Boostr y Gemini nunca se guardan en el teléfono.
+La versión 5.0 conserva las claves de almacenamiento existentes:
 
-## Cambios 4.2
+- `thokar.settings`
+- `thokar.vehicles`
+- `thokar.chats`
+- `thokar.log`
+- `thokar.draft`
 
-- Sistema visual consistente: escala de superficies, radios, espacios y botones de 52 px.
-- Iconos SVG consistentes; se eliminaron iconos-emoji de las acciones principales.
-- Chat tipo WhatsApp con `interactive-widget=resizes-content`, control del teclado y navegación inferior oculta al escribir.
-- Botón Atrás de Android cierra primero hojas inferiores.
-- Streaming de Gemini desde el backend: la respuesta aparece mientras se genera.
-- Indicador de escritura con tres puntos y botón para volver al último mensaje.
-- Mensajes del usuario en rojo oscuro tintado para no saturar la interfaz.
-- Copiar, Guardar, Checklist y Compartir en respuestas de IA.
-- Guardar en Libreta es de un toque, con título automático y `Deshacer`.
-- Checklist se estructura con Gemini en JSON y muestra vista previa editable.
-- Checklist guardado muestra progreso `3/5` y casillas grandes.
-- `APP_TOKEN` obligatorio y comparación segura; rate limit para patente e IA.
-- Caché en memoria de consultas de patente (6 h por defecto) para no gastar consultas repetidas.
-- Gemini y Boostr viven solo en Render.
-- PWA: actualización manual segura. La versión nueva espera hasta que pulses **Actualizar**.
-- Ajustes incluye **Buscar actualización** y **Forzar actualización**.
-- Wake Lock reactivado al volver al Asistente; se puede desactivar en Ajustes.
-- Los borradores del chat se guardan localmente para no perder texto en una actualización/reinicio.
-- Manifest con atajos `Nueva consulta` y `Libreta` al mantener pulsado el icono (si Android lo admite).
-- Fechas amigables (`31 oct 2026`) y miles con punto.
+Los vehículos guardados, libreta y chats existentes se leen directamente. Se agregan campos nuevos sin borrar los anteriores. Los chats también se copian a IndexedDB al iniciar la versión 5.0. Las fotos nuevas del Registro se guardan en IndexedDB.
 
-## Subir
+## Render: variables necesarias
+
+En **Render → Environment** deben existir:
+
+- `APP_TOKEN` — 32 caracteres o más. Es el mismo valor que se escribe en Ajustes > Token THOKAR.
+- `BOOSTR_API_KEY` — API key de Boostr.
+- `GEMINI_API_KEY` — API key de Gemini.
+- `GEMINI_MODEL` — el modelo Gemini que tengas habilitado en tu cuenta.
+
+No pongas las claves de Boostr ni Gemini en el frontend o GitHub.
+
+## Despliegue
 
 1. Reemplaza en GitHub todos los archivos por los de este ZIP.
-2. Render → **Manual Deploy → Clear build cache & deploy**.
-3. Abre `/healthz`. Debe mostrar `build: "4.2.0-polish"`, `configured: true`, `geminiConfigured: true` y `protected: true`.
-4. En THOKAR → Ajustes pega el mismo `APP_TOKEN` de Render y pulsa **Probar conexión completa**.
+2. En Render usa **Manual Deploy → Clear build cache & deploy**.
+3. Abre `/healthz` y confirma:
 
-## Importante
+```json
+{
+  "ok": true,
+  "vehicleLookup": "boostr",
+  "configured": true,
+  "geminiConfigured": true,
+  "protected": true,
+  "build": "5.0.0-workspace"
+}
+```
 
-El Service Worker usa `thokar-taller-v13-polish`. Ya no ejecuta `skipWaiting()` automáticamente durante la instalación; por eso no debería recargar la PWA mientras estás escribiendo.
+4. Abre THOKAR en el teléfono.
+5. En **Ajustes**, pega en `Token THOKAR` el mismo `APP_TOKEN` de Render.
+6. Pulsa **Probar conexión**.
+
+## Prueba recomendada del cambio automático de vehículo
+
+1. Busca una patente A y realiza una pregunta a la IA.
+2. Vuelve a Inicio.
+3. Busca una patente B distinta.
+4. La ficha debe mostrar solo los datos de B.
+5. La vista Hablar de B debe empezar sin mensajes de A.
+6. Pregunta a la IA por el vehículo B y confirma que la respuesta mencione solo su marca/modelo/motor.
+7. Vuelve a Inicio y abre A desde Casos recientes: A conserva su propio historial.
+
+## Android/PWA
+
+La app usa `100dvh`, `interactive-widget=resizes-content`, `visualViewport`, safe areas y History API. El botón Atrás cierra primero modales/hojas. La actualización nueva solo se activa al tocar **Actualizar**.

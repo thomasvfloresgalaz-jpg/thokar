@@ -1,12 +1,12 @@
 {
   "name": "thokar-taller",
-  "version": "4.2.0-polish",
+  "version": "5.0.0",
   "private": true,
-  "description": "THOKAR Taller PWA con backend Node, Boostr API y Gemini en streaming.",
+  "description": "THOKAR 5.0 · PWA de taller centrada en casos de vehículo, Boostr y Gemini.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test boostrProvider.test.js"
+    "test": "node --test *.test.js"
   },
   "engines": {
     "node": ">=22"

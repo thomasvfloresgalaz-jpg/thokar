@@ -1,1115 +1,179 @@
-/* THOKAR Taller - interfaz y conexión con Gemini */
-(function () {
-  'use strict';
-  var L = window.ThokarLib;
-  var APP_BUILD = '4.2.0-polish';
-  var K = { settings: 'thokar.settings', vehicles: 'thokar.vehicles', chats: 'thokar.chats', log: 'thokar.log', draft: 'thokar.draft' };
-
-  /* ---------- Almacenamiento (con respaldo en memoria) ---------- */
-  var storageOk = true;
-  function load(k, def) {
-    try { var s = localStorage.getItem(k); return s ? JSON.parse(s) : def; } catch (e) { storageOk = false; return def; }
-  }
-  function save(k, v) {
-    try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { storageOk = false; }
-  }
-  function emptyVehicle() {
-    return { plate: '', dv: '', tipo: '', marca: '', modelo: '', version: '', anio: '', color: '', combustible: '', motor: '', chasis: '', procedencia: '', regionProcedencia: '', fabricante: '', km: '', cilindrada: '', puertas: '', transmision: '', codigoSii: '', tasacionFiscal: '', tipoSello: '', multas: '', mesRevision: '', revisionTecnica: '', revisionGases: '', permisoCirculacion: '', soap: '', kmRegistrado: '', transportePublico: '', tipoTransportePublico: '', restriccion: '', siniestrado: '' };
-  }
-  var db = {
-    settings: load(K.settings, { appToken: '', keepAwake: true, quickRecent: [] }),
-    vehicles: load(K.vehicles, {}),
-    chats: load(K.chats, {}),
-    log: load(K.log, {})
-  };
-  if (db.settings.keepAwake === undefined) db.settings.keepAwake = true;
-  if (!Array.isArray(db.settings.quickRecent)) db.settings.quickRecent = [];
-  var cur = Object.assign(emptyVehicle(), load(K.draft, {}));
-  var tab = (new URLSearchParams(location.search).get('tab') || 'vehiculo');
-  if (['vehiculo','asistente','libreta','ajustes'].indexOf(tab) < 0) tab = 'vehiculo';
-  var busy = false;
-  var pendingImage = '';
-  var installEvent = null;
-  var wakeLock = null;
-  var backendState = 'idle';
-  var backendBuild = '';
-  var backendInfo = {};
-  var keyboardOpen = false;
-  var swRegistration = null;
-  var toastAction = null;
-  var sheetOpen = false;
-  var sheetStatePushed = false;
-  var jumpButtonVisible = false;
-  var launchNewChat = new URLSearchParams(location.search).get('new') === '1';
-
-  function persist(which) {
-    (which || ['settings', 'vehicles', 'chats', 'log']).forEach(function (n) { save(K[n], db[n]); });
-  }
-  function saveDraft() { save(K.draft, cur); }
-
-  /* ---------- Utilidades ---------- */
-  function $(sel, root) { return (root || document).querySelector(sel); }
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
-  function todayISO() {
-    var d = new Date();
-    var p = function (n) { return (n < 10 ? '0' : '') + n; };
-    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
-  }
-  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-
-  var toastTimer;
-  function vibrate(ms) { try { if (navigator.vibrate) navigator.vibrate(ms || 10); } catch (e) {} }
-  function toast(msg, actionLabel, action) {
-    var root = $('#toast-root');
-    toastAction = typeof action === 'function' ? action : null;
-    root.innerHTML = '<div class="toast" role="status"><span>' + esc(msg) + '</span>' +
-      (toastAction && actionLabel ? '<button id="btn-toast-action">' + esc(actionLabel) + '</button>' : '') + '</div>';
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { root.innerHTML = ''; toastAction = null; }, toastAction ? 6500 : 3800);
-  }
-
-  function md(text) {
-    var out = [], list = null;
-    function inline(s) {
-      return s
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/`([^`]+)`/g, '<code>$1</code>');
-    }
-    function closeList() {
-      if (list) { out.push('</' + list + '>'); list = null; }
-    }
-    esc(text).split('\n').forEach(function (l) {
-      var ul = l.match(/^\s*[-*•]\s+(.*)$/);
-      var ol = l.match(/^\s*\d+[.)]\s+(.*)$/);
-      if (ul || ol) {
-        var type = ol ? 'ol' : 'ul';
-        if (list !== type) { closeList(); out.push('<' + type + '>'); list = type; }
-        out.push('<li>' + inline((ol || ul)[1]) + '</li>');
-        return;
-      }
-      closeList();
-      if (!l.trim()) return;
-      if (/^(Resumen|Pasos|Verificar|Advertencia|Causas probables):/i.test(l.trim())) {
-        var parts = l.split(':');
-        var head = parts.shift();
-        out.push('<div class="ai-section-line"><strong>' + inline(head) + ':</strong>' + (parts.length ? ' ' + inline(parts.join(':').trim()) : '') + '</div>');
-      } else {
-        out.push('<div>' + inline(l) + '</div>');
-      }
-    });
-    closeList();
-    return out.join('');
-  }
-
-  /* ---------- Hojas emergentes ---------- */
-  function setupSheetDrag(sheet) {
-    var grabber = $('.sheet-grabber', sheet);
-    if (!grabber) return;
-    var startY = 0, dy = 0, dragging = false;
-    grabber.addEventListener('pointerdown', function (e) { dragging = true; startY = e.clientY; dy = 0; grabber.setPointerCapture(e.pointerId); });
-    grabber.addEventListener('pointermove', function (e) { if (!dragging) return; dy = Math.max(0, e.clientY - startY); sheet.style.transform = 'translateY(' + dy + 'px)'; });
-    grabber.addEventListener('pointerup', function () { dragging = false; sheet.style.transform = ''; if (dy > 72) closeSheet(); });
-  }
-  function openSheet(html, mount) {
-    var root = $('#sheet-root');
-    if (!sheetOpen) { history.pushState({ thokarSheet: true }, '', location.href); sheetStatePushed = true; }
-    sheetOpen = true;
-    root.innerHTML = '<div class="sheet-bg" data-sheet-bg><div class="sheet" role="dialog" aria-modal="true"><div class="sheet-grabber" aria-hidden="true"><span></span></div>' + html + '</div></div>';
-    var bg = $('[data-sheet-bg]', root);
-    bg.addEventListener('click', function (e) { if (e.target === bg) closeSheet(); });
-    var sheet = $('.sheet', root); setupSheetDrag(sheet);
-    if (mount) mount(sheet);
-    var first = $('.sheet textarea, .sheet input', root);
-    if (first) setTimeout(function () { first.focus(); }, 40);
-  }
-  function closeSheet(fromPop) {
-    if (!sheetOpen) return;
-    sheetOpen = false; $('#sheet-root').innerHTML = '';
-    if (!fromPop && sheetStatePushed && history.state && history.state.thokarSheet) { sheetStatePushed = false; history.back(); }
-    else if (fromPop) sheetStatePushed = false;
-  }
-  window.addEventListener('popstate', function () { if (sheetOpen) closeSheet(true); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
-
-  /* ---------- IA por backend THOKAR ---------- */
-  function fail(msg, status) { var e = new Error(msg); e.handled = true; if (status) e.status = status; return e; }
-  function authHeaders(extra) {
-    var headers = Object.assign({ 'Accept': 'application/json' }, extra || {});
-    var token = (db.settings.appToken || '').trim();
-    if (token) headers['X-THOKAR-TOKEN'] = token;
-    return headers;
-  }
-  function backendError(status, body) {
-    var er = body && body.error ? body.error : {}, code = er.code || '';
-    if (code === 'APP_NOT_PROTECTED') return 'Configura APP_TOKEN en Render con al menos 32 caracteres.';
-    if (code === 'APP_AUTH' || status === 401) return 'THOKAR rechazó el token. Revisa APP_TOKEN en Render y Token THOKAR en Ajustes.';
-    if (code === 'ORIGIN_DENIED' || status === 403) return 'El backend rechazó el origen de la solicitud.';
-    if (code === 'GEMINI_NOT_CONFIGURED') return 'Falta configurar GEMINI_API_KEY en Render.';
-    if (code === 'GEMINI_RATE_LIMIT' || code === 'AI_RATE_LIMIT' || status === 429) return 'La IA recibió demasiadas solicitudes. Espera un momento e intenta nuevamente.';
-    if (code === 'GEMINI_TIMEOUT' || status === 504) return 'Gemini tardó demasiado en responder. Intenta nuevamente.';
-    return er.message || ('El backend no pudo completar la solicitud (' + status + ').');
-  }
-  async function backendJson(path, body) {
-    if (!navigator.onLine) throw fail('Sin internet. Conéctate para continuar.');
-    var res;
-    try { res = await fetch(path, { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), cache: 'no-store', body: JSON.stringify(body) }); }
-    catch (e) { throw fail('No pude comunicarme con el backend de THOKAR.'); }
-    var data = await res.json().catch(function () { return {}; });
-    if (!res.ok || !data.ok) throw fail(backendError(res.status, data), res.status);
-    return data.text || '';
-  }
-  async function geminiJson(body) { return backendJson('/api/ai/json', body); }
-  async function geminiStream(body, onChunk) {
-    if (!navigator.onLine) throw fail('Sin internet. Conéctate para usar el asistente.');
-    var res;
-    try { res = await fetch('/api/ai/stream', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), cache: 'no-store', body: JSON.stringify(body) }); }
-    catch (e) { throw fail('No pude comunicarme con el backend de THOKAR.'); }
-    if (!res.ok) { var data = await res.json().catch(function () { return {}; }); throw fail(backendError(res.status, data), res.status); }
-    if (!res.body || !res.body.getReader) { var text = await res.text(); if (text) onChunk(text); return text; }
-    var reader = res.body.getReader(), decoder = new TextDecoder(), full = '';
-    while (true) { var part = await reader.read(); if (part.done) break; var chunk = decoder.decode(part.value, { stream: true }); if (chunk) { full += chunk; onChunk(chunk); } }
-    return full.trim();
-  }
-
-  /* ---------- Búsqueda automática por patente (backend THOKAR) ---------- */
-  function vehicleApiError(status, body) {
-    var er = body && body.error ? body.error : {};
-    var code = er.code || '';
-    if (code === 'INVALID_PLATE' || status === 400) return 'La patente no tiene un formato válido.';
-    if (code === 'APP_NOT_PROTECTED') return 'Configura APP_TOKEN en Render con al menos 32 caracteres antes de usar las APIs.';
-    if (code === 'APP_AUTH' || status === 401) return 'THOKAR rechazó el token de acceso. Revisa APP_TOKEN en Render y en Ajustes.';
-    if (code === 'NOT_FOUND' || status === 404) return 'No encontré información técnica para esa patente.';
-    if (code === 'RATE_LIMIT' || status === 429) return 'Se hicieron demasiadas consultas. Espera un minuto e intenta otra vez.';
-    if (code === 'BOOSTR_NOT_CONFIGURED') return 'Falta configurar BOOSTR_API_KEY en Render.';
-    if (code === 'BOOSTR_AUTH') return 'Boostr rechazó la API key. Revisa BOOSTR_API_KEY en Render.';
-    if (code === 'BOOSTR_RATE_LIMIT') return 'Boostr alcanzó su límite de consultas. Espera unos segundos e intenta otra vez.';
-    if (code === 'BOOSTR_TIMEOUT' || status === 504) return 'Boostr tardó demasiado en responder. Intenta nuevamente.';
-    if (code === 'BOOSTR_UNAVAILABLE') return 'No se pudo conectar con Boostr API. Intenta nuevamente.';
-    if (code === 'BOOSTR_BAD_RESPONSE' || code === 'BOOSTR_API_ERROR' || code === 'BOOSTR_HTTP_ERROR') return er.message || 'Boostr devolvió una respuesta que THOKAR no pudo procesar.';
-    if (er.message) return er.message;
-    if (status >= 500) return 'El servidor de THOKAR no pudo completar la consulta de patente.';
-    return 'No se pudo consultar la patente (' + status + ').';
-  }
-
-  function lookupStatus(message, isError) {
-    var out = $('#lookup-status');
-    if (!out) return;
-    if (isError === 'loading') {
-      out.innerHTML = '<span class="lookup-loading"><span class="skeleton sk1"></span><span class="skeleton sk2"></span></span>';
-      out.style.color = '';
-      return;
-    }
-    out.textContent = message || '';
-    out.style.color = isError ? 'var(--red)' : '';
-  }
-
-  async function lookupPlate() {
-    if (busy) return;
-    if (!L.isPlateOk(cur.plate)) { toast('Escribe la patente primero.'); return; }
-    if (!navigator.onLine) { toast('Sin internet.'); return; }
-    if (backendState !== 'ok') {
-      toast('Despertando el servidor…');
-      try { await wakeBackend(true); } catch (e) { toast(e.message || 'El servidor no respondió.'); return; }
-    }
-    var btn = $('#btn-lookup');
-    busy = true;
-    lookupStatus('', 'loading');
-    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Buscando…'; }
-    var ctl = new AbortController();
-    var timer = setTimeout(function () { ctl.abort(); }, 60000);
-    try {
-      var headers = { 'Accept': 'application/json' };
-      if ((db.settings.appToken || '').trim()) headers['X-THOKAR-TOKEN'] = (db.settings.appToken || '').trim();
-      var res = await fetch('/api/vehiculo/' + encodeURIComponent(cur.plate), {
-        method: 'GET', headers: headers, cache: 'no-store', signal: ctl.signal
-      });
-      var body = await res.json().catch(function () { return {}; });
-      if (!res.ok || !body.ok) throw fail(vehicleApiError(res.status, body), res.status);
-      var found = body.vehicle || {};
-      var got = Object.keys(found).filter(function (k) { return k !== 'plate' && found[k]; });
-      if (!got.length) throw fail('La fuente respondió, pero no entregó campos técnicos reconocibles.');
-      delete found.plate;
-      var labels = applyFound(found);
-      lookupStatus('Datos técnicos encontrados en ' + (body.source || 'la fuente') + ': ' + labels.join(', ') + '. Verifícalos con la documentación del vehículo.', false);
-      toast('Datos técnicos cargados.');
-    } catch (e) {
-      var msg = e.handled ? e.message : (e.name === 'AbortError'
-        ? 'La consulta superó el tiempo máximo. Intenta nuevamente.'
-        : 'No pude comunicarme con el backend de THOKAR. Revisa que esta versión esté desplegada como aplicación Node, no como sitio estático.');
-      lookupStatus(msg, true);
-      toast(msg);
-    } finally {
-      clearTimeout(timer);
-      busy = false;
-      var b2 = $('#btn-lookup');
-      if (b2) { b2.disabled = false; b2.innerHTML = 'Buscar datos por patente'; }
-    }
-  }
-
-  /* ---------- Vehículo ---------- */
-  function chatKey() { return cur.plate || '_sin_patente'; }
-  function vehicleName() {
-    return [cur.marca, cur.modelo, cur.version].filter(Boolean).join(' ');
-  }
-
-  function applyFound(found, source) {
-    var labels = { plate: 'patente', dv: 'dígito verificador', tipo: 'tipo', marca: 'marca', modelo: 'modelo', version: 'versión', anio: 'año', color: 'color', motor: 'motor', chasis: 'chasis/VIN', combustible: 'combustible', procedencia: 'país de procedencia', regionProcedencia: 'región de procedencia', fabricante: 'fabricante', cilindrada: 'cilindrada', puertas: 'puertas', transmision: 'transmisión', codigoSii: 'código SII', tasacionFiscal: 'tasación fiscal', tipoSello: 'tipo de sello', multas: 'multas', mesRevision: 'mes de revisión', revisionTecnica: 'revisión técnica', revisionGases: 'revisión de gases', permisoCirculacion: 'permiso de circulación', soap: 'SOAP', kmRegistrado: 'kilometraje registrado', transportePublico: 'transporte público', tipoTransportePublico: 'tipo de transporte público', restriccion: 'restricción vehicular', siniestrado: 'siniestrado' };
-    var got = [];
-    Object.keys(found).forEach(function (k) {
-      if (found[k]) { cur[k] = found[k]; got.push(labels[k] || k); }
-    });
-    saveDraft();
-    fillForm();
-    return got;
-  }
-
-  function fillForm() {
-    ['plate', 'tipo', 'marca', 'modelo', 'version', 'anio', 'color', 'combustible', 'motor', 'chasis', 'procedencia', 'fabricante', 'km'].forEach(function (f) {
-      var el = $('#f-' + f);
-      if (el) el.value = f === 'km' ? L.formatKm(cur.km) : (cur[f] || '');
-    });
-  }
-
-  function onField(e) {
-    var el = e.target;
-    if (!el.id || el.id.indexOf('f-') !== 0) return;
-    var f = el.id.slice(2);
-    if (f === 'plate') {
-      cur.plate = L.cleanPlate(el.value);
-      el.value = cur.plate;
-      var saved = db.vehicles[cur.plate];
-      if (saved && !cur.marca && !cur.modelo) { cur = Object.assign(emptyVehicle(), saved); fillForm(); toast('Vehículo cargado desde guardados.'); }
-    } else if (f === 'km') {
-      cur.km = String(el.value).replace(/\D/g, '').slice(0, 7);
-      el.value = L.formatKm(cur.km);
-    } else {
-      cur[f] = el.value;
-    }
-    saveDraft();
-  }
-
-  function saveVehicle() {
-    if (!L.isPlateOk(cur.plate)) { toast('Escribe la patente (5 o 6 caracteres) para guardar.'); return; }
-    if (!cur.marca && !cur.modelo) { toast('Completa al menos marca y modelo.'); return; }
-    db.vehicles[cur.plate] = Object.assign({}, cur);
-    persist(['vehicles']);
-    toast('Vehículo guardado.');
-    render();
-  }
-
-  function loadVehicle(plate) {
-    if (!db.vehicles[plate]) return;
-    cur = Object.assign(emptyVehicle(), db.vehicles[plate]);
-    saveDraft();
-    render();
-    window.scrollTo(0, 0);
-  }
-
-  function deleteVehicle(plate) {
-    openSheet(
-      '<h3>¿Borrar ' + esc(plate) + '?</h3><p class="muted">Se borra el vehículo guardado, su chat y su libreta de mantención. No se puede deshacer.</p>' +
-      '<div class="btn-row" style="margin-top:16px"><button class="btn" data-sheet-close>Cancelar</button><button class="btn danger" id="confirm-del">Borrar</button></div>',
-      function (s) {
-        $('[data-sheet-close]', s).addEventListener('click', closeSheet);
-        $('#confirm-del', s).addEventListener('click', function () {
-          delete db.vehicles[plate]; delete db.chats[plate]; delete db.log[plate];
-          persist(); closeSheet(); render();
-        });
-      });
-  }
-
-  function openPaste() {
-    openSheet(
-      '<h3>Pegar datos de la patente</h3>' +
-      '<p class="muted small">Abre el buscador que usas, copia el resultado completo y pégalo aquí. La app toma datos del vehículo y antecedentes administrativos útiles (marca, modelo, año, motor, chasis, revisión, SOAP, multas y similares). Los datos personales del propietario se ignoran y no se guardan.</p>' +
-            '<div class="field"><label for="paste-text">Texto copiado</label><textarea id="paste-text" placeholder="Pega aquí"></textarea></div>' +
-      '<div class="btn-row" style="margin-top:14px"><button class="btn" data-sheet-close>Cancelar</button><button class="btn primary" id="do-paste">Leer datos</button></div>',
-      function (s) {
-        $('[data-sheet-close]', s).addEventListener('click', closeSheet);
-        $('#do-paste', s).addEventListener('click', function () {
-          var found = L.parsePasted($('#paste-text', s).value);
-          var got = applyFound(found);
-          closeSheet();
-          toast(got.length ? 'Datos leídos: ' + got.join(', ') + '. Verifícalos antes de comprar repuestos.' : 'No encontré datos del vehículo en ese texto.');
-        });
-      });
-  }
-
-  function loadImage(file) {
-    return new Promise(function (resolve, reject) {
-      var url = URL.createObjectURL(file);
-      var img = new Image();
-      img.onload = function () {
-        var max = 1280, w = img.naturalWidth, h = img.naturalHeight;
-        var scale = Math.min(1, max / Math.max(w, h));
-        var c = document.createElement('canvas');
-        c.width = Math.round(w * scale); c.height = Math.round(h * scale);
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        URL.revokeObjectURL(url);
-        resolve(c.toDataURL('image/jpeg', 0.85).split(',')[1]);
-      };
-      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('No pude abrir esa imagen.')); };
-      img.src = url;
-    });
-  }
-
-  async function readPhoto(file) {
-    if (!file) return;
-    var btn = $('#btn-photo');
-    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Leyendo…'; }
-    try {
-      var b64 = await loadImage(file);
-      var prompt = 'La imagen es un permiso de circulación, padrón o certificado de un vehículo de Chile. ' +
-        'Extrae SOLO datos del vehículo, nunca del propietario. Responde únicamente un JSON con estas claves: ' +
-        'patente, marca, modelo, anio, motor, chasis, combustible. Usa "" si un dato no se ve con claridad. ' +
-        'Copia patente, motor y chasis carácter por carácter, sin adivinar.';
-      var text = await geminiJson({
-        contents: [{ role: 'user', parts: [{ inline_data: { mime_type: 'image/jpeg', data: b64 } }, { text: prompt }] }],
-        generationConfig: { temperature: 0, responseMimeType: 'application/json' }
-      });
-      var got = applyFound(L.parseModelJson(text));
-      toast(got.length ? 'Leí: ' + got.join(', ') + '. Compara motor y chasis con el papel.' : 'No pude leer datos en esa foto. Prueba con más luz.');
-    } catch (e) {
-      toast(e.handled ? e.message : (e.message || 'No se pudo leer la foto.'));
-    } finally {
-      if (btn) { btn.disabled = false; btn.innerHTML = 'Foto del permiso'; }
-    }
-  }
-
-  /* ---------- Asistente ---------- */
-  var QUICK = [
-    ['Aceite y filtro', 'Qué aceite (viscosidad y norma), cuántos litros aproximados y qué filtro de aceite lleva este vehículo.'],
-    ['Bujías', 'Qué bujías lleva este vehículo (tipo, rosca, gap si lo sabes) y cada cuánto se cambian.'],
-    ['Pastillas delanteras', 'Qué pastillas de freno delanteras lleva este vehículo y qué marcas de repuesto sirven.'],
-    ['Refrigerante', 'Qué refrigerante (tipo y especificación) y qué capacidad aproximada del circuito tiene este vehículo.'],
-    ['Correa o cadena', 'Este motor usa correa o cadena de distribución, y cada cuánto se revisa o se cambia.'],
-    ['Ralentí inestable', 'Este vehículo tiene el ralentí inestable o bajo. Hazme las preguntas que necesites y dame las causas probables con cómo comprobar cada una.'],
-    ['Tras desconectar batería', 'Se desconectó la batería o se cambió el alternador y ahora el motor anda raro. Qué reaprendizajes o adaptaciones necesita este vehículo y qué más conviene revisar.'],
-    ['Códigos de falla', 'Voy a darte códigos de falla OBD-II de este vehículo. Dime qué datos necesitas y cómo interpretarlos.']
-  ];
-
-  function loadChatImage(file) {
-    return loadImage(file);
-  }
-
-  async function ask(text) {
-    text = String(text || '').trim();
-    if (busy) return;
-    if (!text && !pendingImage) return;
-    if (!text) text = 'Mira esta foto y dime qué ves y qué podría ser.';
-    if (!(db.settings.appToken || '').trim()) { toast('Primero configura el Token THOKAR en Ajustes.'); setTab('ajustes'); return; }
-    var key = chatKey(), th = db.chats[key] = db.chats[key] || [], image = pendingImage; pendingImage = '';
-    var now = Date.now();
-    th.push({ role: 'user', text: text + (image ? '  [foto adjunta]' : ''), at: now });
-    var modelMessage = { role: 'model', text: '', streaming: true, at: now + 1 }; th.push(modelMessage);
-    busy = true; persist(['chats']); render(); scrollChatEnd();
-    try {
-      var recent = th.slice(0, -1).filter(function (m) { return !m.error && !m.streaming; }).slice(-12);
-      var contents = recent.map(function (m) { return { role: m.role, parts: [{ text: m.text }] }; });
-      if (image && contents.length) contents[contents.length - 1].parts.unshift({ inline_data: { mime_type: 'image/jpeg', data: image } });
-      var modelIndex = th.length - 1;
-      await geminiStream({ systemInstruction: { parts: [{ text: L.buildSystemPrompt(cur) }] }, contents: contents, generationConfig: { temperature: 0.3 } }, function (chunk) {
-        modelMessage.text += chunk; modelMessage.streaming = false;
-        var node = $('[data-msg-content="' + modelIndex + '"]');
-        if (node) { node.innerHTML = md(modelMessage.text); node.classList.remove('streaming-placeholder'); }
-        var thread = $('#chat-thread'); if (thread && thread.scrollHeight - thread.scrollTop - thread.clientHeight < 160) thread.scrollTop = thread.scrollHeight;
-      });
-      modelMessage.streaming = false;
-      if (!modelMessage.text.trim()) throw fail('Gemini no devolvió una respuesta.');
-    } catch (e) { modelMessage.streaming = false; modelMessage.error = true; modelMessage.text = e.message || 'Error inesperado.'; }
-    if (th.length > 50) db.chats[key] = th.slice(-50);
-    busy = false; persist(['chats']); render(); scrollChatEnd();
-  }
-  function retryMessage(index) {
-    var list = db.chats[chatKey()] || [], i = Number(index), prev = list[i - 1];
-    if (!prev || prev.role !== 'user') return toast('No encontré la pregunta original para reintentar.');
-    list.splice(i, 1); persist(['chats']); ask(String(prev.text || '').replace(/\s+\[foto adjunta\]$/, ''));
-  }
-  function scrollChatEnd() {
-    var box = $('#chat-thread'); if (!box) return;
-    requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; updateJumpLatest(); });
-  }
-
-  /* ---------- Libreta ---------- */
-  function openEntry() {
-    if (!L.isPlateOk(cur.plate)) { toast('Escribe y guarda la patente primero.'); setTab('vehiculo'); return; }
-    var jobs = ['Cambio de aceite y filtro', 'Pastillas de freno', 'Refrigerante', 'Bujías', 'Diagnóstico con escáner', 'Filtro de aire', 'Otro trabajo'];
-    openSheet(
-      '<h3>Nuevo trabajo en ' + esc(cur.plate) + '</h3>' +
-      '<div class="grid2 field">' +
-      '<div><label for="e-fecha">Fecha</label><input id="e-fecha" type="date" value="' + todayISO() + '"></div>' +
-      '<div><label for="e-km">Kilometraje</label><input id="e-km" inputmode="numeric" value="' + esc(L.formatKm(cur.km)) + '"></div>' +
-      '<div class="span2"><label for="e-trabajo">Trabajo</label><input id="e-trabajo" list="jobs" placeholder="Ej. Cambio de aceite y filtro"><datalist id="jobs">' +
-      jobs.map(function (j) { return '<option value="' + esc(j) + '">'; }).join('') + '</datalist></div>' +
-      '<div class="span2"><label for="e-notas">Repuestos y aceite usados</label><textarea id="e-notas" placeholder="Ej. 5W-30 sintético, 4 L, filtro marca X"></textarea></div>' +
-      '<div><label for="e-nkm">Próximo cambio (km)</label><input id="e-nkm" inputmode="numeric"></div>' +
-      '<div><label for="e-nfecha">Próximo (fecha)</label><input id="e-nfecha" type="date"></div>' +
-      '</div>' +
-      '<div class="btn-row" style="margin-top:16px"><button class="btn" data-sheet-close>Cancelar</button><button class="btn primary" id="e-save">Guardar</button></div>',
-      function (s) {
-        ['#e-km', '#e-nkm'].forEach(function (id) {
-          $(id, s).addEventListener('input', function (e) { e.target.value = L.formatKm(e.target.value); });
-        });
-        $('[data-sheet-close]', s).addEventListener('click', closeSheet);
-        $('#e-save', s).addEventListener('click', function () {
-          var trabajo = $('#e-trabajo', s).value.trim();
-          if (!trabajo) { toast('Escribe qué trabajo hiciste.'); return; }
-          var entry = {
-            id: uid(),
-            fecha: $('#e-fecha', s).value,
-            km: $('#e-km', s).value.replace(/\D/g, ''),
-            trabajo: trabajo,
-            notas: $('#e-notas', s).value.trim(),
-            nextKm: $('#e-nkm', s).value.replace(/\D/g, ''),
-            nextFecha: $('#e-nfecha', s).value
-          };
-          var list = db.log[cur.plate] = db.log[cur.plate] || [];
-          list.unshift(entry);
-          list.sort(function (a, b) { return String(b.fecha).localeCompare(String(a.fecha)); });
-          if (entry.km) { cur.km = entry.km; saveDraft(); if (db.vehicles[cur.plate]) db.vehicles[cur.plate].km = entry.km; }
-          if (!db.vehicles[cur.plate] && (cur.marca || cur.modelo)) db.vehicles[cur.plate] = Object.assign({}, cur);
-          persist(['log', 'vehicles']);
-          closeSheet(); toast('Trabajo guardado.'); render();
-        });
-      });
-  }
-
-  function openReminder(id) {
-    var entry = (db.log[cur.plate] || []).filter(function (e) { return e.id === id; })[0];
-    if (!entry) return;
-    var text = L.reminderText(cur, entry);
-    openSheet(
-      '<h3>Recordatorio para el cliente</h3>' +
-      '<div class="field"><label for="r-text">Mensaje (puedes editarlo)</label><textarea id="r-text" style="min-height:150px">' + esc(text) + '</textarea></div>' +
-      '<div class="btn-row" style="margin-top:14px"><button class="btn" id="r-copy">Copiar</button><a class="btn primary" id="r-wa" target="_blank" rel="noopener" style="text-decoration:none;display:flex;align-items:center;justify-content:center">Abrir WhatsApp</a></div>' +
-      '<button class="link-btn" data-sheet-close>Cerrar</button>',
-      function (s) {
-        var ta = $('#r-text', s), wa = $('#r-wa', s);
-        var upd = function () { wa.href = 'https://wa.me/?text=' + encodeURIComponent(ta.value); };
-        upd(); ta.addEventListener('input', upd);
-        $('[data-sheet-close]', s).addEventListener('click', closeSheet);
-        $('#r-copy', s).addEventListener('click', function () {
-          ta.select();
-          var done = function () { toast('Mensaje copiado.'); };
-          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done, function () { document.execCommand('copy'); done(); });
-          else { document.execCommand('copy'); done(); }
-        });
-      });
-  }
-
-  function deleteEntry(id) {
-    db.log[cur.plate] = (db.log[cur.plate] || []).filter(function (e) { return e.id !== id; });
-    persist(['log']); render();
-  }
-
-  /* ---------- Ajustes ---------- */
-  function exportBackup() {
-    var data = { app: 'thokar-taller', version: 1, fecha: new Date().toISOString(), vehicles: db.vehicles, log: db.log, chats: db.chats };
-    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'thokar-respaldo-' + todayISO() + '.json';
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
-    toast('Respaldo descargado. Los tokens y claves de Render no se incluyen.');
-  }
-
-  function importBackup(file) {
-    if (!file) return;
-    var fr = new FileReader();
-    fr.onload = function () {
-      try {
-        var d = JSON.parse(fr.result);
-        if (d.app !== 'thokar-taller') throw new Error('x');
-        Object.assign(db.vehicles, d.vehicles || {});
-        Object.keys(d.log || {}).forEach(function (p) {
-          var have = {}; (db.log[p] || []).forEach(function (e) { have[e.id] = true; });
-          db.log[p] = (db.log[p] || []).concat((d.log[p] || []).filter(function (e) { return !have[e.id]; }));
-        });
-        Object.assign(db.chats, d.chats || {});
-        persist(); toast('Respaldo importado.'); render();
-      } catch (e) { toast('Ese archivo no es un respaldo de THOKAR Taller.'); }
-    };
-    fr.readAsText(file);
-  }
-
-  async function testConnection() {
-    var out = $('#test-out');
-    if (!out) return;
-    out.innerHTML = '<span class="spinner"></span> Probando backend e IA…';
-    try {
-      await wakeBackend(true);
-      var text = await geminiJson({ contents: [{ role: 'user', parts: [{ text: 'Responde solo con OK.' }] }], generationConfig: { temperature: 0 } });
-      out.innerHTML = '<strong style="color:var(--ok)">Conectado.</strong> Backend, APP_TOKEN y Gemini respondieron: ' + esc(text.slice(0, 30));
-    } catch (e) { out.innerHTML = '<strong style="color:var(--red)">Falló:</strong> ' + esc(e.message || 'No se pudo probar la conexión.'); }
-  }
-
-  /* ---------- Estado de app / móvil ---------- */
-  function renderConnectionState() {
-    var root = $('#connection-root');
-    if (!root) return;
-    if (backendState === 'connecting') root.innerHTML = '<div class="connection-pill"><span class="status-dot waking"></span><span>Despertando servidor…</span></div>';
-    else if (backendState === 'offline') root.innerHTML = '<div class="connection-pill error-pill"><span class="status-dot offline"></span><span>Sin internet</span></div>';
-    else if (backendState === 'error') root.innerHTML = '<button class="connection-pill error-pill" id="btn-retry-backend"><span class="status-dot offline"></span>Servidor sin respuesta · Reintentar</button>';
-    else root.innerHTML = '';
-  }
-
-  async function wakeBackend(silent) {
-    if (!navigator.onLine) { backendState = 'offline'; renderConnectionState(); if (!silent) toast('Sin internet.'); throw fail('Sin internet.'); }
-    backendState = 'connecting'; renderConnectionState();
-    var delays = [0, 2000, 5000, 10000], lastError = null;
-    for (var i = 0; i < delays.length; i++) {
-      if (delays[i]) await new Promise(function (resolve) { setTimeout(resolve, delays[i]); });
-      var ctl = new AbortController();
-      var timer = setTimeout(function () { ctl.abort(); }, 20000);
-      try {
-        var res = await fetch('/healthz?ts=' + Date.now(), { cache: 'no-store', signal: ctl.signal });
-        var data = await res.json().catch(function () { return {}; });
-        if (!res.ok || !data.ok) throw new Error('health');
-        clearTimeout(timer); backendState = 'ok'; backendBuild = data.build || ''; backendInfo = data; renderConnectionState();
-        if (backendBuild && backendBuild !== APP_BUILD) showUpdateBanner('Hay una versión nueva de THOKAR disponible.');
-        if (tab === 'ajustes') render();
-        return data;
-      } catch (e) { lastError = e; clearTimeout(timer); backendState = 'connecting'; renderConnectionState(); }
-    }
-    backendState = 'error'; renderConnectionState();
-    if (!silent) toast('El servidor no respondió. Toca Reintentar.');
-    throw fail(lastError && lastError.name === 'AbortError' ? 'El servidor está tardando en despertar.' : 'Backend sin respuesta.');
-  }
-
-  function showUpdateBanner(message) {
-    var root = $('#update-root');
-    if (!root) return;
-    root.innerHTML = '<div class="update-banner"><span>' + esc(message || 'Hay una versión nueva disponible.') + '</span><button id="btn-update-apply">Actualizar</button></div>';
-  }
-
-  function applyServiceWorkerUpdate() {
-    if (swRegistration && swRegistration.waiting) { swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' }); return; }
-    window.location.reload();
-  }
-  async function checkForUpdate(manual) {
-    if (!('serviceWorker' in navigator)) return;
-    try {
-      if (!swRegistration) swRegistration = await navigator.serviceWorker.getRegistration();
-      if (swRegistration) await swRegistration.update();
-      if (swRegistration && swRegistration.waiting) showUpdateBanner('Hay una versión nueva de THOKAR disponible.');
-      else if (manual) toast('THOKAR ya está actualizado.');
-    } catch (e) { if (manual) toast('No pude comprobar actualizaciones.'); }
-  }
-  async function forceUpdate() {
-    try {
-      if ('serviceWorker' in navigator) { var regs = await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(function (r) { return r.unregister(); })); }
-      if ('caches' in window) { var keys = await caches.keys(); await Promise.all(keys.map(function (k) { return caches.delete(k); })); }
-    } catch (e) {}
-    window.location.replace('/?refresh=' + Date.now());
-  }
-
-  async function updateWakeLock() {
-    var shouldHold = db.settings.keepAwake !== false && tab === 'asistente' && document.visibilityState === 'visible';
-    if (!shouldHold) {
-      if (wakeLock) { try { await wakeLock.release(); } catch (e) {} wakeLock = null; }
-      return;
-    }
-    if (!('wakeLock' in navigator) || wakeLock) return;
-    try {
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', function () { wakeLock = null; });
-    } catch (e) {}
-  }
-
-  function syncKeyboardState() {
-    var vv = window.visualViewport;
-    var h = vv ? vv.height : window.innerHeight;
-    document.documentElement.style.setProperty('--vvh', Math.round(h) + 'px');
-    var active = document.activeElement && document.activeElement.id === 'chat-input';
-    var open = Boolean(active && (keyboardOpen || !vv || vv.height < window.innerHeight - 80));
-    if (open !== keyboardOpen) {
-      keyboardOpen = open;
-      document.body.classList.toggle('keyboard-open', open);
-      if (open) setTimeout(scrollChatEnd, 80);
-    }
-  }
-
-  function resizeChatInput(el) {
-    if (!el || el.id !== 'chat-input') return;
-    el.style.height = 'auto';
-    el.style.height = Math.min(128, Math.max(48, el.scrollHeight)) + 'px';
-  }
-
-  /* ---------- Pantallas ---------- */
-  var ICONS = {
-    vehiculo: '<svg viewBox="0 0 24 24"><path d="M5 16V11l1.6-4.2A2 2 0 0 1 8.5 5.5h7a2 2 0 0 1 1.9 1.3L19 11v5"/><path d="M3.5 16h17v2.5h-3V17H6.5v1.5h-3z"/><circle cx="7.5" cy="13" r=".6"/><circle cx="16.5" cy="13" r=".6"/></svg>',
-    asistente: '<svg viewBox="0 0 24 24"><path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>',
-    libreta: '<svg viewBox="0 0 24 24"><path d="M6 3.5h11a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6z"/><path d="M6 3.5v17M9.5 8h5.5M9.5 11.5h5.5"/></svg>',
-    ajustes: '<svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>',
-    close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
-    bolt: '<svg viewBox="0 0 24 24"><path d="M13 2L4.5 13H11l-1 9 8.5-11H12z"/></svg>',
-    plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
-    send: '<svg viewBox="0 0 24 24"><path d="M3 11.5L21 3l-7.5 18-2.2-7.3z"/><path d="M11.3 13.7L21 3"/></svg>',
-    copy: '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
-    save: '<svg viewBox="0 0 24 24"><path d="M5 3h12l2 2v16H5z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/></svg>',
-    checklist: '<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1.5 1.5L7.5 5M3.5 12l1.5 1.5 2.5-2.5M3.5 18l1.5 1.5 2.5-2.5"/></svg>',
-    share: '<svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/></svg>',
-    retry: '<svg viewBox="0 0 24 24"><path d="M20 6v5h-5"/><path d="M19 11a8 8 0 1 0 1 5"/></svg>',
-    search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>',
-    chevron: '<svg viewBox="0 0 24 24"><path d="M8 10l4 4 4-4"/></svg>',
-    more: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>',
-    down: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>'
-  };
-  var TABS = [['vehiculo', 'Vehículo'], ['asistente', 'Asistente'], ['libreta', 'Libreta'], ['ajustes', 'Ajustes']];
-
-  function setTab(t) { tab = t; render(); window.scrollTo(0, 0); updateWakeLock(); }
-
-  function renderTabs() {
-    $('#tabs').innerHTML = '<div class="tabs-inner">' + TABS.map(function (t) {
-      return '<button class="tab" data-tab="' + t[0] + '"' + (tab === t[0] ? ' aria-current="page"' : '') + '>' + ICONS[t[0]] + '<span>' + t[1] + '</span></button>';
-    }).join('') + '</div>';
-  }
-
-  function serviceDueHtml() {
-    if (!L.isPlateOk(cur.plate)) return '';
-    var list = (db.log[cur.plate] || []).filter(function (e) { return e.nextKm || e.nextFecha; }).slice(0, 4);
-    if (!list.length) return '';
-    var currentKm = Number(String(cur.km || '').replace(/\D/g, '')) || 0;
-    var today = new Date(todayISO() + 'T12:00:00');
-    return '<div class="service-due-list">' + list.map(function (e) {
-      var state = 'ok', label = 'Próximo';
-      var km = Number(String(e.nextKm || '').replace(/\D/g, '')) || 0;
-      var days = null;
-      if (e.nextFecha) { var d = new Date(e.nextFecha + 'T12:00:00'); days = Math.round((d - today) / 86400000); }
-      if ((km && currentKm && currentKm >= km) || (days !== null && days < 0)) { state = 'due'; label = 'Vencido'; }
-      else if ((km && currentKm && km - currentKm <= 1500) || (days !== null && days <= 45)) { state = 'soon'; label = 'Próximo'; }
-      var when = [km ? L.formatKm(km) + ' km' : '', e.nextFecha ? L.formatDate(e.nextFecha) : ''].filter(Boolean).join(' · ');
-      return '<div class="service-due ' + state + '"><span><strong>' + esc(e.trabajo || 'Servicio') + '</strong><small>' + esc(when) + '</small></span><b>' + label + '</b></div>';
-    }).join('') + '</div>';
-  }
-
-  function vehicleView() {
-    var savedPlates = Object.keys(db.vehicles).sort();
-    var hasData = Boolean(cur.marca || cur.modelo || cur.anio || cur.motor || cur.chasis);
-    var extraLabels = {
-      dv: 'Dígito verificador', cilindrada: 'Cilindrada', puertas: 'Puertas', transmision: 'Transmisión', codigoSii: 'Código SII', tasacionFiscal: 'Tasación fiscal', regionProcedencia: 'Región de procedencia', tipoSello: 'Tipo de sello', multas: 'Multas de tránsito',
-      mesRevision: 'Mes de revisión técnica', revisionTecnica: 'Revisión técnica', revisionGases: 'Revisión de gases',
-      permisoCirculacion: 'Permiso de circulación', soap: 'SOAP', kmRegistrado: 'Kilometraje registrado',
-      transportePublico: 'Transporte público', tipoTransportePublico: 'Tipo de transporte público',
-      restriccion: 'Restricción vehicular', siniestrado: 'Siniestrado'
-    };
-    var extraHtml = Object.keys(extraLabels).filter(function (k) { return cur[k]; }).map(function (k) {
-      return '<div><span class="muted small">' + esc(extraLabels[k]) + '</span><div>' + esc(cur[k]) + '</div></div>';
-    }).join('');
-    var carLine = [cur.marca, cur.modelo, cur.version, cur.anio].filter(Boolean).join(' ') || 'Vehículo sin identificar';
-    var subLine = [cur.cilindrada, cur.combustible, cur.transmision].filter(Boolean).join(' · ');
-    var html = '<h2>Vehículo</h2>' +
-      '<div class="plate-block"><label class="plate-label" for="f-plate">Patente</label>' +
-      '<div class="plate"><input id="f-plate" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="12" placeholder="ABCD12" value="' + esc(cur.plate) + '"></div></div>' +
-      '<button class="btn primary block" id="btn-lookup">Buscar datos por patente</button>' +
-      '<p class="muted small" id="lookup-status" style="margin:8px 0 0" aria-live="polite"></p>' +
-      '<div class="btn-row" style="margin-top:10px"><button class="btn" id="btn-paste">Pegar datos</button><button class="btn" id="btn-photo">Foto del permiso</button></div>' +
-      '<input type="file" id="photo-input" accept="image/*" hidden>';
-
-    if (hasData) {
-      html += '<section class="vehicle-summary-card">' +
-        '<div><div class="vehicle-summary-plate">' + esc(cur.plate || '—') + '</div><div class="vehicle-summary-name">' + esc(carLine) + '</div>' +
-        (subLine ? '<div class="vehicle-summary-meta">' + esc(subLine) + '</div>' : '') + '</div>' +
-        '<div class="vehicle-km"><span>Kilometraje</span><strong>' + esc(cur.km ? L.formatKm(cur.km) + ' km' : 'Sin registrar') + '</strong></div>' +
-        serviceDueHtml() +
-        '<div class="vehicle-summary-actions"><button class="btn primary" data-tab-go="asistente">Consultar IA</button><button class="btn" data-tab-go="libreta">Libreta</button></div>' +
-      '</section>';
-    }
-
-    html += '<details class="vehicle-details"' + (!hasData ? ' open' : '') + '><summary><span>Datos técnicos</span>' + ICONS.chevron + '</summary><div class="card details-card"><div class="grid2 field">' +
-      '<div><label for="f-marca">Marca</label><input id="f-marca" autocomplete="off" value="' + esc(cur.marca) + '"></div>' +
-      '<div><label for="f-anio">Año</label><input id="f-anio" inputmode="numeric" maxlength="4" value="' + esc(cur.anio) + '"></div>' +
-      '<div class="span2"><label for="f-modelo">Modelo</label><input id="f-modelo" autocomplete="off" value="' + esc(cur.modelo) + '"></div>' +
-      '<div><label for="f-tipo">Tipo</label><input id="f-tipo" autocomplete="off" value="' + esc(cur.tipo) + '"></div>' +
-      '<div><label for="f-color">Color</label><input id="f-color" autocomplete="off" value="' + esc(cur.color) + '"></div>' +
-      '<div class="span2"><label for="f-version">Versión</label><input id="f-version" autocomplete="off" value="' + esc(cur.version) + '"></div>' +
-      '<div><label for="f-combustible">Combustible</label><select id="f-combustible">' +
-      ['', 'Gasolina', 'Diésel', 'Híbrido', 'Eléctrico', 'Gas'].map(function (o) { return '<option value="' + o + '"' + (cur.combustible === o ? ' selected' : '') + '>' + (o || 'Sin indicar') + '</option>'; }).join('') + '</select></div>' +
-      '<div><label for="f-km">Kilometraje</label><input id="f-km" inputmode="numeric" value="' + esc(L.formatKm(cur.km)) + '"></div>' +
-      '<div class="span2"><label for="f-motor">N.° de motor</label><input id="f-motor" autocomplete="off" autocapitalize="characters" value="' + esc(cur.motor) + '"></div>' +
-      '<div class="span2"><label for="f-chasis">Chasis / VIN</label><input id="f-chasis" autocomplete="off" autocapitalize="characters" value="' + esc(cur.chasis) + '"></div>' +
-      '<div><label for="f-procedencia">Procedencia</label><input id="f-procedencia" autocomplete="off" value="' + esc(cur.procedencia) + '"></div>' +
-      '<div><label for="f-fabricante">Fabricante</label><input id="f-fabricante" autocomplete="off" value="' + esc(cur.fabricante) + '"></div>' +
-      '</div></div></details>' +
-      (extraHtml ? '<details class="vehicle-details"><summary><span>Antecedentes adicionales</span>' + ICONS.chevron + '</summary><div class="card details-card"><div class="grid2 field">' + extraHtml + '</div></div></details>' : '') +
-      '<div class="btn-row" style="margin-top:12px"><button class="btn primary" id="btn-save">Guardar vehículo</button><button class="btn" id="btn-clear">Vehículo nuevo</button></div>' +
-      '<div style="margin-top:24px"><h3>Recientes</h3>' +
-      (savedPlates.length ? '<div class="recent-vehicles">' + savedPlates.map(function (p) {
-        var v = db.vehicles[p];
-        return '<button class="recent-chip' + (p === cur.plate ? ' active' : '') + '" data-load="' + esc(p) + '"><span>' + esc(p) + '</span><small>' + esc([v.marca, v.modelo].filter(Boolean).join(' ')) + '</small></button>';
-      }).join('') + '</div>' : '<p class="muted" style="margin-top:6px">Aún no hay vehículos guardados.</p>') + '</div>';
-    return html;
-  }
-
-  function messageIsLong(text) {
-    text = String(text || '');
-    return text.length > 950 || text.split('\n').length > 13;
-  }
-
-  function chatTime(ts) {
-    if (!ts) return '';
-    try { return new Intl.DateTimeFormat('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(ts)); } catch (e) { return ''; }
-  }
-
-  function renderChatMessage(m, index) {
-    var roleClass = m.role === 'user' ? 'user' : 'model' + (m.error ? ' error' : '');
-    var body = m.streaming && !m.text ? '<span class="typing-dots" aria-label="Escribiendo"><i></i><i></i><i></i></span>' : (m.role === 'user' ? esc(m.text) : md(m.text));
-    var longClass = m.role === 'model' && !m.error && !m.streaming && messageIsLong(m.text) ? ' collapsible' : '';
-    var html = '<div class="msg-wrap ' + (m.role === 'user' ? 'user-wrap' : 'model-wrap') + '">' +
-      '<div class="msg ' + roleClass + '"><div class="msg-content' + longClass + (m.streaming && !m.text ? ' streaming-placeholder' : '') + '" data-msg-content="' + index + '">' + body + '</div>' +
-      (longClass ? '<button class="msg-more" data-msg-expand="' + index + '">Ver más</button>' : '') + '<div class="msg-time">' + esc(chatTime(m.at)) + '</div></div>';
-    if (m.role === 'model' && m.error) {
-      html += '<div class="msg-actions"><button data-msg-retry="' + index + '">' + ICONS.retry + '<span>Reintentar</span></button></div>';
-    } else if (m.role === 'model' && !m.streaming) {
-      var canChecklist = checklistFromText(m.text).length >= 3;
-      html += '<div class="msg-actions" aria-label="Acciones de la respuesta">' +
-        '<button data-msg-copy="' + index + '">' + ICONS.copy + '<span>Copiar</span></button>' +
-        '<button data-msg-save="' + index + '">' + ICONS.save + '<span>Guardar</span></button>' +
-        (canChecklist ? '<button data-msg-checklist="' + index + '">' + ICONS.checklist + '<span>Checklist</span></button>' : '') +
-        '<button data-msg-share="' + index + '">' + ICONS.share + '<span>Compartir</span></button>' +
-      '</div>';
-    }
-    return html + '</div>';
-  }
-
-  function openVehicleSheet() {
-    var rows = [
-      ['Patente', cur.plate], ['Vehículo', [cur.marca, cur.modelo, cur.version, cur.anio].filter(Boolean).join(' ')],
-      ['Kilometraje', cur.km ? L.formatKm(cur.km) + ' km' : ''], ['Combustible', cur.combustible],
-      ['Motor', cur.motor], ['VIN / Chasis', cur.chasis], ['Transmisión', cur.transmision], ['Color', cur.color]
-    ].filter(function (r) { return r[1]; });
-    openSheet('<h3>' + esc(cur.plate || 'Vehículo') + '</h3><div class="vehicle-sheet-list">' +
-      rows.map(function (r) { return '<div><span>' + esc(r[0]) + '</span><strong>' + esc(r[1]) + '</strong></div>'; }).join('') +
-      '</div><div class="btn-row" style="margin-top:16px"><button class="btn" data-sheet-close>Cerrar</button><button class="btn primary" id="sheet-go-vehicle">Abrir ficha</button></div>',
-      function (sheet) {
-        $('[data-sheet-close]', sheet).addEventListener('click', closeSheet);
-        $('#sheet-go-vehicle', sheet).addEventListener('click', function () { closeSheet(); setTab('vehiculo'); });
-      });
-  }
-
-  function rememberQuick(index) {
-    index = Number(index);
-    var list = Array.isArray(db.settings.quickRecent) ? db.settings.quickRecent.slice() : [];
-    list = list.filter(function (x) { return Number(x) !== index; });
-    list.unshift(index); db.settings.quickRecent = list.slice(0, 3); persist(['settings']);
-  }
-  function openAssistantActions() {
-    var links = L.searchLinks(cur);
-    function qbtn(i) { var icon = i >= 5 ? ICONS.search : ICONS.bolt; return '<button class="action-sheet-item" data-quick="' + i + '"><span class="action-icon">' + icon + '</span><span>' + esc(QUICK[i][0]) + '</span></button>'; }
-    var recent = (db.settings.quickRecent || []).filter(function (i) { return QUICK[Number(i)]; }).slice(0, 3);
-    var html = '<div class="action-sheet-head"><div><h3>Acciones rápidas</h3><p class="muted small">Para ' + esc(cur.plate || 'el vehículo actual') + '</p></div><button class="sheet-x icon-button" data-sheet-close aria-label="Cerrar">' + ICONS.close + '</button></div>';
-    if (recent.length) html += '<div class="action-category"><div class="action-category-title">Usadas recientemente</div><div class="action-grid">' + recent.map(qbtn).join('') + '</div></div>';
-    html += '<div class="action-category"><div class="action-category-title">Mantención</div><div class="action-grid">' + [0,1,3,4].map(qbtn).join('') + '</div></div>' +
-      '<div class="action-category"><div class="action-category-title">Diagnóstico</div><div class="action-grid">' + [5,6,7].map(qbtn).join('') + '</div></div>';
-    if (links.length) html += '<div class="action-category"><div class="action-category-title">Repuestos y catálogos</div><div class="action-grid">' + links.map(function (l) { return '<a class="action-sheet-item" href="' + esc(l.url) + '" target="_blank" rel="noopener"><span class="action-icon">' + ICONS.search + '</span><span>' + esc(l.label) + '</span></a>'; }).join('') + '</div></div>';
-    openSheet(html);
-  }
-
-  function openChatMenu() {
-    openSheet('<div class="action-sheet-head"><div><h3>Conversación</h3><p class="muted small">' + esc(cur.plate || 'Vehículo actual') + '</p></div><button class="sheet-x icon-button" data-sheet-close aria-label="Cerrar">' + ICONS.close + '</button></div>' +
-      '<div class="action-category"><div class="action-grid one-col"><button class="action-sheet-item" id="sheet-new-chat"><span class="action-icon">' + ICONS.plus + '</span><span>Nueva conversación</span></button></div></div>', function (sheet) {
-        $('#sheet-new-chat', sheet).addEventListener('click', function () { db.chats[chatKey()] = []; persist(['chats']); closeSheet(); render(); });
-      });
-  }
-
-  function updateJumpLatest() {
-    var box = $('#chat-thread'), btn = $('#btn-jump-latest');
-    if (!box || !btn) return;
-    var far = box.scrollHeight - box.scrollTop - box.clientHeight > 220;
-    btn.classList.toggle('hidden', !far);
-    jumpButtonVisible = far;
-  }
-
-  function getChatMessage(index) {
-    return (db.chats[chatKey()] || [])[Number(index)] || null;
-  }
-
-  function copyChatMessage(index) {
-    var m = getChatMessage(index);
-    if (!m) return;
-    var done = function () { toast('Respuesta copiada.'); };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(m.text).then(done, function () { toast('No pude copiarla automáticamente.'); });
-    else {
-      var ta = document.createElement('textarea'); ta.value = m.text; document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); done(); } catch (e) { toast('No pude copiarla automáticamente.'); }
-      ta.remove();
-    }
-  }
-
-  function autoAiTitle(text) {
-    var lines = String(text || '').split('\n').map(function (x) { return x.replace(/[*`#]/g, '').trim(); }).filter(Boolean), summary = '';
-    for (var i = 0; i < lines.length; i++) { if (/^Resumen:/i.test(lines[i])) { summary = lines[i].replace(/^Resumen:\s*/i, ''); break; } }
-    if (!summary) summary = lines[0] || 'Diagnóstico IA';
-    summary = summary.replace(/^\d+[.)]\s*/, '').replace(/^[-•]\s*/, '').trim();
-    if (summary.length > 58) summary = summary.slice(0, 55).trim() + '…';
-    return summary || 'Diagnóstico IA';
-  }
-  function saveAiMessage(index) {
-    var m = getChatMessage(index);
-    if (!m || !L.isPlateOk(cur.plate)) { toast('Carga y guarda un vehículo antes de guardar el diagnóstico.'); return; }
-    var list = db.log[cur.plate] = db.log[cur.plate] || [];
-    var entry = { id: uid(), fecha: todayISO(), km: cur.km || '', trabajo: autoAiTitle(m.text), notas: m.text, source: 'ai' };
-    list.unshift(entry); persist(['log']); vibrate(10);
-    toast('Guardado en Libreta', 'Deshacer', function () { db.log[cur.plate] = (db.log[cur.plate] || []).filter(function (e) { return e.id !== entry.id; }); persist(['log']); toast('Guardado deshecho.'); if (tab === 'libreta') render(); });
-  }
-  function shareChatMessage(index) {
-    var m = getChatMessage(index); if (!m) return;
-    var title = (cur.plate ? cur.plate + ' · ' : '') + 'THOKAR';
-    if (navigator.share) { navigator.share({ title: title, text: m.text }).catch(function () {}); return; }
-    copyChatMessage(index);
-  }
-
-  function checklistFromText(text) {
-    var items = String(text || '').split('\n').map(function (line) {
-      return line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim();
-    }).filter(function (line) {
-      return line && !/^(Resumen|Pasos|Verificar|Advertencia|Causas probables):?$/i.test(line) && line.length > 5;
-    });
-    var unique = [];
-    items.forEach(function (item) { if (unique.indexOf(item) < 0) unique.push(item); });
-    return unique.slice(0, 12);
-  }
-
-  async function saveChecklistFromMessage(index) {
-    var m = getChatMessage(index);
-    if (!m || !L.isPlateOk(cur.plate)) { toast('Carga y guarda un vehículo antes de crear un checklist.'); return; }
-    if (busy) return; busy = true; toast('Preparando checklist…');
-    try {
-      var text = await geminiJson({ contents: [{ role: 'user', parts: [{ text: 'Convierte esta respuesta técnica en un checklist práctico. Responde SOLO JSON con {"titulo":"...","items":["...","..."]}. Incluye entre 3 y 12 pasos concretos, sin inventar datos. Respuesta original:\n\n' + m.text }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } });
-      var parsed = L.parseModelJson(text) || {}, title = String(parsed.titulo || 'Checklist IA').trim().slice(0, 80);
-      var items = Array.isArray(parsed.items) ? parsed.items.map(function (x) { return String(x || '').trim(); }).filter(Boolean).slice(0, 12) : [];
-      if (items.length < 3) items = checklistFromText(m.text);
-      if (items.length < 3) throw fail('No encontré suficientes pasos claros para crear el checklist.');
-      openSheet('<h3>Revisar checklist</h3><div class="field"><label for="check-title">Título</label><input id="check-title" value="' + esc(title) + '"></div><div class="field" style="margin-top:12px"><label for="check-items">Pasos (uno por línea)</label><textarea id="check-items" style="min-height:220px">' + esc(items.join('\n')) + '</textarea></div><div class="btn-row" style="margin-top:14px"><button class="btn" data-sheet-close>Cancelar</button><button class="btn primary" id="check-save">Guardar</button></div>', function (sheet) {
-        $('#check-save', sheet).addEventListener('click', function () {
-          var edited = $('#check-items', sheet).value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 20);
-          if (!edited.length) return toast('Añade al menos un paso.');
-          var list = db.log[cur.plate] = db.log[cur.plate] || [];
-          var entry = { id: uid(), fecha: todayISO(), km: cur.km || '', trabajo: $('#check-title', sheet).value.trim() || 'Checklist IA', notas: '', source: 'ai', checklist: edited.map(function (x) { return { text: x, done: false }; }) };
-          list.unshift(entry); persist(['log']); closeSheet(); vibrate(10);
-          toast('Checklist guardado', 'Deshacer', function () { db.log[cur.plate] = (db.log[cur.plate] || []).filter(function (e) { return e.id !== entry.id; }); persist(['log']); toast('Checklist eliminado.'); });
-        });
-      });
-    } catch (e) { toast(e.message || 'No pude preparar el checklist.'); }
-    finally { busy = false; }
-  }
-
-  function assistantView() {
-    var hasCar = cur.marca || cur.modelo || L.isPlateOk(cur.plate);
-    var key = chatKey();
-    var th = db.chats[key] || [];
-    var plateLabel = L.isPlateOk(cur.plate) ? cur.plate : 'SIN PATENTE';
-    var mainVehicle = [cur.marca, cur.modelo, cur.anio].filter(Boolean).join(' ') || 'Vehículo sin identificar';
-    var vehicleMeta = [cur.combustible, cur.cilindrada, cur.km ? L.formatKm(cur.km) + ' km' : ''].filter(Boolean).join(' · ');
-    var html = '<h2>Asistente</h2>';
-    if (!hasCar) {
-      html += '<div class="notice assistant-notice">Carga una patente para que la IA responda con contexto. <button class="link-btn" data-tab-go="vehiculo">Cargar vehículo</button></div>';
-    }
-    if (!(db.settings.appToken || '').trim()) {
-      html += '<div class="notice assistant-notice">Falta configurar el Token THOKAR. <button class="link-btn" data-tab-go="ajustes">Abrir Ajustes</button></div>';
-    }
-
-    var starter = !th.length && !busy ? '<div class="assistant-starter"><div class="starter-title">¿Qué necesitas revisar?</div><div class="starter-grid">' +
-      [0,1,2,5,6,7].map(function (i) { return '<button data-quick="' + i + '">' + esc(QUICK[i][0]) + '</button>'; }).join('') + '</div></div>' : '';
-
-    html += '<section class="assistant-chat-window whatsapp-chat" aria-label="Chat con el asistente">' +
-      '<div class="assistant-chat-head whatsapp-head">' +
-        '<button class="assistant-contact-button" id="btn-vehicle-sheet" aria-label="Ver ficha del vehículo">' +
-          '<div class="assistant-avatar" aria-hidden="true">' + ICONS.vehiculo + '</div>' +
-          '<div class="assistant-contact">' +
-            '<div class="assistant-contact-name">' + esc(plateLabel) + '</div>' +
-            '<div class="assistant-contact-car">' + esc(mainVehicle) + '</div>' +
-            (vehicleMeta ? '<div class="assistant-contact-meta">' + esc(vehicleMeta) + '</div>' : '') +
-          '</div>' +
-        '</button>' +
-        '<button class="assistant-clear-icon icon-button" id="btn-chat-menu" aria-label="Opciones del chat" title="Opciones del chat">' + ICONS.more + '</button>' +
-      '</div>' +
-      '<div class="thread assistant-thread whatsapp-thread" id="chat-thread" aria-live="polite">' + starter + th.map(renderChatMessage).join('') +
-        '<div id="thread-end"></div><button class="jump-latest icon-button hidden" id="btn-jump-latest" aria-label="Ir al último mensaje">' + ICONS.down + '</button></div>' +
-      (pendingImage ? '<div class="assistant-attachment small muted">Foto lista para enviar. <button class="link-btn" id="btn-unattach">Quitar</button></div>' : '') +
-      '<form class="composer assistant-composer whatsapp-composer" id="composer">' +
-        '<button type="button" class="composer-action-btn assistant-action-btn icon-button" id="btn-assistant-actions" aria-label="Acciones rápidas" title="Acciones rápidas">' + ICONS.bolt + '</button>' +
-        '<button type="button" class="composer-action-btn assistant-photo-btn icon-button" id="btn-attach" aria-label="Adjuntar foto" title="Adjuntar foto">' + ICONS.plus + '</button>' +
-        '<textarea id="chat-input" rows="1" placeholder="Escribe un mensaje…" aria-label="Mensaje"></textarea>' +
-        '<button class="whatsapp-send icon-button send-button" type="submit" aria-label="Enviar"' + (busy ? ' disabled' : '') + '>' + ICONS.send + '</button>' +
-      '</form><input type="file" id="chat-photo" accept="image/*" hidden>' +
-      '</section>';
-    return html;
-  }
-
-  function logView() {
-    var html = '<h2>Libreta</h2>';
-    if (!L.isPlateOk(cur.plate)) {
-      return html + '<div class="empty card" style="margin-top:14px"><p>Carga un vehículo para ver o crear su historial.</p><button class="btn primary" data-tab-go="vehiculo">Cargar vehículo</button></div>';
-    }
-    var list = db.log[cur.plate] || [];
-    html += '<div class="summary"><div class="name">' + esc(cur.plate) + '</div><div class="meta">' + esc(vehicleName() || 'Sin marca ni modelo') + '</div></div>';
-    html += '<button class="btn primary block" id="btn-add-entry">Registrar trabajo</button><div style="margin-top:16px">';
-    if (!list.length) html += '<div class="empty muted"><p>Todavía no hay trabajos, diagnósticos ni checklists guardados.</p></div>';
-    html += list.map(function (e) {
-      var next = [e.nextKm ? L.formatKm(e.nextKm) + ' km' : '', e.nextFecha ? L.formatDate(e.nextFecha) : ''].filter(Boolean).join(' o ');
-      var checkCount = Array.isArray(e.checklist) ? e.checklist.length : 0;
-      var checkDone = checkCount ? e.checklist.filter(function (x) { return x.done; }).length : 0;
-      var checklist = checkCount ? '<div class="check-progress"><span>Checklist</span><strong>' + checkDone + '/' + checkCount + '</strong></div><div class="saved-checklist">' + e.checklist.map(function (item, i) {
-        return '<label><input type="checkbox" data-check-entry="' + esc(e.id) + '" data-check-index="' + i + '"' + (item.done ? ' checked' : '') + '><span>' + esc(item.text) + '</span></label>';
-      }).join('') + '</div>' : '';
-      return '<div class="entry"><div class="head"><span class="title">' + esc(e.trabajo) + '</span><span class="muted small">' + esc(L.formatDate(e.fecha)) + '</span></div>' +
-        '<div class="muted small">' + esc(e.km ? L.formatKm(e.km) + ' km' : 'Sin kilometraje') + (e.source === 'ai' ? ' · IA' : '') + '</div>' +
-        (e.notas ? '<div class="entry-notes">' + esc(e.notas) + '</div>' : '') + checklist +
-        (next ? '<div class="small" style="margin-top:6px">Próximo: ' + esc(next) + '</div>' : '') +
-        '<div class="actions">' + (!checklist ? '<button class="btn" data-remind="' + esc(e.id) + '">Recordatorio</button>' : '') + '<button class="btn danger" data-delentry="' + esc(e.id) + '">Borrar</button></div></div>';
-    }).join('') + '</div>';
-    return html;
-  }
-
-  function settingsView() {
-    var protectedOk = backendInfo.protected === true;
-    var boostrOk = backendInfo.configured === true;
-    var geminiOk = backendInfo.geminiConfigured === true;
-    return '<h2>Ajustes</h2><div class="stack" style="margin-top:14px">' +
-      '<div class="card"><div class="settings-status-head"><div><h3>Conexión</h3><p class="muted small">THOKAR usa Boostr y Gemini desde el backend de Render.</p></div><span class="status-badge ' + (backendState === 'ok' ? 'ok' : 'warn') + '">' + esc(backendState === 'ok' ? 'Conectado' : backendState === 'connecting' ? 'Conectando' : 'Revisar') + '</span></div>' +
-      '<div class="settings-status-list"><div><span>APP_TOKEN</span><strong class="' + (protectedOk ? 'ok-text' : 'warn-text') + '">' + (protectedOk ? 'Configurado' : 'Falta') + '</strong></div><div><span>Boostr</span><strong class="' + (boostrOk ? 'ok-text' : 'warn-text') + '">' + (boostrOk ? 'Configurado' : 'Falta clave') + '</strong></div><div><span>Gemini</span><strong class="' + (geminiOk ? 'ok-text' : 'warn-text') + '">' + (geminiOk ? 'Configurado' : 'Falta clave') + '</strong></div></div>' +
-      '<div class="field" style="margin-top:14px"><label for="s-app-token">Token THOKAR</label><input id="s-app-token" type="password" autocomplete="off" spellcheck="false" placeholder="El mismo APP_TOKEN de Render" value="' + esc(db.settings.appToken || '') + '"></div>' +
-      '<p class="muted small" style="margin-top:8px">En Render define <strong>APP_TOKEN</strong> (32+ caracteres), <strong>BOOSTR_API_KEY</strong> y <strong>GEMINI_API_KEY</strong>. Las claves de proveedores nunca se guardan en el teléfono.</p>' +
-      '<button class="btn primary block" id="btn-test" style="margin-top:12px">Probar conexión completa</button><p class="small" id="test-out" style="margin-top:10px" aria-live="polite"></p></div>' +
-      '<div class="card"><h3>Comportamiento</h3><label class="setting-toggle"><span><strong>Mantener pantalla encendida</strong><small>Mientras el Asistente está abierto</small></span><input id="s-wake-lock" type="checkbox"' + (db.settings.keepAwake !== false ? ' checked' : '') + '></label></div>' +
-      '<div class="card"><h3>Actualización de la app</h3><p class="muted small" style="margin:6px 0 12px">Versión instalada: <strong>' + APP_BUILD + '</strong>' + (backendBuild ? ' · servidor: <strong>' + esc(backendBuild) + '</strong>' : '') + '.</p><div class="btn-row"><button class="btn" id="btn-check-update">Buscar actualización</button><button class="btn danger" id="btn-force-update">Forzar actualización</button></div></div>' +
-      '<div class="card"><h3>Respaldo</h3><p class="muted small" style="margin:6px 0 12px">Vehículos, libreta y conversaciones. Los tokens no se exportan.</p><div class="btn-row"><button class="btn" id="btn-export">Descargar respaldo</button><button class="btn" id="btn-import">Importar respaldo</button></div><input type="file" id="import-input" accept="application/json,.json" hidden></div>' +
-      '<div class="card"><h3>Instalar en el teléfono</h3><p class="muted small" style="margin:6px 0 10px">Android (Chrome): menú ⋮ → Instalar app. iPhone (Safari): Compartir → Agregar a pantalla de inicio.</p>' + (installEvent ? '<button class="btn primary block" id="btn-install">Instalar ahora</button>' : '') + '</div>' +
-      (storageOk ? '' : '<div class="notice">Este navegador no deja guardar datos. Lo que escribas se perderá al cerrar la app.</div>') + '</div>';
-  }
-
-  function render() {
-    var app = $('#app');
-    var view = tab === 'vehiculo' ? vehicleView() : tab === 'asistente' ? assistantView() : tab === 'libreta' ? logView() : settingsView();
-    app.innerHTML = view;
-    renderTabs();
-    if (tab === 'asistente') {
-      scrollChatEnd();
-      var thread = $('#chat-thread'); if (thread) thread.addEventListener('scroll', updateJumpLatest, { passive: true });
-      var ta = $('#chat-input'); var draft = load(K.draft + '.chat.' + chatKey(), ''); if (ta && draft) { ta.value = draft; resizeChatInput(ta); }
-    }
-  }
-
-  /* ---------- Eventos ---------- */
-  document.addEventListener('input', function (e) { onField(e); if (e.target.id === 'chat-input') { resizeChatInput(e.target); save(K.draft + '.chat.' + chatKey(), e.target.value); } });
-  document.addEventListener('change', function (e) {
-    if (e.target.id === 'f-combustible') onField(e);
-    if (e.target.id === 'photo-input') { readPhoto(e.target.files[0]); e.target.value = ''; }
-    if (e.target.id === 'import-input') { importBackup(e.target.files[0]); e.target.value = ''; }
-    if (e.target.id === 'chat-photo') {
-      var f = e.target.files[0]; e.target.value = '';
-      if (f) loadChatImage(f).then(function (b64) { pendingImage = b64; render(); }, function (er) { toast(er.message); });
-    }
-    if (e.target.id === 's-app-token') { db.settings.appToken = e.target.value.trim(); persist(['settings']); toast('Token THOKAR guardado en este teléfono.'); wakeBackend(true).catch(function () {}); }
-    if (e.target.id === 's-wake-lock') { db.settings.keepAwake = e.target.checked; persist(['settings']); updateWakeLock(); }
-    if (e.target.dataset.checkEntry) {
-      var entry = (db.log[cur.plate] || []).filter(function (x) { return x.id === e.target.dataset.checkEntry; })[0];
-      var idx = Number(e.target.dataset.checkIndex);
-      if (entry && entry.checklist && entry.checklist[idx]) { entry.checklist[idx].done = e.target.checked; persist(['log']); }
-    }
-  });
-  document.addEventListener('submit', function (e) {
-    if (e.target.id === 'composer') {
-      e.preventDefault();
-      var ta = $('#chat-input'); var v = ta.value; ta.value = ''; save(K.draft + '.chat.' + chatKey(), '');
-      ask(v);
-    }
-  });
-  document.addEventListener('keydown', function (e) {
-    if (e.target.id === 'chat-input' && e.key === 'Enter' && !e.shiftKey && !e.isComposing && window.matchMedia('(min-width: 700px)').matches) {
-      e.preventDefault(); $('#composer').requestSubmit();
-    }
-  });
-  document.addEventListener('click', function (e) {
-    var t = e.target.closest('button, a');
-    if (!t) return;
-    if (t.dataset.tab) return setTab(t.dataset.tab);
-    if (t.dataset.tabGo) return setTab(t.dataset.tabGo);
-    if (t.dataset.load) return loadVehicle(t.dataset.load);
-    if (t.dataset.del) return deleteVehicle(t.dataset.del);
-    if (t.dataset.quick !== undefined) { rememberQuick(+t.dataset.quick); if ($('#sheet-root').innerHTML) closeSheet(); return ask(QUICK[+t.dataset.quick][1]); }
-    if (t.dataset.msgCopy !== undefined) return copyChatMessage(t.dataset.msgCopy);
-    if (t.dataset.msgSave !== undefined) return saveAiMessage(t.dataset.msgSave);
-    if (t.dataset.msgChecklist !== undefined) return saveChecklistFromMessage(t.dataset.msgChecklist);
-    if (t.dataset.msgShare !== undefined) return shareChatMessage(t.dataset.msgShare);
-    if (t.dataset.msgRetry !== undefined) return retryMessage(t.dataset.msgRetry);
-    if (t.dataset.sheetClose !== undefined) return closeSheet();
-    if (t.dataset.msgExpand !== undefined) { var c = $('[data-msg-content="' + t.dataset.msgExpand + '"]'); if (c) c.classList.toggle('expanded'); t.textContent = c && c.classList.contains('expanded') ? 'Ver menos' : 'Ver más'; return; }
-    if (t.dataset.remind) return openReminder(t.dataset.remind);
-    if (t.dataset.delentry) return deleteEntry(t.dataset.delentry);
-    switch (t.id) {
-      case 'btn-lookup': return lookupPlate();
-      case 'btn-assistant-actions': return openAssistantActions();
-      case 'btn-vehicle-sheet': return openVehicleSheet();
-      case 'btn-retry-backend': return wakeBackend();
-      case 'btn-update-apply': return applyServiceWorkerUpdate();
-      case 'btn-check-update': return checkForUpdate(true);
-      case 'btn-force-update': return forceUpdate();
-      case 'btn-toast-action': if (toastAction) { var undo = toastAction; toastAction = null; $('#toast-root').innerHTML = ''; return undo(); } break;
-      case 'btn-attach': return $('#chat-photo').click();
-      case 'btn-unattach': pendingImage = ''; return render();
-      case 'btn-paste': return openPaste();
-      case 'btn-photo': return $('#photo-input').click();
-      case 'btn-save': return saveVehicle();
-      case 'btn-clear': cur = emptyVehicle(); saveDraft(); return render();
-      case 'btn-chat-menu': return openChatMenu();
-      case 'btn-jump-latest': return scrollChatEnd();
-      case 'btn-add-entry': return openEntry();
-      case 'btn-export': return exportBackup();
-      case 'btn-import': return $('#import-input').click();
-      case 'btn-test': return testConnection();
-      case 'btn-install': installEvent.prompt(); installEvent = null; return render();
-    }
-  });
-
-  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); installEvent = e; if (tab === 'ajustes') render(); });
-  window.addEventListener('offline', function () { toast('Sin internet. El asistente necesita conexión.'); });
-  document.addEventListener('visibilitychange', function () { updateWakeLock(); if (document.visibilityState === 'visible') checkForUpdate(false); });
-  window.addEventListener('focus', updateWakeLock);
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', syncKeyboardState);
-    window.visualViewport.addEventListener('scroll', syncKeyboardState);
-  }
-  document.addEventListener('focusin', function (e) {
-    if (e.target && e.target.id === 'chat-input') { keyboardOpen = true; document.body.classList.add('keyboard-open'); setTimeout(scrollChatEnd, 80); }
-    syncKeyboardState();
-  });
-  document.addEventListener('focusout', function (e) {
-    if (e.target && e.target.id === 'chat-input') setTimeout(function () { keyboardOpen = false; document.body.classList.remove('keyboard-open'); syncKeyboardState(); }, 120);
-  });
-
-  if ('serviceWorker' in navigator) {
-    var reloadingForController = false;
-    navigator.serviceWorker.addEventListener('controllerchange', function () {
-      if (reloadingForController) return;
-      reloadingForController = true;
-      window.location.reload();
-    });
-    window.addEventListener('load', function () {
-      navigator.serviceWorker.register('sw.js').then(function (reg) {
-        swRegistration = reg;
-        if (reg.waiting && navigator.serviceWorker.controller) showUpdateBanner('Hay una versión nueva de THOKAR disponible.');
-        reg.addEventListener('updatefound', function () {
-          var nw = reg.installing;
-          if (!nw) return;
-          nw.addEventListener('statechange', function () {
-            if (nw.state === 'installed' && navigator.serviceWorker.controller) showUpdateBanner('Hay una versión nueva de THOKAR disponible.');
-          });
-        });
-        setTimeout(function () { reg.update().catch(function () {}); }, 1500);
-      }).catch(function () {});
-    });
-  }
-
-  if (launchNewChat) { db.chats[chatKey()] = []; persist(['chats']); history.replaceState(null, '', location.pathname + '?tab=asistente'); }
-  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
-  render();
-  wakeBackend().catch(function () {});
-  updateWakeLock();
+/* THOKAR 5.0.0 · workspace centrado en el vehículo */
+(function(){
+'use strict';
+var L=window.ThokarLib;
+var APP_BUILD='5.0.0-workspace';
+var K={settings:'thokar.settings',vehicles:'thokar.vehicles',chats:'thokar.chats',log:'thokar.log',draft:'thokar.draft'};
+var $=function(s,r){return (r||document).querySelector(s)};
+var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function load(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+function todayISO(){return new Date().toISOString().slice(0,10)}
+function wait(ms){return new Promise(function(r){setTimeout(r,ms)})}
+function vibrate(){try{if(navigator.vibrate)navigator.vibrate(10)}catch(e){}}
+function emptyVehicle(){return{plate:'',dv:'',tipo:'',marca:'',modelo:'',version:'',anio:'',color:'',combustible:'',motor:'',chasis:'',procedencia:'',regionProcedencia:'',fabricante:'',km:'',cilindrada:'',puertas:'',transmision:'',codigoSii:'',tasacionFiscal:'',tipoSello:'',multas:'',mesRevision:'',revisionTecnica:'',revisionGases:'',permisoCirculacion:'',soap:'',kmRegistrado:'',transportePublico:'',tipoTransportePublico:'',restriccion:'',siniestrado:'',caseStatus:'Abierto',client:{name:'',phone:''},confirmed:{aceite:'',filtroAceite:'',bujias:'',refrigerante:''},lastActivity:0}}
+var defaults={appToken:'',keepAwake:true,theme:'light',quickRecent:[],serviceIntervals:{aceiteKm:'10000',aceiteMeses:'12',filtrosKm:'15000',frenosKm:'20000',refrigeranteMeses:'24',distribucionKm:'90000'}};
+var db={settings:Object.assign({},defaults,load(K.settings,{})),vehicles:load(K.vehicles,{}),chats:load(K.chats,{}),log:load(K.log,{})};
+Object.keys(db.vehicles).forEach(function(p){db.vehicles[p]=Object.assign(emptyVehicle(),db.vehicles[p]);if(!db.vehicles[p].client)db.vehicles[p].client={name:'',phone:''};if(!db.vehicles[p].confirmed)db.vehicles[p].confirmed={aceite:'',filtroAceite:'',bujias:'',refrigerante:''};if(!db.vehicles[p].caseStatus)db.vehicles[p].caseStatus='Abierto'});
+var cur=Object.assign(emptyVehicle(),load(K.draft,{}));if(!cur.client)cur.client={name:'',phone:''};if(!cur.confirmed)cur.confirmed={aceite:'',filtroAceite:'',bujias:'',refrigerante:''};
+var screen='home',workspaceView='talk',sheetLevel='full',recordFilter='Todos',busy=false,pendingImage='',wakeLock=null,backendState='idle',backendInfo={},swRegistration=null,modalOpen=false,modalPushed=false,installEvent=null,searchStatus='',lookupBusy=false,micRecognition=null;
+var toastTimer,toastUndo=null;
+
+/* ---------- IndexedDB: migración transparente de chats y fotos ---------- */
+var idbPromise=null;
+function openIDB(){if(!('indexedDB'in window))return Promise.resolve(null);if(idbPromise)return idbPromise;idbPromise=new Promise(function(resolve){var req=indexedDB.open('thokar-local-v1',1);req.onupgradeneeded=function(){var d=req.result;if(!d.objectStoreNames.contains('kv'))d.createObjectStore('kv');if(!d.objectStoreNames.contains('photos'))d.createObjectStore('photos')};req.onsuccess=function(){resolve(req.result)};req.onerror=function(){resolve(null)}});return idbPromise}
+async function idbPut(store,key,val){var d=await openIDB();if(!d)return;return new Promise(function(resolve){var tx=d.transaction(store,'readwrite');tx.objectStore(store).put(val,key);tx.oncomplete=function(){resolve()};tx.onerror=function(){resolve()}})}
+async function idbGet(store,key){var d=await openIDB();if(!d)return null;return new Promise(function(resolve){var tx=d.transaction(store,'readonly'),r=tx.objectStore(store).get(key);r.onsuccess=function(){resolve(r.result||null)};r.onerror=function(){resolve(null)}})}
+async function migrateIDB(){var saved=await idbGet('kv','chats');if(saved&&typeof saved==='object')Object.keys(saved).forEach(function(p){if(!db.chats[p]||!db.chats[p].length)db.chats[p]=saved[p]});await idbPut('kv','chats',db.chats);if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(function(){})}
+function persist(parts){(parts||['settings','vehicles','chats','log']).forEach(function(n){save(K[n],db[n])});if(!parts||parts.indexOf('chats')>=0)idbPut('kv','chats',db.chats)}
+function saveDraft(){save(K.draft,cur)}
+
+/* ---------- SVG ---------- */
+var I={
+ gear:'<svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.86 2.86-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21H9.55v-.1A1.7 1.7 0 0 0 8.5 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.86-2.86.06-.06A1.7 1.7 0 0 0 4.1 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H2.3V9.55h.1A1.7 1.7 0 0 0 4.1 8.5a1.7 1.7 0 0 0-.34-1.88l-.06-.06L6.56 3.7l.06.06A1.7 1.7 0 0 0 8.5 4.1a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V2.3h4.05v.1A1.7 1.7 0 0 0 15 4.1a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.86 2.86-.06.06A1.7 1.7 0 0 0 19.4 8.5a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4h.1v4.05h-.1A1.7 1.7 0 0 0 19.4 15z"/></svg>',
+ back:'<svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>', search:'<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>',
+ car:'<svg viewBox="0 0 24 24"><path d="M5 16v-5l1.7-4.2A2 2 0 0 1 8.5 5.5h7a2 2 0 0 1 1.9 1.3L19 11v5"/><path d="M3.5 16h17v2.5h-3V17H6.5v1.5h-3z"/></svg>',
+ chat:'<svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4v-4z"/><path d="M8 9h8M8 12h5"/></svg>', note:'<svg viewBox="0 0 24 24"><path d="M6 3h12v18H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>', data:'<svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/><path d="M8 3v4M15 10v4M11 17v4"/></svg>',
+ mic:'<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>', camera:'<svg viewBox="0 0 24 24"><path d="M4 7h4l1.5-2h5L16 7h4v12H4z"/><circle cx="12" cy="13" r="4"/></svg>', send:'<svg viewBox="0 0 24 24"><path d="M3 11.5L21 3l-7.5 18-2.2-7.3z"/><path d="M11.3 13.7L21 3"/></svg>', bolt:'<svg viewBox="0 0 24 24"><path d="M13 2L4.5 13H11l-1 9 8.5-11H12z"/></svg>',
+ copy:'<svg viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>', save:'<svg viewBox="0 0 24 24"><path d="M5 3h12l2 2v16H5z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/></svg>', share:'<svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/></svg>', check:'<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1.5 1.5L7.5 5M3.5 12l1.5 1.5 2.5-2.5M3.5 18l1.5 1.5 2.5-2.5"/></svg>',
+ more:'<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>', down:'<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>', plus:'<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>', trash:'<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/></svg>', phone:'<svg viewBox="0 0 24 24"><path d="M7 3l3 4-2 2c1.5 3 3.5 5 6.5 6.5l2-2 4 3c-1 3-3 4.5-5.5 4C8 19 5 16 3.5 9 3 6.5 4 4 7 3z"/></svg>',
+ sun:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>'
+};
+
+/* ---------- UI feedback ---------- */
+function toast(msg,label,undo){var root=$('#toast-root');toastUndo=typeof undo==='function'?undo:null;root.innerHTML='<div class="toast" role="status"><span>'+esc(msg)+'</span>'+(toastUndo&&label?'<button id="toast-action">'+esc(label)+'</button>':'')+'</div>';clearTimeout(toastTimer);toastTimer=setTimeout(function(){root.innerHTML='';toastUndo=null},toastUndo?6500:3500)}
+function applyTheme(){var t=db.settings.theme||'light';if(t==='auto')t=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';document.documentElement.dataset.theme=t;var meta=$('#theme-color-meta');if(meta)meta.content=t==='dark'?'#0F1113':'#F4F2EE'}
+function transition(fn){if(document.startViewTransition&&!matchMedia('(prefers-reduced-motion:reduce)').matches)return document.startViewTransition(fn);fn()}
+function fmtTime(ts){try{return new Date(ts||Date.now()).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}catch(e){return''}}
+function carName(v){return[v.marca,v.modelo,v.version].filter(Boolean).join(' ')||'Vehículo'}
+function activePlate(){return L.isPlateOk(cur.plate)?cur.plate:''}
+function markActivity(){cur.lastActivity=Date.now();if(db.vehicles[cur.plate])db.vehicles[cur.plate].lastActivity=cur.lastActivity}
+
+/* ---------- Navegación / modal ---------- */
+function navigate(next,opts){opts=opts||{};transition(function(){screen=next;if(next==='workspace'&&opts.view)workspaceView=opts.view;if(next==='workspace')sheetLevel=workspaceView==='talk'?'full':'medium';render()});if(!opts.fromPop){try{history.pushState({screen:next},'',location.pathname)}catch(e){}}updateWakeLock()}
+function home(){transition(function(){screen='home';render()});updateWakeLock()}
+function openModal(html,mount){modalOpen=true;try{history.pushState({modal:true},'',location.href);modalPushed=true}catch(e){};$('#overlay-root').innerHTML='<div class="overlay" id="modal-bg"><section class="modal-sheet" role="dialog" aria-modal="true"><div class="grabber" id="modal-grabber"><span></span></div>'+html+'</section></div>';var bg=$('#modal-bg');bg.addEventListener('click',function(e){if(e.target===bg)closeModal()});if(mount)mount($('.modal-sheet'));setupModalDrag()}
+function closeModal(fromPop){if(!modalOpen)return;modalOpen=false;$('#overlay-root').innerHTML='';if(!fromPop&&modalPushed&&history.state&&history.state.modal){modalPushed=false;history.back()}else if(fromPop)modalPushed=false}
+function setupModalDrag(){var g=$('#modal-grabber'),s=$('.modal-sheet');if(!g||!s)return;var y=0,d=0,on=false;g.addEventListener('pointerdown',function(e){on=true;y=e.clientY;g.setPointerCapture(e.pointerId)});g.addEventListener('pointermove',function(e){if(!on)return;d=Math.max(0,e.clientY-y);s.style.transform='translateY('+d+'px)'});g.addEventListener('pointerup',function(){on=false;s.style.transform='';if(d>80)closeModal();d=0})}
+window.addEventListener('popstate',function(e){if(modalOpen)return closeModal(true);var st=e.state&&e.state.screen;if(st){screen=st;render();updateWakeLock()}else{screen='home';render();updateWakeLock()}});
+
+/* ---------- Backend ---------- */
+function authHeaders(extra){var h=Object.assign({'Accept':'application/json'},extra||{});if((db.settings.appToken||'').trim())h['X-THOKAR-TOKEN']=db.settings.appToken.trim();return h}
+function backendMessage(status,b){var e=b&&b.error||{},c=e.code||'';if(c==='APP_NOT_PROTECTED')return'Configura APP_TOKEN en Render.';if(c==='APP_AUTH'||status===401)return'El Token THOKAR no coincide con APP_TOKEN.';if(c==='BOOSTR_NOT_CONFIGURED')return'Falta BOOSTR_API_KEY en Render.';if(c==='BOOSTR_AUTH')return'Boostr rechazó la API key.';if(c==='GEMINI_NOT_CONFIGURED')return'Falta GEMINI_API_KEY en Render.';if(c==='NOT_FOUND'||status===404)return'No encontré datos para esa patente.';if(status===429)return'Demasiadas consultas. Espera un momento.';return e.message||'No pude completar la solicitud.'}
+async function wakeBackend(silent){if(!navigator.onLine){backendState='offline';renderConnection();throw new Error('Sin internet.')};backendState='waking';renderConnection();var delays=[0,2000,5000,10000],last;for(var i=0;i<delays.length;i++){if(delays[i])await wait(delays[i]);var ctl=new AbortController(),tm=setTimeout(function(){ctl.abort()},13000);try{var r=await fetch('/healthz?ts='+Date.now(),{cache:'no-store',signal:ctl.signal});clearTimeout(tm);var d=await r.json();if(!r.ok||!d.ok)throw new Error('health');backendState='ok';backendInfo=d;renderConnection();if(d.build&&d.build!==APP_BUILD)showUpdate('Hay una versión nueva disponible.');return d}catch(e){clearTimeout(tm);last=e}}backendState='error';renderConnection();if(!silent)toast('Servidor sin respuesta.');throw last||new Error('Servidor sin respuesta.')}
+function renderConnection(){var r=$('#connection-root');if(!r)return;if(backendState==='waking')r.innerHTML='<div class="connection-pill"><span class="dot"></span>Despertando el servidor…</div>';else if(backendState==='offline')r.innerHTML='<div class="connection-pill error"><span class="dot"></span>Sin internet</div>';else if(backendState==='error')r.innerHTML='<button class="connection-pill error" id="retry-backend"><span class="dot"></span>Servidor sin respuesta</button>';else r.innerHTML=''}
+async function postJSON(path,body){if(backendState!=='ok')await wakeBackend(true);var r=await fetch(path,{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),cache:'no-store',body:JSON.stringify(body)});var d=await r.json().catch(function(){return{}});if(!r.ok||!d.ok)throw new Error(backendMessage(r.status,d));return d.text||''}
+async function geminiStream(body,onChunk){if(backendState!=='ok')await wakeBackend(true);var r=await fetch('/api/ai/stream',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),cache:'no-store',body:JSON.stringify(body)});if(!r.ok){var d=await r.json().catch(function(){return{}});throw new Error(backendMessage(r.status,d))}if(!r.body||!r.body.getReader){var tx=await r.text();onChunk(tx);return tx}var reader=r.body.getReader(),dec=new TextDecoder(),full='';while(true){var p=await reader.read();if(p.done)break;var c=dec.decode(p.value,{stream:true});if(c){full+=c;onChunk(c)}}return full}
+
+/* ---------- Cambio de vehículo / búsqueda ---------- */
+function freshContext(plate){var old=cur.plate;cur=emptyVehicle();cur.plate=L.cleanPlate(plate);pendingImage='';saveDraft();if(old!==cur.plate){/* Separación fuerte: jamás reutiliza datos técnicos del vehículo anterior. */}return old}
+async function lookupPlate(plate){plate=L.cleanPlate(plate);if(!L.isPlateOk(plate)){toast('Escribe una patente válida.');return}if(lookupBusy)return;lookupBusy=true;searchStatus='Buscando '+plate+'…';render();var previous=cur.plate;freshContext(plate);if(previous!==plate){db.chats[plate]=[];save(K.draft+'.chat.'+plate,'');persist(['chats'])}try{if(backendState!=='ok')await wakeBackend(true);var r=await fetch('/api/vehiculo/'+encodeURIComponent(plate),{headers:authHeaders(),cache:'no-store'});var b=await r.json().catch(function(){return{}});if(!r.ok||!b.ok)throw new Error(backendMessage(r.status,b));var found=b.vehicle||{};var saved=db.vehicles[plate];var keep=saved?{km:saved.km||'',client:saved.client||{name:'',phone:''},confirmed:saved.confirmed||{},caseStatus:saved.caseStatus||'Abierto',lastActivity:saved.lastActivity||0}:{};cur=Object.assign(emptyVehicle(),found,keep,{plate:plate});cur.lastActivity=Date.now();saveDraft();searchStatus='';workspaceView='data';sheetLevel='medium';screen='workspace';/* El chat cambia por clave de patente; nunca se envía historia de la patente anterior. */persist(['chats']);render();history.pushState({screen:'workspace'},'',location.pathname);toast('Vehículo cargado.');vibrate()}catch(e){searchStatus=e.message||'No pude consultar la patente.';/* El vehículo anterior NO vuelve a aparecer. */cur=Object.assign(emptyVehicle(),{plate:plate});saveDraft();render();toast(searchStatus)}finally{lookupBusy=false;render()}}
+function saveVehicle(){if(!L.isPlateOk(cur.plate))return toast('No hay una patente válida.');if(!cur.marca&&!cur.modelo)return toast('Primero consulta o completa los datos del vehículo.');cur.lastActivity=Date.now();db.vehicles[cur.plate]=JSON.parse(JSON.stringify(cur));persist(['vehicles']);saveDraft();toast('Vehículo guardado.');vibrate();render()}
+function openCase(plate){var v=db.vehicles[plate];if(!v)return;var source=document.querySelector('[data-open-case=\"'+plate+'\"] .plate-chip');if(source)source.style.viewTransitionName='active-plate';cur=Object.assign(emptyVehicle(),JSON.parse(JSON.stringify(v)));saveDraft();workspaceView='talk';sheetLevel='full';navigate('workspace',{view:'talk'})}
+function changeStatus(){var states=['Abierto','En diagnóstico','Listo'];var i=states.indexOf(cur.caseStatus||'Abierto');cur.caseStatus=states[(i+1)%states.length];if(db.vehicles[cur.plate]){db.vehicles[cur.plate].caseStatus=cur.caseStatus;persist(['vehicles'])}saveDraft();render()}
+
+/* ---------- Chat ---------- */
+var QUICK=[
+ ['Diagnóstico inicial','Tengo una falla en este vehículo. Hazme las preguntas mínimas necesarias y propón un diagnóstico ordenado.'],
+ ['Aceite y filtro','Indícame aceite, norma, capacidad aproximada y filtro de aceite para este vehículo.'],
+ ['Códigos de falla','Voy a darte códigos OBD-II. Explícalos usando solo el contexto de este vehículo.'],
+ ['Reaprendizaje batería','Se desconectó la batería. Indica reaprendizajes/adaptaciones aplicables a este vehículo y cómo verificarlos.'],
+ ['Frenos','Ayúdame a revisar frenos de este vehículo: inspección, mediciones y señales de reemplazo.'],
+ ['Bujías','Indica especificación de bujías y verificaciones para este vehículo.'],
+ ['Suspensión','Guíame para diagnosticar ruidos o juego de suspensión en este vehículo.'],
+ ['Sistema eléctrico','Guíame para diagnosticar una falla eléctrica de este vehículo con mediciones seguras.']
+];
+function chatKey(){return activePlate()||'_sin_patente'}
+function buildContents(list,image){var recent=list.filter(function(m){return !m.error&&!m.streaming}).slice(-14);var c=recent.map(function(m){return{role:m.role,parts:[{text:m.text}]}});if(image&&c.length)c[c.length-1].parts.unshift({inline_data:{mime_type:'image/jpeg',data:image}});return c}
+function loadImage(file){return new Promise(function(resolve,reject){var url=URL.createObjectURL(file),im=new Image();im.onload=function(){var max=1280,s=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)),cv=document.createElement('canvas');cv.width=Math.round(im.naturalWidth*s);cv.height=Math.round(im.naturalHeight*s);cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);URL.revokeObjectURL(url);resolve(cv.toDataURL('image/jpeg',.82).split(',')[1])};im.onerror=function(){URL.revokeObjectURL(url);reject(new Error('No pude abrir la imagen.'))};im.src=url})}
+async function ask(text){text=String(text||'').trim();if(busy)return;if(!activePlate())return toast('Carga un vehículo primero.');if(!text&&!pendingImage)return;if(!text)text='Analiza esta foto en el contexto de este vehículo.';var key=chatKey(),list=db.chats[key]=db.chats[key]||[],img=pendingImage;pendingImage='';var user={role:'user',text:text+(img?' [foto adjunta]':''),at:Date.now()},model={role:'model',text:'',at:Date.now()+1,streaming:true};list.push(user,model);busy=true;markActivity();persist(['chats','vehicles']);render();scrollChatEnd();try{var before=list.slice(0,-1);await geminiStream({systemInstruction:{parts:[{text:L.buildSystemPrompt(cur)}]},contents:buildContents(before,img),generationConfig:{temperature:.25}},function(chunk){model.text+=chunk;model.streaming=false;updateStreamingModel(list.length-1,model)});if(!model.text.trim())throw new Error('La IA no devolvió una respuesta.')}catch(e){model.streaming=false;model.error=true;model.text=e.message||'No pude responder.'}busy=false;if(list.length>60)db.chats[key]=list.slice(-60);persist(['chats']);render();scrollChatEnd()}
+function updateStreamingModel(index,m){var n=$('[data-ai-content="'+index+'"]');if(!n)return;n.innerHTML=renderAiBody(m,index);var th=$('#talk-thread');if(th&&th.scrollHeight-th.scrollTop-th.clientHeight<180)th.scrollTop=th.scrollHeight}
+function parseCertainty(text){var m=String(text||'').match(/Certeza\s*:\s*(Alta|Media|Baja)/i);return m?m[1].toLowerCase():'media'}
+function cleanAIText(text){return String(text||'').replace(/^Certeza\s*:\s*(Alta|Media|Baja)\s*$/gim,'').trim()}
+function extractSteps(text){var out=[];cleanAIText(text).split(/\n/).forEach(function(l){var m=l.match(/^\s*(?:\d+[.)]|[-•])\s+(.+)/);if(m&&m[1].trim().length>4)out.push(m[1].trim())});return out.slice(0,12)}
+function md(text){var safe=esc(cleanAIText(text));safe=safe.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/`([^`]+)`/g,'<code>$1</code>');var lines=safe.split('\n'),html='',list='';lines.forEach(function(l){var num=l.match(/^\s*\d+[.)]\s+(.+)/),bul=l.match(/^\s*[-•]\s+(.+)/);if(num||bul){var type=num?'ol':'ul';if(list!==type){if(list)html+='</'+list+'>';html+='<'+type+'>';list=type}html+='<li>'+(num||bul)[1]+'</li>';return}if(list){html+='</'+list+'>';list=''}if(!l.trim())return;var h=l.match(/^(Resumen|Pasos|Verificar|Advertencia|Causas probables)\s*:\s*(.*)$/i);if(h)html+='<h4>'+h[1]+'</h4>'+(h[2]?'<p>'+h[2]+'</p>':'');else html+='<p>'+l+'</p>'});if(list)html+='</'+list+'>';return html}
+function renderAiBody(m,index){if(m.streaming&&!m.text)return'<div class="typing"><i></i><i></i><i></i></div>';var body=md(m.text),steps=extractSteps(m.text);if(steps.length>=3){m.stepChecks=m.stepChecks||steps.map(function(){return false});body+='<div class="ai-steps">'+steps.map(function(s,i){return'<label class="ai-step"><input type="checkbox" data-chat-step="'+index+'" data-step-index="'+i+'" '+(m.stepChecks[i]?'checked':'')+'><span>'+esc(s)+'</span></label>'}).join('')+'</div>'}return body}
+function renderChatMessage(m,i){if(m.role==='user')return'<div class="user-pill"><div>'+esc(m.text)+'</div><div class="msg-time">'+fmtTime(m.at)+'</div></div>';var certainty=parseCertainty(m.text);return'<article class="ai-doc'+(m.error?' error':'')+'"><div class="ai-head"><span class="ai-label">THOKAR IA</span>'+(!m.error?'<span class="certainty '+certainty+'">Certeza '+certainty+'</span>':'')+'</div><div class="ai-content" data-ai-content="'+i+'">'+renderAiBody(m,i)+'</div><div class="ai-actions">'+(m.error?'<button class="ai-action" data-retry="'+i+'">'+I.search+' Reintentar</button>':'<button class="ai-action" data-copy-msg="'+i+'">'+I.copy+' Copiar</button><button class="ai-action" data-save-msg="'+i+'">'+I.save+' Guardar</button><button class="ai-action" data-check-msg="'+i+'">'+I.check+' Checklist</button><button class="ai-action" data-share-msg="'+i+'">'+I.share+' Compartir</button>')+'</div><div class="msg-time">'+fmtTime(m.at)+'</div></article>'}
+function scrollChatEnd(){var t=$('#talk-thread');if(t)requestAnimationFrame(function(){t.scrollTop=t.scrollHeight;updateJump()})}
+function updateJump(){var t=$('#talk-thread'),b=$('#jump-latest');if(t&&b)b.classList.toggle('hidden',t.scrollHeight-t.scrollTop-t.clientHeight<220)}
+function retry(i){var l=db.chats[chatKey()]||[],prev=l[Number(i)-1];if(!prev||prev.role!=='user')return;l.splice(Number(i),1);persist(['chats']);ask(prev.text.replace(/\s*\[foto adjunta\]$/,''))}
+function copyMsg(i){var m=(db.chats[chatKey()]||[])[Number(i)];if(!m)return;navigator.clipboard&&navigator.clipboard.writeText(m.text).then(function(){toast('Copiado.')})}
+function autoTitle(text){var t=cleanAIText(text),m=t.match(/Resumen\s*:\s*([^\n]+)/i);return(m?m[1]:t.split('\n').filter(Boolean)[0]||'Diagnóstico IA').replace(/\*\*/g,'').slice(0,72)}
+function saveMsg(i){var m=(db.chats[chatKey()]||[])[Number(i)];if(!m)return;var e={id:uid(),type:'Diagnóstico',fecha:todayISO(),km:cur.km||'',trabajo:autoTitle(m.text),notas:m.text,source:'IA'};var list=db.log[cur.plate]=db.log[cur.plate]||[];list.unshift(e);persist(['log']);toast('Guardado en Registro.','Deshacer',function(){db.log[cur.plate]=(db.log[cur.plate]||[]).filter(function(x){return x.id!==e.id});persist(['log']);render()});vibrate()}
+function saveChecklist(i){var m=(db.chats[chatKey()]||[])[Number(i)];if(!m)return;var steps=extractSteps(m.text);if(steps.length<3)return toast('La respuesta no tiene suficientes pasos para un checklist.');var e={id:uid(),type:'Checklist',fecha:todayISO(),km:cur.km||'',trabajo:autoTitle(m.text),notas:'',checklist:steps.map(function(s){return{text:s,done:false}}),source:'IA'};(db.log[cur.plate]=db.log[cur.plate]||[]).unshift(e);persist(['log']);toast('Checklist guardado.','Deshacer',function(){db.log[cur.plate]=(db.log[cur.plate]||[]).filter(function(x){return x.id!==e.id});persist(['log']);render()});vibrate()}
+async function shareMsg(i){var m=(db.chats[chatKey()]||[])[Number(i)];if(!m)return;var txt=cur.plate+' · '+carName(cur)+'\n\n'+m.text;if(navigator.share)try{return await navigator.share({title:'THOKAR · '+cur.plate,text:txt})}catch(e){}if(navigator.clipboard){await navigator.clipboard.writeText(txt);toast('Texto copiado para compartir.')}}
+function rememberQuick(i){var a=db.settings.quickRecent||[];a=[i].concat(a.filter(function(x){return x!==i})).slice(0,3);db.settings.quickRecent=a;persist(['settings'])}
+function askQuick(i){rememberQuick(i);closeModal();ask(QUICK[i][1])}
+function openQuickActions(){var recent=(db.settings.quickRecent||[]).filter(function(i){return QUICK[i]});var rest=QUICK.map(function(_,i){return i}).filter(function(i){return recent.indexOf(i)<0});function tiles(arr){return arr.map(function(i){return'<button class="action-tile" data-quick="'+i+'">'+I.bolt+'<span>'+esc(QUICK[i][0])+'</span></button>'}).join('')}openModal('<h2 class="sheet-title">Acciones rápidas</h2>'+(recent.length?'<div class="section-label">Usadas recientemente</div><div class="action-grid">'+tiles(recent)+'</div>':'')+'<div class="section-label">Diagnóstico y mantención</div><div class="action-grid">'+tiles(rest)+'</div>')}
+function startMic(){var R=window.SpeechRecognition||window.webkitSpeechRecognition;if(!R)return toast('Usa el micrófono del teclado de Android en este dispositivo.');try{if(micRecognition)micRecognition.stop()}catch(e){};micRecognition=new R();micRecognition.lang='es-CL';micRecognition.interimResults=true;var ta=$('#chat-input');micRecognition.onresult=function(e){var t='';for(var i=e.resultIndex;i<e.results.length;i++)t+=e.results[i][0].transcript;ta.value=t;save(K.draft+'.chat.'+chatKey(),ta.value)};micRecognition.onerror=function(){toast('No pude iniciar el dictado.')};micRecognition.start()}
+
+/* ---------- Registro ---------- */
+var TYPES=['Todos','Diagnóstico','Trabajo','Checklist','Nota','Repuesto'];
+function entryType(e){return e.type||(e.checklist?'Checklist':'Trabajo')}
+function renderRecord(){var list=(db.log[cur.plate]||[]).filter(function(e){return recordFilter==='Todos'||entryType(e)===recordFilter});return'<div class="filter-row">'+TYPES.map(function(t){return'<button class="filter-chip '+(recordFilter===t?'active':'')+'" data-filter="'+esc(t)+'">'+esc(t)+'</button>'}).join('')+'</div>'+(list.length?'<div class="timeline">'+list.map(renderEntry).join('')+'</div>':'<div class="home-empty"><div class="empty-icon">'+I.note+'</div><strong>Aún no hay registros</strong><p class="muted small">Guarda diagnósticos, trabajos o checklists de este vehículo.</p></div>')+'<div class="record-actions"><button class="btn" id="service-report">Informe de servicio</button><button class="btn primary" id="add-entry">Registrar</button></div>'}
+function renderEntry(e){var type=entryType(e),done=0,total=0;if(e.checklist){total=e.checklist.length;done=e.checklist.filter(function(x){return x.done}).length}return'<article class="timeline-item"><div class="timeline-top"><div><div class="timeline-type">'+esc(type)+'</div><div class="timeline-title">'+esc(e.trabajo||e.titulo||'Registro')+'</div><div class="timeline-meta">'+esc(L.formatDate(e.fecha)||'')+(e.km?' · '+esc(L.formatKm(e.km))+' km':'')+'</div></div><button class="mini-copy" data-delete-entry="'+e.id+'" aria-label="Eliminar registro">'+I.trash+'</button></div>'+(e.notas?'<div class="timeline-notes">'+esc(e.notas)+'</div>':'')+(e.checklist?'<div class="ai-steps">'+e.checklist.map(function(x,i){return'<label class="ai-step"><input type="checkbox" data-log-check="'+e.id+'" data-log-index="'+i+'" '+(x.done?'checked':'')+'><span>'+esc(x.text)+'</span></label>'}).join('')+'</div><div class="progress"><span style="width:'+(total?Math.round(done/total*100):0)+'%"></span></div><div class="timeline-meta">'+done+'/'+total+' completado</div>':'')+(e.photoId?'<img class="entry-photo" data-photo-id="'+esc(e.photoId)+'" alt="Foto del registro">':'')+'</article>'}
+function openEntry(){var photoFile=null;openModal('<h2 class="sheet-title">Registrar trabajo</h2><div class="grid2"><div class="field"><label>Tipo</label><select id="e-type"><option>Trabajo</option><option>Diagnóstico</option><option>Nota</option><option>Repuesto</option></select></div><div class="field"><label>Fecha</label><input id="e-date" type="date" value="'+todayISO()+'"></div></div><div class="field" style="margin-top:12px"><label>Descripción</label><input id="e-title" placeholder="Ej. cambio de aceite y filtro"></div><div class="grid2" style="margin-top:12px"><div class="field"><label>Kilometraje</label><input id="e-km" inputmode="numeric" value="'+esc(L.formatKm(cur.km))+'"></div><div class="field"><label>Foto</label><input id="e-photo" type="file" accept="image/*" capture="environment"></div></div><div class="field" style="margin-top:12px"><label>Notas / repuestos</label><textarea id="e-notes"></textarea></div><div class="grid2" style="margin-top:12px"><div class="field"><label>Próximo a los km</label><input id="e-next-km" inputmode="numeric"></div><div class="field"><label>Próxima fecha</label><input id="e-next-date" type="date"></div></div><button class="btn primary block" id="save-entry" style="margin-top:16px">Guardar registro</button>',function(s){$('#e-photo',s).addEventListener('change',function(e){photoFile=e.target.files[0]||null});$('#save-entry',s).addEventListener('click',async function(){var title=$('#e-title',s).value.trim();if(!title)return toast('Escribe una descripción.');var photoId='';if(photoFile){try{var b64=await loadImage(photoFile);photoId='p_'+uid();await idbPut('photos',photoId,'data:image/jpeg;base64,'+b64)}catch(e){}}var en={id:uid(),type:$('#e-type',s).value,fecha:$('#e-date',s).value,km:$('#e-km',s).value.replace(/\D/g,''),trabajo:title,notas:$('#e-notes',s).value.trim(),nextKm:$('#e-next-km',s).value.replace(/\D/g,''),nextFecha:$('#e-next-date',s).value,photoId:photoId};(db.log[cur.plate]=db.log[cur.plate]||[]).unshift(en);if(en.km)cur.km=en.km;markActivity();if(db.vehicles[cur.plate])db.vehicles[cur.plate]=JSON.parse(JSON.stringify(cur));persist(['log','vehicles']);saveDraft();closeModal();toast('Registro guardado.');vibrate();render()})})}
+async function hydratePhotos(){var els=$$('[data-photo-id]');for(var i=0;i<els.length;i++){var d=await idbGet('photos',els[i].dataset.photoId);if(d)els[i].src=d}}
+function deleteEntry(id){openModal('<h2 class="sheet-title">Eliminar registro</h2><p>Esta acción no se puede deshacer.</p><button class="btn danger block" id="confirm-delete-entry" style="margin-top:16px">Eliminar</button>',function(s){$('#confirm-delete-entry',s).addEventListener('click',function(){db.log[cur.plate]=(db.log[cur.plate]||[]).filter(function(e){return e.id!==id});persist(['log']);closeModal();render()})})}
+async function serviceReport(){var list=(db.log[cur.plate]||[]).slice(0,8),client=cur.client||{};var txt='THOKAR · Informe de servicio\n'+cur.plate+' · '+carName(cur)+(cur.km?' · '+L.formatKm(cur.km)+' km':'')+'\n'+(client.name?'Cliente: '+client.name+'\n':'')+'\n'+list.map(function(e){return'• '+(L.formatDate(e.fecha)||'')+' · '+(e.trabajo||'Registro')+(e.km?' · '+L.formatKm(e.km)+' km':'')}).join('\n');if(navigator.share)try{return await navigator.share({title:'Informe THOKAR '+cur.plate,text:txt})}catch(e){}if(navigator.clipboard){await navigator.clipboard.writeText(txt);toast('Informe copiado.')}}
+
+/* ---------- Datos ---------- */
+function dataRow(label,value,copyKey){return'<div class="data-row"><span class="data-key">'+esc(label)+'</span><span class="data-value">'+esc(value||'—')+'</span>'+(copyKey&&value?'<button class="mini-copy" data-copy-field="'+copyKey+'" aria-label="Copiar '+esc(label)+'">'+I.copy+'</button>':'<span></span>')+'</div>'}
+function serviceItems(){var list=(db.log[cur.plate]||[]).filter(function(e){return e.nextKm||e.nextFecha}).slice(0,5);if(!list.length)return'<p class="muted small">Aún no hay próximos servicios calculados. Se crean al registrar un trabajo.</p>';var km=Number(cur.km||0),now=new Date();return'<div class="service-list">'+list.map(function(e){var cls='',lab='Programado';if(e.nextKm&&km>=Number(e.nextKm)){cls='due';lab='Vencido'}else if(e.nextKm&&Number(e.nextKm)-km<=1500){cls='soon';lab='Próximo'}if(e.nextFecha){var days=(new Date(e.nextFecha+'T12:00:00')-now)/86400000;if(days<0){cls='due';lab='Vencido'}else if(days<45&&!cls){cls='soon';lab='Próximo'}}return'<div class="service-item"><div><strong>'+esc(e.trabajo||'Servicio')+'</strong><div class="small muted">'+(e.nextKm?L.formatKm(e.nextKm)+' km':'')+(e.nextKm&&e.nextFecha?' · ':'')+(e.nextFecha?L.formatDate(e.nextFecha):'')+'</div></div><span class="service-state '+cls+'">'+lab+'</span></div>'}).join('')+'</div>'}
+function renderData(){var v=cur,c=v.client||{},co=v.confirmed||{};return'<section class="data-section"><h3>Guardar caso</h3><p class="muted small">Buscar otra patente desde Inicio cambia de vehículo automáticamente y limpia el contexto activo.</p><button class="btn primary block" id="save-vehicle" style="margin-top:12px">Guardar vehículo</button></section><section class="data-section"><h3>Estado del caso</h3><button class="btn" id="cycle-status-data">'+esc(v.caseStatus||'Abierto')+' · tocar para cambiar</button></section><section class="data-section"><h3>Datos técnicos</h3>'+dataRow('Marca',v.marca)+dataRow('Modelo',v.modelo)+dataRow('Versión',v.version)+dataRow('Año',v.anio)+dataRow('Tipo',v.tipo)+dataRow('Combustible',v.combustible)+dataRow('Cilindrada',v.cilindrada)+dataRow('Motor',v.motor,'motor')+dataRow('VIN / chasis',v.chasis,'chasis')+dataRow('Transmisión',v.transmision)+dataRow('Color',v.color)+dataRow('Fabricante',v.fabricante)+dataRow('Procedencia',v.procedencia)+'</section><section class="data-section"><h3>Datos confirmados</h3><div class="field"><label>Aceite</label><input id="confirmed-aceite" value="'+esc(co.aceite||'')+'" placeholder="Ej. 5W-30 API SP"></div><div class="field" style="margin-top:12px"><label>Filtro de aceite</label><input id="confirmed-filtroAceite" value="'+esc(co.filtroAceite||'')+'"></div><div class="field" style="margin-top:12px"><label>Bujías</label><input id="confirmed-bujias" value="'+esc(co.bujias||'')+'"></div><div class="field" style="margin-top:12px"><label>Refrigerante</label><input id="confirmed-refrigerante" value="'+esc(co.refrigerante||'')+'"></div></section><section class="data-section"><h3>Cliente opcional</h3><div class="field"><label>Nombre</label><input id="client-name" value="'+esc(c.name||'')+'"></div><div class="field" style="margin-top:12px"><label>Teléfono</label><div class="row"><input class="grow" id="client-phone" inputmode="tel" value="'+esc(c.phone||'')+'"><button class="icon-btn" id="client-wa" aria-label="Abrir WhatsApp">'+I.phone+'</button></div></div></section><section class="data-section"><h3>Próximos servicios</h3>'+serviceItems()+'</section>'}
+
+/* ---------- Home / workspace rendering ---------- */
+function latestActivity(p,v){var logs=db.log[p]||[],chat=db.chats[p]||[];return Math.max(Number(v.lastActivity||0),logs.length?new Date(logs[0].fecha||0).getTime():0,chat.length?Number(chat[chat.length-1].at||0):0)}
+function statusClass(s){return s==='En diagnóstico'?'diagnostico':s==='Listo'?'listo':''}
+function renderHome(){var plates=Object.keys(db.vehicles).sort(function(a,b){return latestActivity(b,db.vehicles[b])-latestActivity(a,db.vehicles[a])});var list=plates.map(function(p){var v=db.vehicles[p],last=latestActivity(p,v),meta=last?new Date(last).toLocaleDateString('es-CL',{day:'numeric',month:'short'}):'Sin actividad';return'<button class="case-card" data-open-case="'+p+'"><span class="plate-chip">'+esc(p)+'</span><span><span class="case-name">'+esc([v.marca,v.modelo,v.anio].filter(Boolean).join(' ')||'Vehículo guardado')+'</span><span class="case-meta">Última actividad · '+esc(meta)+'</span></span><span class="status-chip '+statusClass(v.caseStatus)+'">'+esc(v.caseStatus||'Abierto')+'</span></button>'}).join('');return'<section class="screen home"><header class="topbar"><div><h1 class="screen-title">THOKAR</h1><p class="screen-subtitle"><span class="connection-dot '+(backendState==='ok'?'':backendState==='offline'?'offline':'waking')+'"></span> Taller móvil</p></div><button class="icon-btn" id="open-settings" aria-label="Ajustes">'+I.gear+'</button></header><div class="section-label">Casos recientes</div>'+(list?'<div class="case-list">'+list+'</div>':'<div class="home-empty"><div class="empty-icon">'+I.car+'</div><h2>Busca tu primer vehículo</h2><p class="muted">Escribe una patente abajo. Al buscar otra, THOKAR cambia automáticamente de contexto.</p></div>')+'<div class="search-status">'+esc(searchStatus)+'</div><form class="search-dock" id="plate-search"><input id="home-plate" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="6" placeholder="PATENTE" aria-label="Patente"><button class="btn primary" '+(lookupBusy?'disabled':'')+'>'+I.search+' Buscar</button></form></section>'}
+function duePills(){var list=(db.log[cur.plate]||[]).filter(function(e){return e.nextKm||e.nextFecha}).slice(0,3);if(!list.length)return'';var km=Number(cur.km||0);return'<div class="due-row">'+list.map(function(e){var cls='';if(e.nextKm&&km>=Number(e.nextKm))cls='danger';else if(e.nextKm&&Number(e.nextKm)-km<=1500)cls='warn';return'<span class="due-pill '+cls+'">'+esc(e.trabajo||'Servicio')+(e.nextKm?' · '+L.formatKm(e.nextKm)+' km':'')+'</span>'}).join('')+'</div>'}
+function renderTalk(){var list=db.chats[chatKey()]||[],empty=!list.length&&!busy;return'<div class="talk"><div class="talk-thread" id="talk-thread">'+(empty?renderQuickStart():'')+list.map(renderChatMessage).join('')+(busy&&list.length&&list[list.length-1].streaming&&!list[list.length-1].text?'':'')+'</div><button class="jump-latest hidden" id="jump-latest" aria-label="Ir al último mensaje">'+I.down+'</button>'+(pendingImage?'<div class="attach-preview"><span>Foto lista para enviar</span><button class="btn ghost" id="remove-attachment">Quitar</button></div>':'')+'<div class="composer-wrap"><form class="composer" id="composer"><button type="button" class="icon-btn" id="quick-actions" aria-label="Acciones rápidas">'+I.bolt+'</button><button type="button" class="icon-btn" id="mic" aria-label="Dictar mensaje">'+I.mic+'</button><button type="button" class="icon-btn" id="camera" aria-label="Adjuntar foto">'+I.camera+'</button><textarea id="chat-input" rows="1" placeholder="Escribe un mensaje…" aria-label="Mensaje"></textarea><button class="icon-btn send" aria-label="Enviar">'+I.send+'</button></form><input id="chat-photo" type="file" accept="image/*" capture="environment" hidden></div></div>'}
+function renderQuickStart(){return'<div class="quick-start">'+QUICK.slice(0,6).map(function(q,i){return'<button class="quick-card" data-quick="'+i+'">'+I.bolt+'<span>'+esc(q[0])+'</span></button>'}).join('')+'</div>'+renderCarPanel()}
+function renderCarPanel(){return'<div class="car-panel"><div class="section-label">Consultar por zona</div><div class="car-svg-wrap"><svg viewBox="0 0 360 220" role="img" aria-label="Dibujo genérico de vehículo con zonas de consulta"><path class="car-body" d="M85 28h190c28 0 47 18 52 47l16 70c4 20-10 43-31 43H48c-21 0-35-23-31-43l16-70c5-29 24-47 52-47z"/><rect class="car-body" x="115" y="45" width="130" height="45" rx="12"/><rect class="car-zone" tabindex="0" data-zone="motor" x="118" y="100" width="124" height="52" rx="12"/><circle class="car-zone" tabindex="0" data-zone="frenos" cx="70" cy="165" r="24"/><circle class="car-zone" tabindex="0" data-zone="frenos" cx="290" cy="165" r="24"/><rect class="car-zone" tabindex="0" data-zone="bateria" x="250" y="98" width="42" height="42" rx="8"/><rect class="car-zone" tabindex="0" data-zone="suspension" x="42" y="92" width="52" height="52" rx="10"/><rect class="car-zone" tabindex="0" data-zone="interior" x="128" y="48" width="104" height="38" rx="8"/></svg></div><div class="zone-list">'+[['motor','Motor'],['frenos','Frenos'],['bateria','Batería / eléctrico'],['suspension','Suspensión'],['neumaticos','Neumáticos'],['interior','Interior']].map(function(z){return'<button class="zone-btn" data-zone="'+z[0]+'">'+z[1]+'</button>'}).join('')+'</div></div>'}
+function renderWorkspace(){var main=[cur.marca,cur.modelo,cur.anio].filter(Boolean).join(' ')||'Vehículo';var spec=[cur.motor?('Motor '+cur.motor):'',cur.combustible].filter(Boolean).join(' · ');var content=workspaceView==='talk'?renderTalk():workspaceView==='record'?renderRecord():renderData();return'<section class="workspace"><div class="workspace-top"><div class="workspace-nav"><button class="back-btn" id="back-home" aria-label="Volver a Inicio">'+I.back+'</button><button class="icon-btn" id="open-settings" aria-label="Ajustes">'+I.gear+'</button></div><div class="vehicle-hero"><div class="hero-head"><div><span class="plate-chip active-plate">'+esc(cur.plate)+'</span><div class="hero-title">'+esc(main)+'</div><div class="hero-spec">'+esc(spec)+'</div></div><button class="status-chip '+statusClass(cur.caseStatus)+'" id="cycle-status">'+esc(cur.caseStatus||'Abierto')+'</button></div><div class="km-box"><small>Kilometraje actual</small><span class="km-value">'+esc(cur.km?L.formatKm(cur.km)+' km':'Sin registrar')+'</span></div>'+duePills()+'</div></div><section class="workspace-sheet '+sheetLevel+'" id="workspace-sheet"><div class="sheet-handle" id="workspace-handle" aria-label="Cambiar altura de la hoja"></div><div class="view-tabs"><button class="view-tab" data-view="talk" aria-selected="'+(workspaceView==='talk')+'">Hablar</button><button class="view-tab" data-view="record" aria-selected="'+(workspaceView==='record')+'">Registro</button><button class="view-tab" data-view="data" aria-selected="'+(workspaceView==='data')+'">Datos</button></div><div class="sheet-scroll" id="sheet-scroll">'+content+'</div></section></section>'}
+
+/* ---------- Settings ---------- */
+function renderSettings(){var s=db.settings,it=s.serviceIntervals||defaults.serviceIntervals;return'<section class="screen"><header class="topbar"><button class="back-btn" id="settings-back" aria-label="Volver">'+I.back+'</button><div class="grow"><h1 class="screen-title">Ajustes</h1><p class="screen-subtitle">THOKAR '+APP_BUILD+'</p></div></header><div class="settings-grid"><div class="card"><h2 class="card-title">Conexión</h2><div class="field"><label>Token THOKAR</label><input id="setting-token" type="password" value="'+esc(s.appToken||'')+'" placeholder="El mismo APP_TOKEN de Render"></div><p class="muted small" style="margin:8px 0 12px">Boostr y Gemini se configuran solo en Render.</p><button class="btn primary block" id="test-connection">Probar conexión</button><p id="test-result" class="small muted" style="margin-top:8px"></p></div><div class="card"><h2 class="card-title">Apariencia</h2><div class="field"><label>Tema</label><select id="setting-theme"><option value="auto" '+(s.theme==='auto'?'selected':'')+'>Automático</option><option value="light" '+(s.theme==='light'?'selected':'')+'>Claro</option><option value="dark" '+(s.theme==='dark'?'selected':'')+'>Oscuro</option></select></div><label class="setting-row"><span><strong>Mantener pantalla encendida</strong><small>Solo mientras Hablar está activo</small></span><input class="switch" id="setting-wake" type="checkbox" '+(s.keepAwake!==false?'checked':'')+'></label></div><div class="card"><h2 class="card-title">Intervalos por defecto</h2><div class="grid2"><div class="field"><label>Aceite (km)</label><input id="int-aceiteKm" inputmode="numeric" value="'+esc(it.aceiteKm||'')+'"></div><div class="field"><label>Aceite (meses)</label><input id="int-aceiteMeses" inputmode="numeric" value="'+esc(it.aceiteMeses||'')+'"></div><div class="field"><label>Filtros (km)</label><input id="int-filtrosKm" inputmode="numeric" value="'+esc(it.filtrosKm||'')+'"></div><div class="field"><label>Frenos (km)</label><input id="int-frenosKm" inputmode="numeric" value="'+esc(it.frenosKm||'')+'"></div><div class="field"><label>Refrigerante (meses)</label><input id="int-refrigeranteMeses" inputmode="numeric" value="'+esc(it.refrigeranteMeses||'')+'"></div><div class="field"><label>Distribución (km)</label><input id="int-distribucionKm" inputmode="numeric" value="'+esc(it.distribucionKm||'')+'"></div></div></div><div class="card"><h2 class="card-title">Datos y app</h2><div class="grid2"><button class="btn" id="export-backup">Respaldo</button><button class="btn" id="import-backup">Restaurar</button><button class="btn" id="check-update">Buscar actualización</button><button class="btn danger" id="force-update">Forzar actualización</button></div><input id="import-file" type="file" accept="application/json" hidden></div><div class="card"><h2 class="card-title">Estado</h2><p class="small muted">Servidor: '+esc(backendState)+' · Boostr: '+(backendInfo.configured?'configurado':'sin confirmar')+' · Gemini: '+(backendInfo.geminiConfigured?'configurado':'sin confirmar')+'</p></div></div></section>'}
+
+function render(){var app=$('#app');app.innerHTML=screen==='home'?renderHome():screen==='workspace'?renderWorkspace():renderSettings();afterRender()}
+function afterRender(){applyTheme();if(screen==='workspace'){setupWorkspaceDrag();if(workspaceView==='talk'){var t=$('#talk-thread');if(t){t.addEventListener('scroll',updateJump,{passive:true});var draft=load(K.draft+'.chat.'+chatKey(),'');var ta=$('#chat-input');if(ta&&draft)ta.value=draft;scrollChatEnd()}}if(workspaceView==='record')hydratePhotos()}else if(screen==='home'){setTimeout(function(){var p=$('#home-plate');if(p&&new URLSearchParams(location.search).get('new')==='1')p.focus()},60)}}
+function setupWorkspaceDrag(){var h=$('#workspace-handle'),s=$('#workspace-sheet');if(!h||!s)return;var y=0,d=0,on=false,base=0;h.addEventListener('pointerdown',function(e){on=true;y=e.clientY;base=s.getBoundingClientRect().height;h.setPointerCapture(e.pointerId)});h.addEventListener('pointermove',function(e){if(!on)return;d=e.clientY-y;var nh=Math.max(112,Math.min(innerHeight*.92,base-d));s.style.height=nh+'px'});h.addEventListener('pointerup',function(){if(!on)return;on=false;s.style.height='';var ratio=(base-d)/innerHeight;sheetLevel=ratio>.72?'full':ratio>.3?'medium':'peek';s.className='workspace-sheet '+sheetLevel;d=0});h.addEventListener('click',function(){sheetLevel=sheetLevel==='peek'?'medium':sheetLevel==='medium'?'full':'peek';s.className='workspace-sheet '+sheetLevel})}
+
+/* ---------- Wake lock / keyboard ---------- */
+async function updateWakeLock(){var need=db.settings.keepAwake!==false&&screen==='workspace'&&workspaceView==='talk'&&document.visibilityState==='visible';if(!need){if(wakeLock)try{await wakeLock.release()}catch(e){}wakeLock=null;return}if(!('wakeLock'in navigator)||wakeLock)return;try{wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',function(){wakeLock=null})}catch(e){}}
+function syncViewport(){var h=window.visualViewport?window.visualViewport.height:innerHeight;document.documentElement.style.setProperty('--vh',Math.round(h)+'px')}
+
+/* ---------- Backup ---------- */
+function exportBackup(){var data={app:'thokar-taller',version:2,fecha:new Date().toISOString(),vehicles:db.vehicles,log:db.log,chats:db.chats,settings:{theme:db.settings.theme,keepAwake:db.settings.keepAwake,serviceIntervals:db.settings.serviceIntervals}};var b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='thokar-respaldo-'+todayISO()+'.json';a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},500)}
+function importBackup(file){if(!file)return;var r=new FileReader();r.onload=function(){try{var d=JSON.parse(r.result);if(d.app!=='thokar-taller')throw 0;Object.assign(db.vehicles,d.vehicles||{});Object.assign(db.log,d.log||{});Object.assign(db.chats,d.chats||{});if(d.settings)Object.assign(db.settings,d.settings);persist();applyTheme();toast('Respaldo restaurado.');render()}catch(e){toast('Ese archivo no es un respaldo de THOKAR.')}};r.readAsText(file)}
+
+/* ---------- Update ---------- */
+function showUpdate(msg){$('#update-root').innerHTML='<div class="update-banner"><span>'+esc(msg)+'</span><button id="apply-update">Actualizar</button></div>'}
+function applyUpdate(){if(swRegistration&&swRegistration.waiting)swRegistration.waiting.postMessage({type:'SKIP_WAITING'});else location.reload()}
+async function checkUpdate(manual){try{if(!swRegistration)swRegistration=await navigator.serviceWorker.getRegistration();if(swRegistration)await swRegistration.update();if(swRegistration&&swRegistration.waiting)showUpdate('Hay una versión nueva disponible.');else if(manual)toast('THOKAR ya está actualizado.')}catch(e){if(manual)toast('No pude comprobar actualizaciones.')}}
+async function forceUpdate(){try{var regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(function(r){return r.unregister()}));var keys=await caches.keys();await Promise.all(keys.map(function(k){return caches.delete(k)}))}catch(e){}location.replace('/?refresh='+Date.now())}
+
+/* ---------- Misc ---------- */
+async function testConnection(){var out=$('#test-result');if(out)out.textContent='Probando…';try{await wakeBackend(true);var t=await postJSON('/api/ai/json',{contents:[{role:'user',parts:[{text:'Responde solo OK'}]}],generationConfig:{temperature:0}});if(out)out.textContent='Conectado · '+t.slice(0,20)}catch(e){if(out)out.textContent=e.message}}
+function openPhotoInput(){var f=$('#chat-photo');if(f)f.click()}
+function zonePrompt(z){var map={motor:'Quiero diagnosticar el motor de este vehículo. Pregúntame síntomas y guíame por pruebas.',frenos:'Quiero revisar frenos de este vehículo. Guíame por inspección y mediciones.',bateria:'Quiero diagnosticar batería, carga o sistema eléctrico de este vehículo.',suspension:'Quiero diagnosticar suspensión y dirección de este vehículo.',neumaticos:'Quiero revisar neumáticos, desgaste y posibles causas en este vehículo.',interior:'Quiero diagnosticar un problema del interior, climatización o equipamiento de este vehículo.'};ask(map[z]||'Ayúdame a revisar esta zona del vehículo.')}
+function openClientWhatsApp(){var p=String((cur.client||{}).phone||'').replace(/\D/g,'');if(!p)return toast('Agrega el teléfono del cliente.');window.open('https://wa.me/'+p,'_blank','noopener')}
+
+/* ---------- Events ---------- */
+document.addEventListener('submit',function(e){if(e.target.id==='plate-search'){e.preventDefault();lookupPlate($('#home-plate').value)}else if(e.target.id==='composer'){e.preventDefault();var ta=$('#chat-input'),v=ta.value;ta.value='';save(K.draft+'.chat.'+chatKey(),'');ask(v)}});
+document.addEventListener('input',function(e){var id=e.target.id;if(id==='home-plate'){e.target.value=L.cleanPlate(e.target.value)}if(id==='chat-input'){save(K.draft+'.chat.'+chatKey(),e.target.value);e.target.style.height='auto';e.target.style.height=Math.min(132,Math.max(52,e.target.scrollHeight))+'px'}if(id==='setting-token'){db.settings.appToken=e.target.value.trim();persist(['settings'])}if(id.indexOf('confirmed-')===0){cur.confirmed=cur.confirmed||{};cur.confirmed[id.replace('confirmed-','')]=e.target.value;saveDraft();if(db.vehicles[cur.plate])db.vehicles[cur.plate].confirmed=cur.confirmed}if(id==='client-name'||id==='client-phone'){cur.client=cur.client||{};cur.client[id==='client-name'?'name':'phone']=e.target.value;saveDraft();if(db.vehicles[cur.plate])db.vehicles[cur.plate].client=cur.client}if(id.indexOf('int-')===0){db.settings.serviceIntervals=db.settings.serviceIntervals||{};db.settings.serviceIntervals[id.slice(4)]=e.target.value.replace(/\D/g,'');persist(['settings'])}});
+document.addEventListener('change',function(e){if(e.target.id==='setting-theme'){db.settings.theme=e.target.value;persist(['settings']);applyTheme()}if(e.target.id==='setting-wake'){db.settings.keepAwake=e.target.checked;persist(['settings']);updateWakeLock()}if(e.target.id==='chat-photo'){var f=e.target.files[0];e.target.value='';if(f)loadImage(f).then(function(b){pendingImage=b;render()}).catch(function(er){toast(er.message)})}if(e.target.id==='import-file'){importBackup(e.target.files[0]);e.target.value=''}if(e.target.dataset.chatStep!==undefined){var m=(db.chats[chatKey()]||[])[Number(e.target.dataset.chatStep)];if(m){m.stepChecks=m.stepChecks||[];m.stepChecks[Number(e.target.dataset.stepIndex)]=e.target.checked;persist(['chats'])}}if(e.target.dataset.logCheck){var en=(db.log[cur.plate]||[]).filter(function(x){return x.id===e.target.dataset.logCheck})[0];if(en&&en.checklist&&en.checklist[Number(e.target.dataset.logIndex)]){en.checklist[Number(e.target.dataset.logIndex)].done=e.target.checked;persist(['log']);render()}}});
+document.addEventListener('click',function(e){var t=e.target.closest('button,[data-zone]');if(!t)return;if(t.dataset.openCase)return openCase(t.dataset.openCase);if(t.dataset.view){workspaceView=t.dataset.view;sheetLevel=workspaceView==='talk'?'full':'medium';render();updateWakeLock();return}if(t.dataset.quick!==undefined)return askQuick(Number(t.dataset.quick));if(t.dataset.zone)return zonePrompt(t.dataset.zone);if(t.dataset.filter){recordFilter=t.dataset.filter;render();return}if(t.dataset.copyMsg!==undefined)return copyMsg(t.dataset.copyMsg);if(t.dataset.saveMsg!==undefined)return saveMsg(t.dataset.saveMsg);if(t.dataset.checkMsg!==undefined)return saveChecklist(t.dataset.checkMsg);if(t.dataset.shareMsg!==undefined)return shareMsg(t.dataset.shareMsg);if(t.dataset.retry!==undefined)return retry(t.dataset.retry);if(t.dataset.deleteEntry)return deleteEntry(t.dataset.deleteEntry);if(t.dataset.copyField){var val=cur[t.dataset.copyField]||'';if(navigator.clipboard)navigator.clipboard.writeText(val).then(function(){toast('Copiado.')});return}switch(t.id){case'open-settings':return navigate('settings');case'settings-back':return history.back();case'back-home':return history.back();case'cycle-status':case'cycle-status-data':return changeStatus();case'save-vehicle':return saveVehicle();case'quick-actions':return openQuickActions();case'mic':return startMic();case'camera':return openPhotoInput();case'remove-attachment':pendingImage='';return render();case'jump-latest':return scrollChatEnd();case'add-entry':return openEntry();case'service-report':return serviceReport();case'client-wa':return openClientWhatsApp();case'test-connection':return testConnection();case'export-backup':return exportBackup();case'import-backup':return $('#import-file').click();case'check-update':return checkUpdate(true);case'force-update':return forceUpdate();case'apply-update':return applyUpdate();case'retry-backend':return wakeBackend();case'toast-action':if(toastUndo){var u=toastUndo;toastUndo=null;$('#toast-root').innerHTML='';return u()}}});
+document.addEventListener('focusin',function(e){if(e.target.id==='chat-input'){document.body.classList.add('keyboard-open');syncViewport();scrollChatEnd()}});document.addEventListener('focusout',function(e){if(e.target.id==='chat-input')setTimeout(function(){document.body.classList.remove('keyboard-open');syncViewport()},120)});
+window.addEventListener('online',function(){wakeBackend(true).catch(function(){})});window.addEventListener('offline',function(){backendState='offline';renderConnection()});document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'){syncViewport();checkUpdate(false)}updateWakeLock()});if(window.visualViewport){visualViewport.addEventListener('resize',syncViewport);visualViewport.addEventListener('scroll',syncViewport)}
+
+/* ---------- SW ---------- */
+if('serviceWorker'in navigator){var reloadOnce=false;navigator.serviceWorker.addEventListener('controllerchange',function(){if(!reloadOnce){reloadOnce=true;location.reload()}});window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').then(function(r){swRegistration=r;if(r.waiting&&navigator.serviceWorker.controller)showUpdate('Hay una versión nueva disponible.');r.addEventListener('updatefound',function(){var n=r.installing;if(n)n.addEventListener('statechange',function(){if(n.state==='installed'&&navigator.serviceWorker.controller)showUpdate('Hay una versión nueva disponible.')})});setTimeout(function(){r.update().catch(function(){})},1800)}).catch(function(){})})}
+
+/* ---------- Boot ---------- */
+applyTheme();syncViewport();try{history.replaceState({screen:'home'},'',location.pathname+location.search)}catch(e){}
+var q=new URLSearchParams(location.search);if(q.get('tab')==='ajustes')screen='settings';else if((q.get('tab')==='asistente'||q.get('tab')==='libreta')&&activePlate()){screen='workspace';workspaceView=q.get('tab')==='libreta'?'record':'talk';sheetLevel='full'}
+migrateIDB().then(function(){persist(['chats'])});render();wakeBackend(true).catch(function(){});updateWakeLock();
 })();

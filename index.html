@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-  <meta name="theme-color" content="#0B0C0E">
+  <meta name="theme-color" content="#F4F2EE" id="theme-color-meta">
+  <meta name="color-scheme" content="light dark">
   <title>THOKAR Taller</title>
-  <meta name="description" content="Ficha de vehículo, asistente de repuestos y libreta de mantención para THOKAR.">
+  <meta name="description" content="THOKAR: vehículo, diagnóstico asistido y registro de servicio.">
   <meta name="robots" content="noindex, nofollow">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
@@ -13,13 +14,12 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="THOKAR">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main id="app"></main>
-  <nav class="tabs" id="tabs" aria-label="Secciones"></nav>
-  <div id="sheet-root"></div>
+  <main id="app" aria-live="polite"></main>
+  <div id="overlay-root"></div>
   <div id="toast-root"></div>
   <div id="connection-root"></div>
   <div id="update-root"></div>
