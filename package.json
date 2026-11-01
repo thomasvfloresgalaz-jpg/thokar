@@ -1,18 +1,17 @@
 {
   "name": "thokar-taller",
-  "version": "3.3.0-inputfix",
+  "version": "4.0.0-boostr",
   "private": true,
-  "description": "THOKAR Taller con backend robusto para PatenteChile y deteccion flexible del formulario.",
+  "description": "THOKAR Taller con backend Node y consulta de patentes mediante Boostr API.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test vehicleParser.test.js"
+    "test": "node --test boostrProvider.test.js vehicleParser.test.js"
   },
   "engines": {
     "node": ">=22"
   },
   "dependencies": {
-    "express": "5.3.0",
-    "playwright": "1.64.1"
+    "express": "5.3.0"
   }
 }

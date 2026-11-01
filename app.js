@@ -15,7 +15,7 @@
     try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { storageOk = false; }
   }
   function emptyVehicle() {
-    return { plate: '', tipo: '', marca: '', modelo: '', version: '', anio: '', color: '', combustible: '', motor: '', chasis: '', procedencia: '', fabricante: '', km: '', cilindrada: '', tipoSello: '', multas: '', mesRevision: '', revisionTecnica: '', revisionGases: '', permisoCirculacion: '', soap: '', kmRegistrado: '', transportePublico: '', tipoTransportePublico: '', restriccion: '', siniestrado: '' };
+    return { plate: '', dv: '', tipo: '', marca: '', modelo: '', version: '', anio: '', color: '', combustible: '', motor: '', chasis: '', procedencia: '', regionProcedencia: '', fabricante: '', km: '', cilindrada: '', puertas: '', transmision: '', codigoSii: '', tasacionFiscal: '', tipoSello: '', multas: '', mesRevision: '', revisionTecnica: '', revisionGases: '', permisoCirculacion: '', soap: '', kmRegistrado: '', transportePublico: '', tipoTransportePublico: '', restriccion: '', siniestrado: '' };
   }
   var db = {
     settings: load(K.settings, { apiKey: '', model: '', auto: '' }),
@@ -179,9 +179,12 @@
     if (code === 'INVALID_PLATE' || status === 400) return 'La patente no tiene un formato válido.';
     if (code === 'NOT_FOUND' || status === 404) return 'No encontré información técnica para esa patente.';
     if (code === 'RATE_LIMIT' || status === 429) return 'Se hicieron demasiadas consultas. Espera un minuto e intenta otra vez.';
-    if (code === 'SOURCE_BLOCKED') return 'PatenteChile pidió una verificación o bloqueó la automatización. THOKAR no intenta evadirla; usa "Pegar datos" por ahora.';
-    if (code === 'SOURCE_TIMEOUT' || status === 504) return 'PatenteChile tardó demasiado en responder. Intenta nuevamente o usa "Pegar datos".';
-    if (code === 'SOURCE_CHANGED') return er.message || 'PatenteChile respondió, pero THOKAR no pudo reconocer los campos de la ficha.';
+    if (code === 'BOOSTR_NOT_CONFIGURED') return 'Falta configurar BOOSTR_API_KEY en Render.';
+    if (code === 'BOOSTR_AUTH') return 'Boostr rechazó la API key. Revisa BOOSTR_API_KEY en Render.';
+    if (code === 'BOOSTR_RATE_LIMIT') return 'Boostr alcanzó su límite de consultas. Espera unos segundos e intenta otra vez.';
+    if (code === 'BOOSTR_TIMEOUT' || status === 504) return 'Boostr tardó demasiado en responder. Intenta nuevamente.';
+    if (code === 'BOOSTR_UNAVAILABLE') return 'No se pudo conectar con Boostr API. Intenta nuevamente.';
+    if (code === 'BOOSTR_BAD_RESPONSE' || code === 'BOOSTR_API_ERROR' || code === 'BOOSTR_HTTP_ERROR') return er.message || 'Boostr devolvió una respuesta que THOKAR no pudo procesar.';
     if (er.message) return er.message;
     if (status >= 500) return 'El servidor de THOKAR no pudo completar la consulta de patente.';
     return 'No se pudo consultar la patente (' + status + ').';
@@ -238,7 +241,7 @@
   }
 
   function applyFound(found, source) {
-    var labels = { plate: 'patente', tipo: 'tipo', marca: 'marca', modelo: 'modelo', anio: 'año', color: 'color', motor: 'motor', chasis: 'chasis', combustible: 'combustible', procedencia: 'procedencia', fabricante: 'fabricante', cilindrada: 'cilindrada', tipoSello: 'tipo de sello', multas: 'multas', mesRevision: 'mes de revisión', revisionTecnica: 'revisión técnica', revisionGases: 'revisión de gases', permisoCirculacion: 'permiso de circulación', soap: 'SOAP', kmRegistrado: 'kilometraje registrado', transportePublico: 'transporte público', tipoTransportePublico: 'tipo de transporte público', restriccion: 'restricción vehicular', siniestrado: 'siniestrado' };
+    var labels = { plate: 'patente', dv: 'dígito verificador', tipo: 'tipo', marca: 'marca', modelo: 'modelo', version: 'versión', anio: 'año', color: 'color', motor: 'motor', chasis: 'chasis/VIN', combustible: 'combustible', procedencia: 'país de procedencia', regionProcedencia: 'región de procedencia', fabricante: 'fabricante', cilindrada: 'cilindrada', puertas: 'puertas', transmision: 'transmisión', codigoSii: 'código SII', tasacionFiscal: 'tasación fiscal', tipoSello: 'tipo de sello', multas: 'multas', mesRevision: 'mes de revisión', revisionTecnica: 'revisión técnica', revisionGases: 'revisión de gases', permisoCirculacion: 'permiso de circulación', soap: 'SOAP', kmRegistrado: 'kilometraje registrado', transportePublico: 'transporte público', tipoTransportePublico: 'tipo de transporte público', restriccion: 'restricción vehicular', siniestrado: 'siniestrado' };
     var got = [];
     Object.keys(found).forEach(function (k) {
       if (found[k]) { cur[k] = found[k]; got.push(labels[k] || k); }
@@ -307,8 +310,7 @@
     openSheet(
       '<h3>Pegar datos de la patente</h3>' +
       '<p class="muted small">Abre el buscador que usas, copia el resultado completo y pégalo aquí. La app toma datos del vehículo y antecedentes administrativos útiles (marca, modelo, año, motor, chasis, revisión, SOAP, multas y similares). Los datos personales del propietario se ignoran y no se guardan.</p>' +
-      '<p style="margin:10px 0"><a href="https://www.patentechile.com/" target="_blank" rel="noopener" style="color:var(--text)">Abrir patentechile.com en otra pestaña</a></p>' +
-      '<div class="field"><label for="paste-text">Texto copiado</label><textarea id="paste-text" placeholder="Pega aquí"></textarea></div>' +
+            '<div class="field"><label for="paste-text">Texto copiado</label><textarea id="paste-text" placeholder="Pega aquí"></textarea></div>' +
       '<div class="btn-row" style="margin-top:14px"><button class="btn" data-sheet-close>Cancelar</button><button class="btn primary" id="do-paste">Leer datos</button></div>',
       function (s) {
         $('[data-sheet-close]', s).addEventListener('click', closeSheet);
@@ -561,7 +563,7 @@
   function vehicleView() {
     var savedPlates = Object.keys(db.vehicles).sort();
     var extraLabels = {
-      cilindrada: 'Cilindrada', tipoSello: 'Tipo de sello', multas: 'Multas de tránsito',
+      dv: 'Dígito verificador', cilindrada: 'Cilindrada', puertas: 'Puertas', transmision: 'Transmisión', codigoSii: 'Código SII', tasacionFiscal: 'Tasación fiscal', regionProcedencia: 'Región de procedencia', tipoSello: 'Tipo de sello', multas: 'Multas de tránsito',
       mesRevision: 'Mes de revisión técnica', revisionTecnica: 'Revisión técnica', revisionGases: 'Revisión de gases',
       permisoCirculacion: 'Permiso de circulación', soap: 'SOAP', kmRegistrado: 'Kilometraje registrado',
       transportePublico: 'Transporte público', tipoTransportePublico: 'Tipo de transporte público',
@@ -664,8 +666,8 @@
       '<div class="btn-row" style="margin-top:12px"><button class="btn" id="btn-detect">Detectar modelo</button><button class="btn primary" id="btn-test">Probar conexión</button></div>' +
       '<p class="small" id="test-out" style="margin-top:10px" aria-live="polite"></p></div>' +
       '<div class="card"><h3>Búsqueda automática por patente</h3>' +
-      '<p class="muted small" style="margin:6px 0 8px">La consulta ahora pasa por el backend de THOKAR. No necesitas token de Apify en el teléfono. El servidor devuelve datos del vehículo y antecedentes administrativos disponibles, y descarta datos personales del propietario.</p>' +
-      '<p class="muted small">Si PatenteChile presenta CAPTCHA, bloqueo o cambia su página, THOKAR lo informará y podrás seguir usando "Pegar datos" o "Foto del permiso".</p></div>' +
+      '<p class="muted small" style="margin:6px 0 8px">La consulta pasa por el backend de THOKAR y usa Boostr API. La clave de Boostr se guarda sólo como variable de entorno en Render y nunca se envía al teléfono.</p>' +
+      '<p class="muted small">Los campos disponibles dependen de tu plan de Boostr. THOKAR solicita únicamente la ficha del vehículo y no pide información del propietario.</p></div>' +
       '<div class="card"><h3>Respaldo</h3><p class="muted small" style="margin:6px 0 12px">Vehículos, libreta y conversaciones. Descárgalo de vez en cuando por si cambias de teléfono o borras los datos del navegador.</p>' +
       '<div class="btn-row"><button class="btn" id="btn-export">Descargar respaldo</button><button class="btn" id="btn-import">Importar respaldo</button></div><input type="file" id="import-input" accept="application/json,.json" hidden></div>' +
       '<div class="card"><h3>Instalar en el teléfono</h3>' +

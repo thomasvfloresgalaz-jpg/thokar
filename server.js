@@ -1,7 +1,6 @@
 const path = require('path');
 const express = require('express');
-const { lookupVehicle, closeBrowser } = require('./patenteChileProvider');
-const { cleanPlate } = require('./vehicleParser');
+const { lookupVehicle, cleanPlate } = require('./boostrProvider');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -19,21 +18,21 @@ app.use((req, res, next) => {
   next();
 });
 
-// Límite simple por IP para proteger la fuente y evitar consultas masivas.
+// Límite local conservador. Boostr documenta además su propio rate-limit.
 const buckets = new Map();
 function rateLimit(req, res, next) {
   const now = Date.now();
-  const windowMs = 60_000;
-  const limit = Math.max(1, Number(process.env.PLATE_REQUESTS_PER_MINUTE || 8));
+  const windowMs = 10_000;
+  const limit = Math.max(1, Math.min(5, Number(process.env.PLATE_REQUESTS_PER_10_SECONDS || 4)));
   const key = req.ip || req.socket.remoteAddress || 'unknown';
   const previous = buckets.get(key) || [];
   const active = previous.filter((ts) => now - ts < windowMs);
 
   if (active.length >= limit) {
-    res.setHeader('Retry-After', '60');
+    res.setHeader('Retry-After', '10');
     return res.status(429).json({
       ok: false,
-      error: { code: 'RATE_LIMIT', message: 'Demasiadas consultas. Intenta de nuevo en un minuto.' }
+      error: { code: 'RATE_LIMIT', message: 'Demasiadas consultas. Espera unos segundos e intenta nuevamente.' }
     });
   }
 
@@ -43,17 +42,24 @@ function rateLimit(req, res, next) {
 }
 
 setInterval(() => {
-  const cutoff = Date.now() - 60_000;
+  const cutoff = Date.now() - 10_000;
   for (const [key, timestamps] of buckets) {
     const active = timestamps.filter((ts) => ts >= cutoff);
     if (active.length) buckets.set(key, active);
     else buckets.delete(key);
   }
-}, 60_000).unref();
+}, 15_000).unref();
 
 app.get('/healthz', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  res.json({ ok: true, app: 'THOKAR Taller', vehicleLookup: 'backend', layout: 'flat', build: '3.3.0-inputfix' });
+  res.json({
+    ok: true,
+    app: 'THOKAR Taller',
+    vehicleLookup: 'boostr',
+    configured: Boolean(String(process.env.BOOSTR_API_KEY || '').trim()),
+    layout: 'flat',
+    build: '4.0.0-boostr'
+  });
 });
 
 app.get('/api/vehiculo/:patente', rateLimit, async (req, res) => {
@@ -69,7 +75,7 @@ app.get('/api/vehiculo/:patente', rateLimit, async (req, res) => {
 
   try {
     const vehicle = await lookupVehicle(plate);
-    return res.json({ ok: true, source: 'patentechile.com', vehicle });
+    return res.json({ ok: true, source: 'Boostr API', vehicle });
   } catch (error) {
     const status = Number(error.status || 502);
     return res.status(status).json({
@@ -82,8 +88,8 @@ app.get('/api/vehiculo/:patente', rateLimit, async (req, res) => {
   }
 });
 
-// Estructura plana: solo estos archivos de la raíz se pueden descargar.
-// Así server.js, patenteChileProvider.js, vehicleParser.js, .env, etc. NO quedan públicos.
+// Estructura plana: sólo estos archivos de la raíz se publican.
+// boostrProvider.js, server.js, .env y el resto del backend NO se sirven al navegador.
 const PUBLIC_FILES = new Set([
   'index.html',
   'app.js',
@@ -113,8 +119,6 @@ for (const filename of PUBLIC_FILES) {
   app.get(`/${filename}`, (req, res) => sendPublicFile(req, res, filename));
 }
 
-// SPA fallback: cualquier ruta de interfaz vuelve a index.html.
-// Las APIs inexistentes siguen devolviendo JSON 404.
 app.get('/{*splat}', (req, res) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({
@@ -126,14 +130,11 @@ app.get('/{*splat}', (req, res) => {
 });
 
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`THOKAR escuchando en puerto ${PORT} (estructura plana)`);
+  console.log(`THOKAR escuchando en puerto ${PORT} · proveedor Boostr`);
 });
 
-async function shutdown() {
-  server.close(async () => {
-    await closeBrowser();
-    process.exit(0);
-  });
+function shutdown() {
+  server.close(() => process.exit(0));
   setTimeout(() => process.exit(1), 10_000).unref();
 }
 
