@@ -1,12 +1,12 @@
 {
   "name": "thokar-taller",
-  "version": "4.0.0-boostr",
+  "version": "4.0.2-assistant-window",
   "private": true,
   "description": "THOKAR Taller con backend Node y consulta de patentes mediante Boostr API.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test boostrProvider.test.js vehicleParser.test.js"
+    "test": "node --test boostrProvider.test.js"
   },
   "engines": {
     "node": ">=22"

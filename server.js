@@ -58,7 +58,7 @@ app.get('/healthz', (req, res) => {
     vehicleLookup: 'boostr',
     configured: Boolean(String(process.env.BOOSTR_API_KEY || '').trim()),
     layout: 'flat',
-    build: '4.0.0-boostr'
+    build: '4.0.2-assistant-window'
   });
 });
 
@@ -100,7 +100,8 @@ const PUBLIC_FILES = new Set([
   'apple-touch-icon.png',
   'icon-192.png',
   'icon-512.png',
-  'icon-maskable-512.png'
+  'icon-maskable-512.png',
+  'thokar-logo-original.jpg'
 ]);
 
 function sendPublicFile(req, res, filename) {

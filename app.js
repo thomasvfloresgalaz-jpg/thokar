@@ -407,7 +407,11 @@
     if (th.length > 40) db.chats[key] = th.slice(-40);
     busy = false; persist(['chats']); render(); scrollChatEnd();
   }
-  function scrollChatEnd() { var t = $('#thread-end'); if (t) t.scrollIntoView({ block: 'end' }); }
+  function scrollChatEnd() {
+    var box = $('#chat-thread');
+    if (!box) return;
+    requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; });
+  }
 
   /* ---------- Libreta ---------- */
   function openEntry() {
@@ -620,19 +624,22 @@
     if (!(db.settings.apiKey || '').trim()) {
       html += '<div class="notice" style="margin-bottom:12px">Falta la clave gratuita de Gemini. <button class="link-btn" data-tab-go="ajustes">Pegarla en Ajustes</button></div>';
     }
-    html += '<div class="chips" role="group" aria-label="Consultas rápidas">' +
-      QUICK.map(function (q, i) { return '<button class="chip" data-quick="' + i + '"' + (busy ? ' disabled' : '') + '>' + esc(q[0]) + '</button>'; }).join('') + '</div>';
-    html += '<div class="thread" aria-live="polite">' + th.map(function (m) {
-      return '<div class="msg ' + (m.role === 'user' ? 'user' : 'model' + (m.error ? ' error' : '')) + '">' + (m.role === 'user' ? esc(m.text) : md(m.text)) + '</div>';
-    }).join('') + (busy ? '<div class="msg model typing"><span class="spinner"></span> Consultando…</div>' : '') + '<div id="thread-end"></div></div>';
+    html += '<section class="assistant-chat-window" aria-label="Chat con el asistente">' +
+      '<div class="assistant-chat-head"><div><h3>Chat con IA</h3><div class="small muted">' + (th.length ? esc(th.length + ' mensaje' + (th.length === 1 ? '' : 's') + ' en el historial') : 'Conversación nueva') + '</div></div>' +
+      (th.length ? '<button class="link-btn assistant-clear" id="btn-clear-chat">Borrar historial</button>' : '') + '</div>' +
+      '<div class="chips assistant-chips" role="group" aria-label="Consultas rápidas">' +
+      QUICK.map(function (q, i) { return '<button class="chip" data-quick="' + i + '"' + (busy ? ' disabled' : '') + '>' + esc(q[0]) + '</button>'; }).join('') + '</div>' +
+      '<div class="thread assistant-thread" id="chat-thread" aria-live="polite">' + th.map(function (m) {
+        return '<div class="msg ' + (m.role === 'user' ? 'user' : 'model' + (m.error ? ' error' : '')) + '">' + (m.role === 'user' ? esc(m.text) : md(m.text)) + '</div>';
+      }).join('') + (busy ? '<div class="msg model typing"><span class="spinner"></span> Consultando…</div>' : '') + '<div id="thread-end"></div></div>' +
+      (pendingImage ? '<div class="assistant-attachment small muted">Foto lista para enviar. <button class="link-btn" id="btn-unattach">Quitar</button></div>' : '') +
+      '<form class="composer assistant-composer" id="composer"><button type="button" class="btn assistant-photo-btn" id="btn-attach" aria-label="Adjuntar foto">Foto</button><textarea id="chat-input" rows="2" placeholder="Escribe tu consulta para la IA…" aria-label="Mensaje"></textarea><button class="btn primary" type="submit"' + (busy ? ' disabled' : '') + '>Enviar</button></form><input type="file" id="chat-photo" accept="image/*" hidden>' +
+      '</section>';
     var links = L.searchLinks(cur);
     if (links.length) {
-      html += '<p class="muted small" style="margin-top:8px">Confirmar en catálogos (búsqueda en Google):</p><div class="links">' +
+      html += '<p class="muted small" style="margin-top:10px">Confirmar en catálogos (búsqueda en Google):</p><div class="links">' +
         links.map(function (l) { return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + '</a>'; }).join('') + '</div>';
     }
-    if (pendingImage) html += '<div class="small muted" style="margin-top:10px">Foto lista para enviar. <button class="link-btn" id="btn-unattach">Quitar</button></div>';
-    html += '<form class="composer" id="composer"><button type="button" class="btn" id="btn-attach" aria-label="Adjuntar foto" style="min-width:64px">Foto</button><textarea id="chat-input" rows="1" placeholder="Describe el problema o pregunta lo que necesites" aria-label="Mensaje"></textarea><button class="btn primary" type="submit"' + (busy ? ' disabled' : '') + '>Enviar</button></form><input type="file" id="chat-photo" accept="image/*" hidden>';
-    if (th.length) html += '<button class="link-btn" id="btn-clear-chat" style="margin-top:8px">Borrar esta conversación</button>';
     return html;
   }
 
@@ -679,7 +686,8 @@
 
   function render() {
     var app = $('#app');
-    app.innerHTML = tab === 'vehiculo' ? vehicleView() : tab === 'asistente' ? assistantView() : tab === 'libreta' ? logView() : settingsView();
+    var view = tab === 'vehiculo' ? vehicleView() : tab === 'asistente' ? assistantView() : tab === 'libreta' ? logView() : settingsView();
+    app.innerHTML = '<div class="brand-header"><img src="thokar-logo-original.jpg" alt="THOKAR — Ingeniería que mueve"></div>' + view;
     renderTabs();
   }
 

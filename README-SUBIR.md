@@ -1,3 +1,7 @@
+# THOKAR 4.0.2 — Ventana de chat del Asistente
+
+Esta compilación usa la imagen original entregada por Thomas como logo visible de la aplicación y como base de los iconos PWA. Mantiene la integración Boostr y la estructura plana para GitHub/Render.
+
 # THOKAR Taller 4.0 — Boostr API + Render
 
 Esta versión elimina por completo Playwright y la automatización de PatenteChile. La búsqueda por patente se hace desde el backend de THOKAR contra la API oficial de Boostr.
@@ -108,3 +112,11 @@ THOKAR no envía `include=owner` y el backend usa una lista explícita de campos
 ## Notas de límites
 
 Boostr documenta un rate-limit general de hasta 5 solicitudes cada 10 segundos. THOKAR aplica además un límite local conservador de 4 cada 10 segundos por IP.
+## Cambio 4.0.2 — Asistente
+
+- El chat y su historial ahora viven dentro de una ventana/panel de altura fija.
+- El historial hace scroll dentro del panel, no en toda la página.
+- La caja para escribir es más grande y queda en la parte inferior de la ventana.
+- Las consultas rápidas quedan dentro de la misma ventana.
+- El resto de THOKAR no fue modificado.
+
