@@ -4,3 +4,6 @@ npm-debug.log
 .gitignore
 *.zip
 .DS_Store
+.env
+.env.*
+!.env.example
