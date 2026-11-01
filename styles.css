@@ -393,3 +393,33 @@ html[data-theme="sol"] .preboot,html[data-theme="sol"] .boot-fallback{background
 .part-copy{display:flex;flex-direction:column;gap:6px}.part-copy strong{font-family:var(--font-head);font-size:17px;color:var(--text)}.part-copy span{font-size:13px;line-height:1.4;color:var(--text-2)}
 .part-action{margin-top:auto;display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 12px;border-radius:999px;background:color-mix(in srgb,var(--accent) 18%, transparent);border:1px solid color-mix(in srgb,var(--accent) 36%, transparent);font-family:var(--font-head);font-size:13px;color:var(--text)}
 @media (max-width:720px){.part-grid{grid-template-columns:1fr}.part-card{min-height:unset}.plate-chip{font-size:22px;min-width:100px}}
+
+
+/* 6.2.4 · placa chilena compacta y normal */
+.plate-chip{
+  position:relative!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:104px!important;
+  min-width:104px!important;
+  height:42px!important;
+  min-height:42px!important;
+  padding:0 8px 10px!important;
+  box-sizing:border-box!important;
+  background:#fff url('plate-chile.svg?v=624') center/100% 100% no-repeat!important;
+  border:0!important;
+  border-radius:8px!important;
+  box-shadow:0 2px 6px rgba(0,0,0,.18)!important;
+  clip-path:none!important;
+  color:#111315!important;
+  font:800 18px/1 "Arial Narrow",Arial,sans-serif!important;
+  letter-spacing:.09em!important;
+  text-transform:uppercase!important;
+  overflow:hidden!important;
+}
+.plate-chip::after{content:none!important}
+.case-card .plate-chip{width:104px!important;min-width:104px!important;height:42px!important;font-size:18px!important;padding:0 8px 10px!important}
+.hero-head .plate-chip{width:122px!important;min-width:122px!important;height:46px!important;min-height:46px!important;font-size:21px!important;padding:0 10px 11px!important}
+html[data-theme="cabina"] .plate-chip.active-plate{box-shadow:0 2px 8px rgba(0,0,0,.28),0 0 12px rgba(255,42,42,.14)!important}
+@media(max-width:420px){.case-card .plate-chip{width:96px!important;min-width:96px!important;height:40px!important;font-size:17px!important}.hero-head .plate-chip{width:112px!important;min-width:112px!important;height:44px!important;font-size:19px!important}}

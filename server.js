@@ -213,7 +213,7 @@ app.get('/healthz', (req, res) => {
     model: geminiConfig().model,
     layout: 'flat',
     protected: tokenReady,
-    build: '6.2.3-plates-zones'
+    build: '6.2.4-data-order'
   });
 });
 
@@ -301,7 +301,7 @@ app.post('/api/ai/stream', aiRateLimit, async (req, res) => {
 
 const PUBLIC_FILES = new Set([
   'index.html', 'app.js', 'lib.js', 'styles.css', 'sw.js', 'manifest.webmanifest',
-  'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'
+  'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'plate-chile.svg'
 ]);
 
 function sendPublicFile(req, res, filename) {

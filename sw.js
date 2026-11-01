@@ -1,6 +1,6 @@
 /* THOKAR 6.2.2 · network-first y actualización manual */
-const CACHE='thokar-taller-v36-plates-zones';
-const SHELL=['./','index.html','styles.css?v=623','lib.js?v=623','app.js?v=623','manifest.webmanifest?v=623','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
+const CACHE='thokar-taller-v37-data-order';
+const SHELL=['./','index.html','styles.css?v=624','lib.js?v=624','app.js?v=624','manifest.webmanifest?v=624','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','plate-chile.svg?v=624'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)))});
 self.addEventListener('message',event=>{if(event.data&&event.data.type==='SKIP_WAITING')self.skipWaiting()});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});

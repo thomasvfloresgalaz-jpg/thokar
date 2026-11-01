@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 100">
+  <rect x="3" y="3" width="274" height="94" rx="10" fill="#ffffff" stroke="#111315" stroke-width="6"/>
+  <g fill="#111315">
+    <path d="M132 47l8-5 8 5-3-9 8-6h-10l-3-9-3 9h-10l8 6z"/>
+    <text x="140" y="88" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" letter-spacing="8">CHILE</text>
+  </g>
+</svg>
