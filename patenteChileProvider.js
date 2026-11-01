@@ -8,7 +8,7 @@ const {
 } = require('./vehicleParser');
 
 const SOURCE_URL = process.env.PATENTECHILE_URL || 'https://www.patentechile.com/';
-const SOURCE_TIMEOUT_MS = Math.max(10000, Number(process.env.SOURCE_TIMEOUT_MS || 45000));
+const SOURCE_TIMEOUT_MS = Math.max(10000, Number(process.env.SOURCE_TIMEOUT_MS || 55000));
 
 let browserPromise;
 
@@ -33,11 +33,11 @@ function sourceError(code, message, status = 502) {
 }
 
 async function detectBlocked(page) {
-  const text = (await page.locator('body').innerText({ timeout: 3000 }).catch(() => '')).slice(0, 12000);
-  if (/captcha|cloudflare|verify you are human|verifica que eres humano|comprobando (?:tu )?navegador|access denied/i.test(text)) {
+  const text = (await page.locator('body').innerText({ timeout: 3000 }).catch(() => '')).slice(0, 16000);
+  if (/captcha|cloudflare|verify you are human|verifica que eres humano|comprobando (?:tu )?navegador|access denied|attention required/i.test(text)) {
     throw sourceError(
       'SOURCE_BLOCKED',
-      'PatenteChile presentó una verificación o bloqueo automático. THOKAR no intenta evadirla; usa la carga manual mientras la fuente esté bloqueada.',
+      'PatenteChile presentó una verificación o bloqueo automático. THOKAR no intenta evadirla.',
       503
     );
   }
@@ -66,7 +66,7 @@ async function findPlateInput(page) {
       .filter(Boolean).join(' ');
     if (/patente|ppu|placa|AA1122|BBCC11/i.test(hint)) return el;
   }
-  throw sourceError('SOURCE_CHANGED', 'No pude localizar el campo de patente en PatenteChile. Es posible que el sitio haya cambiado.', 502);
+  throw sourceError('SOURCE_CHANGED', 'No pude localizar el campo de patente en PatenteChile.', 502);
 }
 
 async function clickVehicleMode(page) {
@@ -94,7 +94,7 @@ async function submitSearch(page, input) {
     return;
   }
 
-  const visibleButtons = page.getByRole('button', { name: /^\s*(?:🔍\s*)?buscar\s*$/i });
+  const visibleButtons = page.getByRole('button', { name: /buscar/i });
   const n = await visibleButtons.count();
   for (let i = n - 1; i >= 0; i -= 1) {
     const btn = visibleButtons.nth(i);
@@ -106,53 +106,67 @@ async function submitSearch(page, input) {
   await input.press('Enter');
 }
 
-async function extractTechnicalBlock(page) {
+// Extrae la página completa con heurísticas que no dependen de una clase/card concreta.
+// Solo se devuelven pares; el parser de servidor aplica una lista blanca de datos no personales.
+async function extractPageSnapshot(page) {
   return page.evaluate(() => {
-    const privateRx = /(?:propietari|due[nñ]o|nombre\s+completo|\brut\b|\brun\b|direcci[oó]n|domicilio|tel[eé]fono|correo|e-?mail|fecha\s+de\s+nacimiento)/i;
-    const vehicleRx = /informaci[oó]n\s+(?:del\s+)?veh[ií]culo|informaci[oó]n\s+vehicular/i;
-    const usefulRx = /\b(marca|modelo|a[nñ]o|motor|chasis|vin|color|fabricante|procedencia)\b/i;
+    const clean = (v, max = 300) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, max);
+    const rows = [];
+    const seen = new Set();
+    const add = (a, b) => {
+      const label = clean(a, 120);
+      const value = clean(b, 240);
+      if (!label || !value || label === value) return;
+      const key = `${label}\u0000${value}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      rows.push([label, value]);
+    };
 
-    const elements = Array.from(document.querySelectorAll('h1,h2,h3,h4,h5,h6,strong,b,div,section,article,table'));
-    const heading = elements.find((el) => vehicleRx.test((el.textContent || '').trim()) && (el.textContent || '').trim().length < 120);
-    let container = null;
-    if (heading) {
-      let node = heading;
-      for (let i = 0; i < 6 && node; i += 1, node = node.parentElement) {
-        const text = (node.innerText || '').trim();
-        if (usefulRx.test(text) && /marca/i.test(text) && /modelo/i.test(text) && !privateRx.test(text.slice(0, 500))) {
-          container = node;
-          break;
-        }
+    // Tablas actuales o futuras.
+    document.querySelectorAll('tr').forEach((tr) => {
+      const cells = Array.from(tr.querySelectorAll(':scope > th, :scope > td'))
+        .map((cell) => clean(cell.innerText, 260)).filter(Boolean);
+      if (cells.length >= 2) add(cells[0], cells.slice(1).join(' '));
+    });
+
+    // Listas de definición.
+    document.querySelectorAll('dt').forEach((dt) => {
+      const dd = dt.nextElementSibling;
+      if (dd && dd.tagName && dd.tagName.toLowerCase() === 'dd') add(dt.innerText, dd.innerText);
+    });
+
+    // Contenedores de dos columnas/card: etiqueta + valor.
+    document.querySelectorAll('li, p, div, section').forEach((el) => {
+      const children = Array.from(el.children || []).filter((c) => clean(c.innerText, 300));
+      if (children.length !== 2) return;
+      const a = clean(children[0].innerText, 120);
+      const b = clean(children[1].innerText, 240);
+      if (a && b && a.length <= 100 && b.length <= 220) add(a, b);
+    });
+
+    // Etiquetas comunes seguidas por un hermano con valor.
+    document.querySelectorAll('label, strong, b, th, [class*="label" i], [class*="title" i]').forEach((el) => {
+      const a = clean(el.innerText, 120);
+      if (!a || a.length > 100) return;
+      let sib = el.nextElementSibling;
+      if (sib) {
+        const b = clean(sib.innerText, 240);
+        if (b && b.length <= 220) add(a, b);
       }
-      if (!container) container = heading.parentElement;
-    }
+    });
 
-    if (!container) {
-      const candidates = Array.from(document.querySelectorAll('table,section,article,.card,.table-responsive,div'))
-        .map((el) => {
-          const text = (el.innerText || '').trim();
-          let score = 0;
-          for (const rx of [/\bmarca\b/i,/\bmodelo\b/i,/\ba[nñ]o\b/i,/\bmotor\b/i,/\bchasis\b|\bvin\b/i,/\bcolor\b/i]) {
-            if (rx.test(text)) score += 1;
-          }
-          if (privateRx.test(text)) score -= 3;
-          return { el, text, score };
-        })
-        .filter((x) => x.score >= 3)
-        .sort((a, b) => b.score - a.score || a.text.length - b.text.length);
-      if (candidates.length) container = candidates[0].el;
-    }
-
-    if (!container) return { text: '', rows: [] };
-
-    const rows = Array.from(container.querySelectorAll('tr')).map((tr) =>
-      Array.from(tr.querySelectorAll('th,td')).map((cell) => (cell.innerText || '').replace(/\s+/g, ' ').trim()).filter(Boolean)
-    ).filter((row) => row.length >= 2 && !privateRx.test(row.join(' ')));
-
-    let text = (container.innerText || '').trim();
-    text = text.split(/\n/).filter((line) => !privateRx.test(line)).join('\n').slice(0, 8000);
-    return { text, rows };
+    const text = clean(document.body && document.body.innerText, 30000);
+    // Mantener saltos para el parser línea-a-línea.
+    const rawText = String((document.body && document.body.innerText) || '').slice(0, 30000);
+    return { text: rawText, compactText: text, rows: rows.slice(0, 800) };
   });
+}
+
+function mergeVehicle(snapshot, plate) {
+  const fromRows = parseRows(snapshot.rows || []);
+  const fromText = parseVehicleText(snapshot.text || '');
+  return sanitizeVehicle({ ...fromText, ...fromRows }, plate);
 }
 
 async function lookupVehicle(requestedPlate) {
@@ -170,7 +184,6 @@ async function lookupVehicle(requestedPlate) {
   page.setDefaultTimeout(SOURCE_TIMEOUT_MS);
   page.setDefaultNavigationTimeout(SOURCE_TIMEOUT_MS);
 
-  // Reduce consumo sin bloquear JS/CSS necesarios para el formulario.
   await page.route('**/*', async (route) => {
     const type = route.request().resourceType();
     if (['image', 'media', 'font'].includes(type)) return route.abort();
@@ -186,39 +199,54 @@ async function lookupVehicle(requestedPlate) {
     await input.fill(plate);
     await submitSearch(page, input);
 
-    await page.waitForFunction(() => {
-      const text = (document.body && document.body.innerText) || '';
-      return /informaci[oó]n\s+(?:del\s+)?veh[ií]culo|informaci[oó]n\s+vehicular/i.test(text)
-        || /no\s+(?:se\s+)?encontr(?:aron|ó)|sin\s+resultados|patente\s+no\s+encontrada/i.test(text)
-        || /captcha|cloudflare|verify you are human|verifica que eres humano/i.test(text);
-    }, null, { timeout: SOURCE_TIMEOUT_MS }).catch(() => {});
+    const deadline = Date.now() + SOURCE_TIMEOUT_MS;
+    let lastSnapshot = { text: '', compactText: '', rows: [] };
+    let vehicle = {};
 
-    await detectBlocked(page);
+    while (Date.now() < deadline) {
+      await page.waitForTimeout(650);
+      await detectBlocked(page);
+      lastSnapshot = await extractPageSnapshot(page);
+      const body = lastSnapshot.text || '';
 
-    const bodyText = (await page.locator('body').innerText().catch(() => '')).slice(0, 16000);
-    if (/no\s+(?:se\s+)?encontr(?:aron|ó)|sin\s+resultados|patente\s+no\s+encontrada/i.test(bodyText)) {
-      throw sourceError('NOT_FOUND', 'PatenteChile no devolvió información técnica para esa patente.', 404);
+      if (/no\s+(?:se\s+)?encontr(?:aron|ó)|sin\s+resultados|patente\s+no\s+encontrada|no\s+encontramos\s+(?:la\s+)?patente/i.test(body)) {
+        throw sourceError('NOT_FOUND', 'PatenteChile no devolvió información para esa patente.', 404);
+      }
+
+      vehicle = mergeVehicle(lastSnapshot, plate);
+      if (hasUsefulVehicleData(vehicle)) {
+        // Un pequeño segundo muestreo permite que aparezcan bloques que cargan después del resumen principal.
+        await page.waitForTimeout(900);
+        const finalSnapshot = await extractPageSnapshot(page).catch(() => lastSnapshot);
+        vehicle = mergeVehicle({
+          text: `${lastSnapshot.text || ''}\n${finalSnapshot.text || ''}`,
+          rows: [...(lastSnapshot.rows || []), ...(finalSnapshot.rows || [])]
+        }, plate);
+        return vehicle;
+      }
     }
 
-    const block = await extractTechnicalBlock(page);
-    const fromRows = parseRows(block.rows);
-    const fromText = parseVehicleText(block.text);
-    const vehicle = sanitizeVehicle({ ...fromText, ...fromRows }, plate);
-
-    if (!hasUsefulVehicleData(vehicle)) {
-      throw sourceError(
-        'SOURCE_CHANGED',
-        'PatenteChile respondió, pero THOKAR no pudo reconocer la ficha técnica. El sitio puede haber cambiado su estructura.',
-        502
-      );
+    // Diagnóstico seguro: solo etiquetas reconocibles, nunca contenido personal ni HTML bruto.
+    const observed = [];
+    for (const row of lastSnapshot.rows || []) {
+      const label = String(row && row[0] || '').replace(/\s+/g, ' ').trim();
+      if (label && label.length <= 80 && !/propietari|titular|due[nñ]o|nombre|apellido|rut|run|direcci[oó]n|domicilio|tel[eé]fono|correo|mail|nacimiento/i.test(label)) {
+        observed.push(label);
+      }
+      if (observed.length >= 12) break;
     }
-    return vehicle;
+    const suffix = observed.length ? ` Etiquetas visibles: ${[...new Set(observed)].slice(0, 8).join(', ')}.` : '';
+    throw sourceError(
+      'SOURCE_CHANGED',
+      'PatenteChile respondió, pero THOKAR no encontró campos vehiculares reconocibles.' + suffix,
+      502
+    );
   } catch (error) {
     if (error && error.code) throw error;
     if (error && /Timeout/i.test(error.message || '')) {
       throw sourceError('SOURCE_TIMEOUT', 'PatenteChile tardó demasiado en responder.', 504);
     }
-    throw sourceError('SOURCE_ERROR', 'No se pudo completar la consulta técnica en PatenteChile.', 502);
+    throw sourceError('SOURCE_ERROR', 'No se pudo completar la consulta en PatenteChile.', 502);
   } finally {
     await context.close().catch(() => {});
   }

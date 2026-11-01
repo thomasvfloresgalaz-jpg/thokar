@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "3.1.0-flat",
+  "version": "3.2.0-flex",
   "private": true,
-  "description": "THOKAR Taller con backend de consulta técnica por patente, adaptado a estructura plana.",
+  "description": "THOKAR Taller con backend robusto de consulta vehicular por patente y estructura plana.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

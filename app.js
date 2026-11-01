@@ -15,7 +15,7 @@
     try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { storageOk = false; }
   }
   function emptyVehicle() {
-    return { plate: '', tipo: '', marca: '', modelo: '', version: '', anio: '', color: '', combustible: '', motor: '', chasis: '', procedencia: '', fabricante: '', km: '' };
+    return { plate: '', tipo: '', marca: '', modelo: '', version: '', anio: '', color: '', combustible: '', motor: '', chasis: '', procedencia: '', fabricante: '', km: '', cilindrada: '', tipoSello: '', multas: '', mesRevision: '', revisionTecnica: '', revisionGases: '', permisoCirculacion: '', soap: '', kmRegistrado: '', transportePublico: '', tipoTransportePublico: '', restriccion: '', siniestrado: '' };
   }
   var db = {
     settings: load(K.settings, { apiKey: '', model: '', auto: '' }),
@@ -181,7 +181,7 @@
     if (code === 'RATE_LIMIT' || status === 429) return 'Se hicieron demasiadas consultas. Espera un minuto e intenta otra vez.';
     if (code === 'SOURCE_BLOCKED') return 'PatenteChile pidió una verificación o bloqueó la automatización. THOKAR no intenta evadirla; usa "Pegar datos" por ahora.';
     if (code === 'SOURCE_TIMEOUT' || status === 504) return 'PatenteChile tardó demasiado en responder. Intenta nuevamente o usa "Pegar datos".';
-    if (code === 'SOURCE_CHANGED') return 'PatenteChile respondió, pero cambió la estructura de la ficha y THOKAR no pudo reconocerla.';
+    if (code === 'SOURCE_CHANGED') return er.message || 'PatenteChile respondió, pero THOKAR no pudo reconocer los campos de la ficha.';
     if (er.message) return er.message;
     if (status >= 500) return 'El servidor de THOKAR no pudo completar la consulta de patente.';
     return 'No se pudo consultar la patente (' + status + ').';
@@ -238,7 +238,7 @@
   }
 
   function applyFound(found, source) {
-    var labels = { plate: 'patente', tipo: 'tipo', marca: 'marca', modelo: 'modelo', anio: 'año', color: 'color', motor: 'motor', chasis: 'chasis', combustible: 'combustible', procedencia: 'procedencia', fabricante: 'fabricante' };
+    var labels = { plate: 'patente', tipo: 'tipo', marca: 'marca', modelo: 'modelo', anio: 'año', color: 'color', motor: 'motor', chasis: 'chasis', combustible: 'combustible', procedencia: 'procedencia', fabricante: 'fabricante', cilindrada: 'cilindrada', tipoSello: 'tipo de sello', multas: 'multas', mesRevision: 'mes de revisión', revisionTecnica: 'revisión técnica', revisionGases: 'revisión de gases', permisoCirculacion: 'permiso de circulación', soap: 'SOAP', kmRegistrado: 'kilometraje registrado', transportePublico: 'transporte público', tipoTransportePublico: 'tipo de transporte público', restriccion: 'restricción vehicular', siniestrado: 'siniestrado' };
     var got = [];
     Object.keys(found).forEach(function (k) {
       if (found[k]) { cur[k] = found[k]; got.push(labels[k] || k); }
@@ -306,7 +306,7 @@
   function openPaste() {
     openSheet(
       '<h3>Pegar datos de la patente</h3>' +
-      '<p class="muted small">Abre el buscador que usas, copia el resultado completo y pégalo aquí. La app toma solo datos técnicos del vehículo (marca, modelo, año, tipo, color, motor, chasis y similares). Cualquier dato del dueño se ignora y no se guarda.</p>' +
+      '<p class="muted small">Abre el buscador que usas, copia el resultado completo y pégalo aquí. La app toma datos del vehículo y antecedentes administrativos útiles (marca, modelo, año, motor, chasis, revisión, SOAP, multas y similares). Los datos personales del propietario se ignoran y no se guardan.</p>' +
       '<p style="margin:10px 0"><a href="https://www.patentechile.com/" target="_blank" rel="noopener" style="color:var(--text)">Abrir patentechile.com en otra pestaña</a></p>' +
       '<div class="field"><label for="paste-text">Texto copiado</label><textarea id="paste-text" placeholder="Pega aquí"></textarea></div>' +
       '<div class="btn-row" style="margin-top:14px"><button class="btn" data-sheet-close>Cancelar</button><button class="btn primary" id="do-paste">Leer datos</button></div>',
@@ -560,6 +560,16 @@
 
   function vehicleView() {
     var savedPlates = Object.keys(db.vehicles).sort();
+    var extraLabels = {
+      cilindrada: 'Cilindrada', tipoSello: 'Tipo de sello', multas: 'Multas de tránsito',
+      mesRevision: 'Mes de revisión técnica', revisionTecnica: 'Revisión técnica', revisionGases: 'Revisión de gases',
+      permisoCirculacion: 'Permiso de circulación', soap: 'SOAP', kmRegistrado: 'Kilometraje registrado',
+      transportePublico: 'Transporte público', tipoTransportePublico: 'Tipo de transporte público',
+      restriccion: 'Restricción vehicular', siniestrado: 'Siniestrado'
+    };
+    var extraHtml = Object.keys(extraLabels).filter(function (k) { return cur[k]; }).map(function (k) {
+      return '<div><span class="muted small">' + esc(extraLabels[k]) + '</span><div>' + esc(cur[k]) + '</div></div>';
+    }).join('');
     return '' +
       '<div class="plate-block"><label class="plate-label" for="f-plate">Patente</label>' +
       '<div class="plate"><input id="f-plate" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="12" placeholder="ABCD12" value="' + esc(cur.plate) + '"></div></div>' +
@@ -585,6 +595,7 @@
       '<div><label for="f-procedencia">Procedencia</label><input id="f-procedencia" autocomplete="off" value="' + esc(cur.procedencia) + '"></div>' +
       '<div><label for="f-fabricante">Fabricante</label><input id="f-fabricante" autocomplete="off" value="' + esc(cur.fabricante) + '"></div>' +
       '</div></div>' +
+      (extraHtml ? '<div class="card" style="margin-top:12px"><h3>Antecedentes adicionales</h3><div class="grid2 field" style="margin-top:10px">' + extraHtml + '</div></div>' : '') +
       '<div class="btn-row" style="margin-top:12px"><button class="btn primary" id="btn-save">Guardar vehículo</button><button class="btn" id="btn-clear">Vehículo nuevo</button></div>' +
       '<div style="margin-top:24px"><h3>Guardados</h3>' +
       (savedPlates.length ? savedPlates.map(function (p) {
@@ -653,7 +664,7 @@
       '<div class="btn-row" style="margin-top:12px"><button class="btn" id="btn-detect">Detectar modelo</button><button class="btn primary" id="btn-test">Probar conexión</button></div>' +
       '<p class="small" id="test-out" style="margin-top:10px" aria-live="polite"></p></div>' +
       '<div class="card"><h3>Búsqueda automática por patente</h3>' +
-      '<p class="muted small" style="margin:6px 0 8px">La consulta ahora pasa por el backend de THOKAR. No necesitas token de Apify en el teléfono. El servidor devuelve solo datos técnicos del vehículo y descarta datos personales del propietario.</p>' +
+      '<p class="muted small" style="margin:6px 0 8px">La consulta ahora pasa por el backend de THOKAR. No necesitas token de Apify en el teléfono. El servidor devuelve datos del vehículo y antecedentes administrativos disponibles, y descarta datos personales del propietario.</p>' +
       '<p class="muted small">Si PatenteChile presenta CAPTCHA, bloqueo o cambia su página, THOKAR lo informará y podrás seguir usando "Pegar datos" o "Foto del permiso".</p></div>' +
       '<div class="card"><h3>Respaldo</h3><p class="muted small" style="margin:6px 0 12px">Vehículos, libreta y conversaciones. Descárgalo de vez en cuando por si cambias de teléfono o borras los datos del navegador.</p>' +
       '<div class="btn-row"><button class="btn" id="btn-export">Descargar respaldo</button><button class="btn" id="btn-import">Importar respaldo</button></div><input type="file" id="import-input" accept="application/json,.json" hidden></div>' +
