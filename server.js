@@ -94,7 +94,8 @@ function getCachedVehicle(plate) {
 function geminiConfig() {
   return {
     apiKey: String(process.env.GEMINI_API_KEY || '').trim(),
-    model: String(process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim()
+    model: String(process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim(),
+    fallbackModel: String(process.env.GEMINI_FALLBACK_MODEL || 'gemini-3.6-flash').trim()
   };
 }
 
@@ -136,8 +137,9 @@ function geminiErrorMessage(status, payload) {
   return 'No se pudo completar la consulta a Gemini.';
 }
 
-async function googleGeminiFetch(mode, input, signal) {
+async function googleGeminiFetch(mode, input, signal, modelOverride) {
   const { apiKey, model } = geminiConfig();
+  const selectedModel = String(modelOverride || model).trim();
   if (!apiKey) {
     const error = new Error('Falta configurar GEMINI_API_KEY en Render.');
     error.status = 503; error.code = 'GEMINI_NOT_CONFIGURED'; throw error;
@@ -147,9 +149,9 @@ async function googleGeminiFetch(mode, input, signal) {
     const error = new Error('Solicitud de IA inválida.'); error.status = 400; error.code = 'AI_BAD_REQUEST'; throw error;
   }
   const suffix = mode === 'stream' ? ':streamGenerateContent?alt=sse' : ':generateContent';
-  const response = await fetch(`${GEMINI_BASE}/models/${encodeURIComponent(model)}${suffix}`, {
+  const response = await fetch(`${GEMINI_BASE}/models/${encodeURIComponent(selectedModel)}${suffix}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-Taller/5.3.0' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-Taller/6.0.0' },
     body: JSON.stringify(body), signal
   });
   if (!response.ok) {
@@ -160,6 +162,43 @@ async function googleGeminiFetch(mode, input, signal) {
     throw error;
   }
   return response;
+}
+
+
+function geminiRetryable(error) {
+  if (!error) return false;
+  if (error.name === 'AbortError') return true;
+  return [408, 429, 500, 502, 503, 504].includes(Number(error.status || 0));
+}
+
+async function googleGeminiFetchResilient(mode, input, outerSignal) {
+  const cfg = geminiConfig();
+  const models = [cfg.model, cfg.fallbackModel].filter((v, i, a) => v && a.indexOf(v) === i);
+  const delays = [0, 1400];
+  let lastError;
+  for (let m = 0; m < models.length; m++) {
+    for (let attempt = 0; attempt < delays.length; attempt++) {
+      if (outerSignal && outerSignal.aborted) { const e = new Error('Solicitud cancelada.'); e.name = 'AbortError'; throw e; }
+      if (delays[attempt]) await new Promise((r) => setTimeout(r, delays[attempt] + Math.floor(Math.random() * 450)));
+      const ctl = new AbortController();
+      const onAbort = () => ctl.abort();
+      if (outerSignal) outerSignal.addEventListener('abort', onAbort, { once: true });
+      const perAttemptMs = mode === 'stream' ? 34_000 : 32_000;
+      const timer = setTimeout(() => ctl.abort(), perAttemptMs);
+      try {
+        const response = await googleGeminiFetch(mode, input, ctl.signal, models[m]);
+        clearTimeout(timer);
+        if (outerSignal) outerSignal.removeEventListener('abort', onAbort);
+        return response;
+      } catch (error) {
+        clearTimeout(timer);
+        if (outerSignal) outerSignal.removeEventListener('abort', onAbort);
+        lastError = error;
+        if (!geminiRetryable(error)) throw error;
+      }
+    }
+  }
+  throw lastError || new Error('Gemini no respondió.');
 }
 
 app.get('/healthz', (req, res) => {
@@ -174,7 +213,7 @@ app.get('/healthz', (req, res) => {
     model: geminiConfig().model,
     layout: 'flat',
     protected: tokenReady,
-    build: '5.3.0-vehicle-zones'
+    build: '6.0.0-cabina'
   });
 });
 
@@ -201,9 +240,9 @@ app.get('/api/vehiculo/:patente', plateRateLimit, async (req, res) => {
 app.post('/api/ai/json', aiRateLimit, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 60_000);
+  const timer = setTimeout(() => ctl.abort(), 135_000);
   try {
-    const response = await googleGeminiFetch('json', req.body, ctl.signal);
+    const response = await googleGeminiFetchResilient('json', req.body, ctl.signal);
     const payload = await response.json();
     const parts = payload && payload.candidates && payload.candidates[0] && payload.candidates[0].content && payload.candidates[0].content.parts;
     const text = Array.isArray(parts) ? parts.map((p) => p.text || '').join('').trim() : '';
@@ -219,9 +258,9 @@ app.post('/api/ai/json', aiRateLimit, async (req, res) => {
 app.post('/api/ai/stream', aiRateLimit, async (req, res) => {
   const ctl = new AbortController();
   res.on('close', () => { if (!res.writableEnded) ctl.abort(); });
-  const timer = setTimeout(() => ctl.abort(), 90_000);
+  const timer = setTimeout(() => ctl.abort(), 145_000);
   try {
-    const response = await googleGeminiFetch('stream', req.body, ctl.signal);
+    const response = await googleGeminiFetchResilient('stream', req.body, ctl.signal);
     res.status(200);
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store, no-transform');

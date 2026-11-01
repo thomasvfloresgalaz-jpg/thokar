@@ -1,57 +1,52 @@
-# THOKAR 5.3.0 · Datos primero, zonas claras y eliminar vehículo
+# THOKAR 6.0.0 · Cabina / Sol
 
-Esta versión parte de THOKAR 5.1 y corrige problemas detectados usando la app desde el teléfono.
+Versión rediseñada de THOKAR sobre la misma arquitectura plana GitHub → Render → PWA Android.
 
 ## Cambios principales
 
-- El chat ya no se vuelve a renderizar completo al enviar un mensaje. Esto elimina el salto visual hacia arriba y luego hacia abajo.
-- El streaming actualiza únicamente la respuesta que está escribiendo la IA y respeta la posición del usuario si está leyendo mensajes anteriores.
-- Cada historial de chat se guarda automáticamente bajo su **patente**. En Chat aparece una indicación de la patente cuyo historial se está usando.
-- La acción ambigua **Guardar** fue reemplazada por **Registrar diagnóstico**. Esto copia esa respuesta de IA al Registro de la patente actual; no controla el guardado del chat.
-- **Crear checklist** guarda el checklist dentro de Registro para esa misma patente y muestra un botón **Ver checklist** para ir directamente a él.
-- En Registro, **Informe de servicio** y **Registrar** ya no flotan ni tapan información: aparecen únicamente al final de la lista.
-- El formulario Registrar añade un campo opcional **Próximo trabajo / mantención**, además de próxima fecha y próximo kilometraje.
-- El Informe de servicio fue reescrito para el cliente. Separa trabajo realizado, diagnóstico/revisión, repuestos/recomendaciones y próxima mantención.
-- Se mantienen Inicio, pantalla completa del vehículo y pestañas **Chat / Registro / Datos** de la versión 5.1.
-- Se mantiene el cambio automático de contexto por patente para que Gemini no mezcle vehículos.
+- Nuevo sistema visual **Cabina** (oscuro retrofuturista rojo) y **Sol** (alto contraste para trabajo exterior).
+- Inicio renombrado visualmente a **Registro de unidades**.
+- Vehículos/casos con patente, datos, actividad y estado LED.
+- Espacio de trabajo por vehículo con ficha superior y hoja inferior en 3 alturas: asomada, media y completa.
+- Vistas **Hablar / Registro / Datos** dentro de la hoja.
+- Al consultar una patente nueva se abre primero **Datos**, para confirmar marca/modelo/motor antes de usar el chat.
+- `Guardar vehículo` y `Estado del caso` quedan al final de Datos.
+- Datos confirmados ahora muestran recomendaciones automáticas de Gemini para aceite, filtro, bujías y refrigerante. La sugerencia se presenta como orientación y se puede copiar al campo confirmado.
+- Gemini incorpora reintentos automáticos y fallback interno a un modelo Flash estable para errores transitorios/timeouts.
+- Se mantiene separación de chats por patente, eliminación de vehículo, informe de servicio, checklists, fotos, Wake Lock, respaldo, Boostr y seguridad con APP_TOKEN.
 
-## Informe de servicio
+## Variables de Render
 
-El texto compartible usa solo información realmente guardada en Registro. Puede incluir:
+Obligatorias:
 
-- trabajo realizado;
-- diagnóstico o revisión;
-- repuestos/recomendaciones;
-- checklists realizados;
-- próxima mantención o trabajo, con fecha y/o kilometraje.
-
-Si completas el nombre del cliente en Datos, el informe también lo usa en el saludo.
-
-## Render
-
-Mantén estas variables en **Render → Environment**:
-
-- `APP_TOKEN`
+- `APP_TOKEN` (32 caracteres o más)
 - `BOOSTR_API_KEY`
 - `GEMINI_API_KEY`
-- `GEMINI_MODEL`
 
-Luego usa:
+Opcional:
 
-**Manual Deploy → Clear build cache & deploy**
+- `GEMINI_MODEL` (por defecto `gemini-3.8-flash`)
 
-Comprueba:
+No es necesario configurar el modelo de respaldo: THOKAR usa internamente `gemini-3.6-flash` si el modelo principal falla de forma transitoria.
 
-`https://TU-DOMINIO.onrender.com/healthz`
+## Despliegue
 
-Debe incluir:
+1. Reemplaza los archivos del repositorio por los de este paquete.
+2. En Render usa **Manual Deploy → Clear build cache & deploy**.
+3. Abre `/healthz` y verifica:
 
 ```json
-"build": "5.3.0-vehicle-zones"
+{
+  "build": "6.0.0-cabina",
+  "configured": true,
+  "geminiConfigured": true,
+  "protected": true
+}
 ```
 
-## Actualización en Android
+4. En THOKAR → Ajustes, pega el mismo `APP_TOKEN` de Render.
+5. Si la PWA conserva una versión anterior, usa **Forzar actualización**.
 
-El Service Worker usa la caché `thokar-taller-v23-vehicle-zones`.
+## Nota visual
 
-Si la PWA continúa mostrando una versión anterior, usa **Ajustes → Forzar actualización**.
+La V6 no carga fuentes ni recursos desde CDNs. Usa pilas tipográficas locales del sistema para mantener la PWA liviana y disponible sin conexión.
