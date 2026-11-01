@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: thokar-taller
+    runtime: docker
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: SOURCE_TIMEOUT_MS
+        value: 45000
+      - key: PLATE_REQUESTS_PER_MINUTE
+        value: 8
