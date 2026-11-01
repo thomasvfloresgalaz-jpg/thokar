@@ -230,11 +230,15 @@
     const mk = function (label, q) {
       return { label: label, url: 'https://www.google.com/search?q=' + encodeURIComponent(q) };
     };
+    const detail = [base, v.version, v.motor].filter(Boolean).join(' ').trim();
     return [
-      mk('Aceite recomendado', base + ' aceite recomendado viscosidad'),
-      mk('Filtros', 'filtro aceite ' + base + ' equivalencias'),
-      mk('Bujías', 'bujía ' + base + ' NGK'),
-      mk('Pastillas de freno', 'pastillas de freno ' + base)
+      mk('Aceite y filtro', detail + ' aceite motor viscosidad capacidad filtro aceite equivalencias'),
+      mk('Bujías', detail + ' bujías NGK Denso equivalencias'),
+      mk('Pastillas delanteras', detail + ' pastillas freno delanteras medidas equivalencias'),
+      mk('Filtro de aire', detail + ' filtro aire motor equivalencias'),
+      mk('Filtro de cabina', detail + ' filtro polen cabina equivalencias'),
+      mk('Correa / distribución', detail + ' correa distribución cadena distribución kit'),
+      mk('Amortiguadores', detail + ' amortiguadores delanteros traseros equivalencias')
     ];
   }
 

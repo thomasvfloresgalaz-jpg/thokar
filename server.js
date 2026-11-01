@@ -58,7 +58,7 @@ app.get('/healthz', (req, res) => {
     vehicleLookup: 'boostr',
     configured: Boolean(String(process.env.BOOSTR_API_KEY || '').trim()),
     layout: 'flat',
-    build: '4.0.2-assistant-window'
+    build: '4.0.3-whatsapp-assistant'
   });
 });
 

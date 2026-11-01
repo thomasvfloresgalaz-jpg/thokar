@@ -1,6 +1,6 @@
 {
   "name": "thokar-taller",
-  "version": "4.0.2-assistant-window",
+  "version": "4.0.3-whatsapp-assistant",
   "private": true,
   "description": "THOKAR Taller con backend Node y consulta de patentes mediante Boostr API.",
   "main": "server.js",

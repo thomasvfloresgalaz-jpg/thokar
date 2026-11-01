@@ -611,34 +611,51 @@
   }
 
   function assistantView() {
-    var hasCar = cur.marca || cur.modelo;
+    var hasCar = cur.marca || cur.modelo || L.isPlateOk(cur.plate);
     var key = chatKey();
     var th = db.chats[key] || [];
+    var plateLabel = L.isPlateOk(cur.plate) ? cur.plate : 'SIN PATENTE';
+    var mainVehicle = [cur.marca, cur.modelo, cur.anio].filter(Boolean).join(' ') || 'Vehículo sin identificar';
+    var vehicleMeta = [cur.combustible, cur.km ? L.formatKm(cur.km) + ' km' : ''].filter(Boolean).join(' · ');
+    var vehicleDetail = [cur.version, cur.motor ? 'Motor ' + cur.motor : '', cur.chasis ? 'VIN ' + cur.chasis : ''].filter(Boolean).join(' · ');
     var html = '<h2>Asistente</h2>';
-    if (hasCar) {
-      html += '<div class="summary"><div class="name">' + esc(vehicleName()) + '</div><div class="meta">' +
-        esc([cur.plate, cur.anio, cur.combustible, cur.km ? L.formatKm(cur.km) + ' km' : ''].filter(Boolean).join(' · ')) + '</div></div>';
-    } else {
-      html += '<div class="notice" style="margin:14px 0">No hay vehículo cargado. Puedes preguntar igual, pero con marca y modelo las respuestas son más precisas. <button class="link-btn" data-tab-go="vehiculo">Ir a Vehículo</button></div>';
+    if (!hasCar) {
+      html += '<div class="notice" style="margin:12px 0">Carga una patente y los datos del vehículo para que la IA pueda responder con mayor precisión. <button class="link-btn" data-tab-go="vehiculo">Ir a Vehículo</button></div>';
     }
     if (!(db.settings.apiKey || '').trim()) {
-      html += '<div class="notice" style="margin-bottom:12px">Falta la clave gratuita de Gemini. <button class="link-btn" data-tab-go="ajustes">Pegarla en Ajustes</button></div>';
+      html += '<div class="notice" style="margin:0 0 12px">Falta la clave gratuita de Gemini. <button class="link-btn" data-tab-go="ajustes">Pegarla en Ajustes</button></div>';
     }
-    html += '<section class="assistant-chat-window" aria-label="Chat con el asistente">' +
-      '<div class="assistant-chat-head"><div><h3>Chat con IA</h3><div class="small muted">' + (th.length ? esc(th.length + ' mensaje' + (th.length === 1 ? '' : 's') + ' en el historial') : 'Conversación nueva') + '</div></div>' +
-      (th.length ? '<button class="link-btn assistant-clear" id="btn-clear-chat">Borrar historial</button>' : '') + '</div>' +
-      '<div class="chips assistant-chips" role="group" aria-label="Consultas rápidas">' +
-      QUICK.map(function (q, i) { return '<button class="chip" data-quick="' + i + '"' + (busy ? ' disabled' : '') + '>' + esc(q[0]) + '</button>'; }).join('') + '</div>' +
-      '<div class="thread assistant-thread" id="chat-thread" aria-live="polite">' + th.map(function (m) {
+
+    html += '<section class="assistant-chat-window whatsapp-chat" aria-label="Chat con el asistente">' +
+      '<div class="assistant-chat-head whatsapp-head">' +
+        '<div class="assistant-avatar" aria-hidden="true">' + ICONS.vehiculo + '</div>' +
+        '<div class="assistant-contact">' +
+          '<div class="assistant-contact-name">' + esc(plateLabel) + '</div>' +
+          '<div class="assistant-contact-car">' + esc(mainVehicle) + '</div>' +
+          (vehicleMeta ? '<div class="assistant-contact-meta">' + esc(vehicleMeta) + '</div>' : '') +
+          (vehicleDetail ? '<div class="assistant-contact-detail">' + esc(vehicleDetail) + '</div>' : '') +
+        '</div>' +
+        (th.length ? '<button class="assistant-clear-icon" id="btn-clear-chat" aria-label="Borrar historial" title="Borrar historial">×</button>' : '') +
+      '</div>' +
+      '<div class="thread assistant-thread whatsapp-thread" id="chat-thread" aria-live="polite">' + th.map(function (m) {
         return '<div class="msg ' + (m.role === 'user' ? 'user' : 'model' + (m.error ? ' error' : '')) + '">' + (m.role === 'user' ? esc(m.text) : md(m.text)) + '</div>';
       }).join('') + (busy ? '<div class="msg model typing"><span class="spinner"></span> Consultando…</div>' : '') + '<div id="thread-end"></div></div>' +
       (pendingImage ? '<div class="assistant-attachment small muted">Foto lista para enviar. <button class="link-btn" id="btn-unattach">Quitar</button></div>' : '') +
-      '<form class="composer assistant-composer" id="composer"><button type="button" class="btn assistant-photo-btn" id="btn-attach" aria-label="Adjuntar foto">Foto</button><textarea id="chat-input" rows="2" placeholder="Escribe tu consulta para la IA…" aria-label="Mensaje"></textarea><button class="btn primary" type="submit"' + (busy ? ' disabled' : '') + '>Enviar</button></form><input type="file" id="chat-photo" accept="image/*" hidden>' +
+      '<form class="composer assistant-composer whatsapp-composer" id="composer">' +
+        '<button type="button" class="assistant-photo-btn whatsapp-photo" id="btn-attach" aria-label="Adjuntar foto" title="Adjuntar foto">＋</button>' +
+        '<textarea id="chat-input" rows="2" placeholder="Escribe un mensaje…" aria-label="Mensaje"></textarea>' +
+        '<button class="whatsapp-send" type="submit" aria-label="Enviar"' + (busy ? ' disabled' : '') + '>Enviar</button>' +
+      '</form><input type="file" id="chat-photo" accept="image/*" hidden>' +
       '</section>';
+
+    html += '<div class="assistant-quick-block"><div class="assistant-section-title">Preguntas rápidas a la IA</div><div class="chips assistant-chips-below" role="group" aria-label="Consultas rápidas">' +
+      QUICK.map(function (q, i) { return '<button class="chip" data-quick="' + i + '"' + (busy ? ' disabled' : '') + '>' + esc(q[0]) + '</button>'; }).join('') + '</div></div>';
+
     var links = L.searchLinks(cur);
     if (links.length) {
-      html += '<p class="muted small" style="margin-top:10px">Confirmar en catálogos (búsqueda en Google):</p><div class="links">' +
-        links.map(function (l) { return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + '</a>'; }).join('') + '</div>';
+      html += '<div class="assistant-recommendations"><div class="assistant-section-title">Recomendaciones para este vehículo</div>' +
+        '<p class="muted small">Búsquedas rápidas para confirmar compatibilidad y catálogos en Google.</p><div class="links assistant-recommendation-links">' +
+        links.map(function (l) { return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + '</a>'; }).join('') + '</div></div>';
     }
     return html;
   }
@@ -687,7 +704,7 @@
   function render() {
     var app = $('#app');
     var view = tab === 'vehiculo' ? vehicleView() : tab === 'asistente' ? assistantView() : tab === 'libreta' ? logView() : settingsView();
-    app.innerHTML = '<div class="brand-header"><img src="thokar-logo-original.jpg" alt="THOKAR — Ingeniería que mueve"></div>' + view;
+    app.innerHTML = view;
     renderTabs();
   }
 

@@ -1,6 +1,16 @@
-# THOKAR 4.0.2 — Ventana de chat del Asistente
+# THOKAR 4.0.3 — Asistente tipo WhatsApp
 
-Esta compilación usa la imagen original entregada por Thomas como logo visible de la aplicación y como base de los iconos PWA. Mantiene la integración Boostr y la estructura plana para GitHub/Render.
+Cambios de esta versión:
+
+- La sección Asistente usa una ventana de chat grande, sin ocupar toda la pantalla.
+- La cabecera del chat muestra la patente como contacto y debajo marca, modelo, año, combustible, km, versión/motor/VIN cuando existan.
+- El historial tiene scroll interno y el compositor queda fijo al pie del chat.
+- Las preguntas rápidas a Gemini están debajo de la ventana.
+- Debajo se agregan búsquedas/recomendaciones para Aceite y filtro, Bujías, Pastillas delanteras, Filtro de aire, Filtro de cabina, Distribución y Amortiguadores.
+- Se quitó el logo grande del contenido de la aplicación. El logo original se conserva en los iconos PWA/Android/iPhone.
+- Build: `4.0.3-whatsapp-assistant`.
+
+---
 
 # THOKAR Taller 4.0 — Boostr API + Render
 

@@ -47,25 +47,6 @@ p { margin: 0; }
 .hidden { display: none !important; }
 
 
-/* ---------- Marca THOKAR ---------- */
-.brand-header {
-  width: 100%;
-  height: clamp(118px, 28vw, 168px);
-  margin: -4px 0 18px;
-  overflow: hidden;
-  border: 1px solid #24272d;
-  border-radius: 16px;
-  background: #000;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-}
-.brand-header img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
-  object-position: 50% 50%;
-}
-
 /* ---------- Patente (elemento principal) ---------- */
 
 .plate-block { margin: 8px 0 20px; }
@@ -173,87 +154,228 @@ p { margin: 0; }
 .links a { display: inline-flex; align-items: center; min-height: 44px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--text); text-decoration: none; background: var(--surface); }
 
 
-/* ---------- Ventana del Asistente ---------- */
+/* ---------- Asistente: chat tipo WhatsApp ---------- */
 .assistant-chat-window {
-  height: clamp(420px, 58dvh, 590px);
-  min-height: 420px;
-  margin-top: 10px;
+  height: clamp(510px, 68dvh, 700px);
+  min-height: 510px;
+  margin-top: 12px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid #2a3942;
   border-radius: 16px;
-  background: #0d0f12;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  background: #0b141a;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.42);
 }
-.assistant-chat-head {
+
+.whatsapp-head {
   flex: 0 0 auto;
+  min-height: 82px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px 8px;
-  border-bottom: 1px solid rgba(55, 65, 81, 0.7);
+  gap: 10px;
+  padding: 10px 12px;
+  background: #202c33;
+  border-bottom: 1px solid #2a3942;
 }
-.assistant-chat-head h3 { font-size: 19px; }
-.assistant-clear { min-height: 36px; padding: 4px 0; white-space: nowrap; font-size: 13px; }
-.assistant-chips {
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 8px 10px;
-  border-bottom: 1px solid rgba(55, 65, 81, 0.55);
+
+.assistant-avatar {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #111b21;
+  border: 1px solid #3b4a54;
+  color: var(--red);
 }
-.assistant-chips .chip { min-height: 36px; padding: 5px 12px; font-size: 14px; }
+.assistant-avatar svg { width: 25px; height: 25px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+
+.assistant-contact { flex: 1 1 auto; min-width: 0; }
+.assistant-contact-name {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.07em;
+  color: #f4f6f7;
+}
+.assistant-contact-car {
+  margin-top: 3px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #d7dee2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.assistant-contact-meta,
+.assistant-contact-detail {
+  margin-top: 1px;
+  color: #8696a0;
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assistant-clear-icon {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #aebac1;
+  font-size: 25px;
+  line-height: 1;
+}
+.assistant-clear-icon:active { background: #2a3942; }
+
 .assistant-thread {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   margin: 0;
-  padding: 10px 12px 14px;
+  padding: 14px 11px 18px;
   scroll-behavior: smooth;
   scrollbar-gutter: stable;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255,255,255,.018) 0 1px, transparent 1.5px) 0 0 / 22px 22px,
+    #0b141a;
 }
 .assistant-thread:empty::before {
-  content: "Escribe una consulta para comenzar.";
-  color: var(--muted);
+  content: "Pregunta por diagnóstico, mantenimiento o repuestos del vehículo.";
+  color: #8696a0;
   display: block;
   text-align: center;
-  padding-top: 24px;
+  font-size: 13px;
+  max-width: 280px;
+  margin: 26px auto 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #182229;
 }
+
+.whatsapp-thread .msg {
+  max-width: 86%;
+  margin: 5px 0;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  box-shadow: 0 1px 1px rgba(0,0,0,.22);
+  font-size: 15px;
+  line-height: 1.38;
+}
+.whatsapp-thread .msg.user {
+  margin-left: auto;
+  color: #f4f6f7;
+  background: #5f171b;
+  border-bottom-right-radius: 2px;
+  font-weight: 400;
+}
+.whatsapp-thread .msg.model {
+  color: #e9edef;
+  background: #202c33;
+  border-bottom-left-radius: 2px;
+}
+.whatsapp-thread .msg.error { outline: 1px solid var(--red); }
+
 .assistant-attachment {
   flex: 0 0 auto;
-  padding: 5px 12px 0;
-  border-top: 1px solid rgba(55, 65, 81, 0.45);
+  padding: 6px 12px;
+  border-top: 1px solid #2a3942;
+  background: #111b21;
 }
-.assistant-attachment .link-btn { min-height: 30px; padding: 2px 0; }
-.assistant-composer {
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 10px;
-  border-top: 1px solid var(--line);
-  background: #101216;
-}
-.assistant-composer textarea {
-  min-height: 72px;
-  max-height: 120px;
-  line-height: 1.35;
-  background: var(--bg);
-}
-.assistant-photo-btn { min-width: 58px !important; padding-left: 10px; padding-right: 10px; }
 
-@media (max-height: 700px) {
-  .assistant-chat-window { height: 400px; min-height: 400px; }
-  .assistant-composer textarea { min-height: 62px; }
+.whatsapp-composer {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 7px;
+  margin: 0;
+  padding: 8px;
+  background: #202c33;
+  border-top: 1px solid #2a3942;
+}
+.whatsapp-composer textarea {
+  width: 100%;
+  min-height: 54px;
+  max-height: 130px;
+  padding: 15px 14px 12px;
+  border: 0;
+  border-radius: 22px;
+  outline: none;
+  background: #2a3942;
+  color: #f4f6f7;
+  line-height: 1.32;
+  resize: none;
+}
+.whatsapp-composer textarea::placeholder { color: #8696a0; }
+.whatsapp-photo,
+.whatsapp-send {
+  min-height: 44px;
+  border: 0;
+  border-radius: 22px;
+  font-weight: 600;
+}
+.whatsapp-photo {
+  width: 42px;
+  padding: 0;
+  background: #2a3942;
+  color: #aebac1;
+  font-size: 27px;
+  line-height: 1;
+}
+.whatsapp-send {
+  padding: 0 16px;
+  background: var(--red);
+  color: #070707;
+}
+.whatsapp-send:disabled { opacity: .55; }
+
+.assistant-quick-block,
+.assistant-recommendations {
+  margin-top: 18px;
+}
+.assistant-section-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  margin-bottom: 7px;
+}
+.assistant-chips-below {
+  margin: 0 -16px;
+  padding-top: 2px;
+}
+.assistant-recommendation-links {
+  margin-top: 10px;
+  gap: 9px;
+}
+.assistant-recommendation-links a {
+  background: #15171b;
+  border-color: #374151;
+  min-height: 44px;
+  font-weight: 500;
+}
+
+@media (max-height: 720px) {
+  .assistant-chat-window { height: 500px; min-height: 500px; }
 }
 
 @media (max-width: 380px) {
-  .assistant-chat-window { height: clamp(400px, 56dvh, 520px); }
-  .assistant-chat-head { padding-left: 10px; padding-right: 10px; }
-  .assistant-thread { padding-left: 9px; padding-right: 9px; }
-  .assistant-composer { gap: 6px; padding: 8px; }
-  .assistant-composer .btn { min-width: 66px; padding-left: 9px; padding-right: 9px; }
-  .assistant-photo-btn { min-width: 52px !important; }
+  .assistant-chat-window { height: clamp(490px, 66dvh, 620px); min-height: 490px; }
+  .whatsapp-head { padding-left: 9px; padding-right: 9px; }
+  .assistant-avatar { flex-basis: 40px; width: 40px; height: 40px; }
+  .assistant-contact-name { font-size: 22px; }
+  .assistant-thread { padding-left: 8px; padding-right: 8px; }
+  .whatsapp-composer { grid-template-columns: 38px minmax(0, 1fr) auto; gap: 5px; padding: 7px; }
+  .whatsapp-photo { width: 38px; }
+  .whatsapp-send { padding: 0 12px; }
 }
 
 /* ---------- Libreta ---------- */
