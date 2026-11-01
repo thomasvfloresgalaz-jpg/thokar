@@ -4,6 +4,7 @@
   var L = window.ThokarLib;
   var API = 'https://generativelanguage.googleapis.com/v1beta';
   var FALLBACK_MODEL = 'gemini-flash-latest';
+  var APP_BUILD = '4.1.0-ux';
   var K = { settings: 'thokar.settings', vehicles: 'thokar.vehicles', chats: 'thokar.chats', log: 'thokar.log', draft: 'thokar.draft' };
 
   /* ---------- Almacenamiento (con respaldo en memoria) ---------- */
@@ -18,7 +19,7 @@
     return { plate: '', dv: '', tipo: '', marca: '', modelo: '', version: '', anio: '', color: '', combustible: '', motor: '', chasis: '', procedencia: '', regionProcedencia: '', fabricante: '', km: '', cilindrada: '', puertas: '', transmision: '', codigoSii: '', tasacionFiscal: '', tipoSello: '', multas: '', mesRevision: '', revisionTecnica: '', revisionGases: '', permisoCirculacion: '', soap: '', kmRegistrado: '', transportePublico: '', tipoTransportePublico: '', restriccion: '', siniestrado: '' };
   }
   var db = {
-    settings: load(K.settings, { apiKey: '', model: '', auto: '' }),
+    settings: load(K.settings, { apiKey: '', model: '', auto: '', appToken: '' }),
     vehicles: load(K.vehicles, {}),
     chats: load(K.chats, {}),
     log: load(K.log, {})
@@ -28,6 +29,10 @@
   var busy = false;
   var pendingImage = '';
   var installEvent = null;
+  var wakeLock = null;
+  var backendState = 'idle';
+  var backendBuild = '';
+  var keyboardOpen = false;
 
   function persist(which) {
     (which || ['settings', 'vehicles', 'chats', 'log']).forEach(function (n) { save(K[n], db[n]); });
@@ -57,19 +62,35 @@
   }
 
   function md(text) {
-    var out = [], inList = false;
+    var out = [], list = null;
+    function inline(s) {
+      return s
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>');
+    }
+    function closeList() {
+      if (list) { out.push('</' + list + '>'); list = null; }
+    }
     esc(text).split('\n').forEach(function (l) {
-      var m = l.match(/^\s*[-*•]\s+(.*)$/);
-      var inline = function (s) { return s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'); };
-      if (m) {
-        if (!inList) { out.push('<ul>'); inList = true; }
-        out.push('<li>' + inline(m[1]) + '</li>');
+      var ul = l.match(/^\s*[-*•]\s+(.*)$/);
+      var ol = l.match(/^\s*\d+[.)]\s+(.*)$/);
+      if (ul || ol) {
+        var type = ol ? 'ol' : 'ul';
+        if (list !== type) { closeList(); out.push('<' + type + '>'); list = type; }
+        out.push('<li>' + inline((ol || ul)[1]) + '</li>');
+        return;
+      }
+      closeList();
+      if (!l.trim()) return;
+      if (/^(Resumen|Pasos|Verificar|Advertencia|Causas probables):/i.test(l.trim())) {
+        var parts = l.split(':');
+        var head = parts.shift();
+        out.push('<div class="ai-section-line"><strong>' + inline(head) + ':</strong>' + (parts.length ? ' ' + inline(parts.join(':').trim()) : '') + '</div>');
       } else {
-        if (inList) { out.push('</ul>'); inList = false; }
-        if (l.trim() !== '') out.push('<div>' + inline(l) + '</div>');
+        out.push('<div>' + inline(l) + '</div>');
       }
     });
-    if (inList) out.push('</ul>');
+    closeList();
     return out.join('');
   }
 
@@ -177,6 +198,7 @@
     var er = body && body.error ? body.error : {};
     var code = er.code || '';
     if (code === 'INVALID_PLATE' || status === 400) return 'La patente no tiene un formato válido.';
+    if (code === 'APP_AUTH' || status === 401) return 'THOKAR rechazó el token de acceso. Revisa APP_TOKEN en Render y en Ajustes.';
     if (code === 'NOT_FOUND' || status === 404) return 'No encontré información técnica para esa patente.';
     if (code === 'RATE_LIMIT' || status === 429) return 'Se hicieron demasiadas consultas. Espera un minuto e intenta otra vez.';
     if (code === 'BOOSTR_NOT_CONFIGURED') return 'Falta configurar BOOSTR_API_KEY en Render.';
@@ -208,8 +230,10 @@
     var ctl = new AbortController();
     var timer = setTimeout(function () { ctl.abort(); }, 60000);
     try {
+      var headers = { 'Accept': 'application/json' };
+      if ((db.settings.appToken || '').trim()) headers['X-THOKAR-TOKEN'] = (db.settings.appToken || '').trim();
       var res = await fetch('/api/vehiculo/' + encodeURIComponent(cur.plate), {
-        method: 'GET', headers: { 'Accept': 'application/json' }, cache: 'no-store', signal: ctl.signal
+        method: 'GET', headers: headers, cache: 'no-store', signal: ctl.signal
       });
       var body = await res.json().catch(function () { return {}; });
       if (!res.ok || !body.ok) throw fail(vehicleApiError(res.status, body), res.status);
@@ -547,6 +571,69 @@
     } catch (e) { out.innerHTML = '<span style="color:var(--red)">' + esc(e.message) + '</span>'; }
   }
 
+  /* ---------- Estado de app / móvil ---------- */
+  function renderConnectionState() {
+    var root = $('#connection-root');
+    if (!root) return;
+    if (backendState === 'connecting') root.innerHTML = '<div class="connection-pill"><span class="spinner mini"></span> Conectando…</div>';
+    else if (backendState === 'error') root.innerHTML = '<button class="connection-pill error-pill" id="btn-retry-backend">Backend sin respuesta · Reintentar</button>';
+    else root.innerHTML = '';
+  }
+
+  async function wakeBackend() {
+    backendState = 'connecting'; renderConnectionState();
+    var ctl = new AbortController();
+    var timer = setTimeout(function () { ctl.abort(); }, 45000);
+    try {
+      var res = await fetch('/healthz?ts=' + Date.now(), { cache: 'no-store', signal: ctl.signal });
+      var data = await res.json().catch(function () { return {}; });
+      if (!res.ok || !data.ok) throw new Error('health');
+      backendState = 'ok'; backendBuild = data.build || '';
+      renderConnectionState();
+      if (backendBuild && backendBuild !== APP_BUILD) showUpdateBanner('Hay una versión nueva de THOKAR disponible.');
+      if (tab === 'ajustes') render();
+    } catch (e) {
+      backendState = 'error'; renderConnectionState();
+    } finally { clearTimeout(timer); }
+  }
+
+  function showUpdateBanner(message) {
+    var root = $('#update-root');
+    if (!root) return;
+    root.innerHTML = '<div class="update-banner"><span>' + esc(message || 'Hay una versión nueva disponible.') + '</span><button id="btn-update-reload">Actualizar</button></div>';
+  }
+
+  async function updateWakeLock() {
+    var shouldHold = tab === 'asistente' && document.visibilityState === 'visible';
+    if (!shouldHold) {
+      if (wakeLock) { try { await wakeLock.release(); } catch (e) {} wakeLock = null; }
+      return;
+    }
+    if (!('wakeLock' in navigator) || wakeLock) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', function () { wakeLock = null; });
+    } catch (e) {}
+  }
+
+  function syncKeyboardState() {
+    var vv = window.visualViewport;
+    if (!vv) return;
+    var active = document.activeElement && document.activeElement.id === 'chat-input';
+    var open = active && vv.height < window.innerHeight - 120;
+    if (open !== keyboardOpen) {
+      keyboardOpen = open;
+      document.body.classList.toggle('keyboard-open', open);
+      if (open) setTimeout(scrollChatEnd, 80);
+    }
+  }
+
+  function resizeChatInput(el) {
+    if (!el || el.id !== 'chat-input') return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(128, Math.max(48, el.scrollHeight)) + 'px';
+  }
+
   /* ---------- Pantallas ---------- */
   var ICONS = {
     vehiculo: '<svg viewBox="0 0 24 24"><path d="M5 16V11l1.6-4.2A2 2 0 0 1 8.5 5.5h7a2 2 0 0 1 1.9 1.3L19 11v5"/><path d="M3.5 16h17v2.5h-3V17H6.5v1.5h-3z"/><circle cx="7.5" cy="13" r=".6"/><circle cx="16.5" cy="13" r=".6"/></svg>',
@@ -556,7 +643,7 @@
   };
   var TABS = [['vehiculo', 'Vehículo'], ['asistente', 'Asistente'], ['libreta', 'Libreta'], ['ajustes', 'Ajustes']];
 
-  function setTab(t) { tab = t; render(); window.scrollTo(0, 0); }
+  function setTab(t) { tab = t; render(); window.scrollTo(0, 0); updateWakeLock(); }
 
   function renderTabs() {
     $('#tabs').innerHTML = '<div class="tabs-inner">' + TABS.map(function (t) {
@@ -566,6 +653,7 @@
 
   function vehicleView() {
     var savedPlates = Object.keys(db.vehicles).sort();
+    var hasData = Boolean(cur.marca || cur.modelo || cur.anio || cur.motor || cur.chasis);
     var extraLabels = {
       dv: 'Dígito verificador', cilindrada: 'Cilindrada', puertas: 'Puertas', transmision: 'Transmisión', codigoSii: 'Código SII', tasacionFiscal: 'Tasación fiscal', regionProcedencia: 'Región de procedencia', tipoSello: 'Tipo de sello', multas: 'Multas de tránsito',
       mesRevision: 'Mes de revisión técnica', revisionTecnica: 'Revisión técnica', revisionGases: 'Revisión de gases',
@@ -576,38 +664,154 @@
     var extraHtml = Object.keys(extraLabels).filter(function (k) { return cur[k]; }).map(function (k) {
       return '<div><span class="muted small">' + esc(extraLabels[k]) + '</span><div>' + esc(cur[k]) + '</div></div>';
     }).join('');
-    return '' +
+    var carLine = [cur.marca, cur.modelo, cur.version, cur.anio].filter(Boolean).join(' ') || 'Vehículo sin identificar';
+    var subLine = [cur.cilindrada, cur.combustible, cur.transmision].filter(Boolean).join(' · ');
+    var html = '<h2>Vehículo</h2>' +
       '<div class="plate-block"><label class="plate-label" for="f-plate">Patente</label>' +
       '<div class="plate"><input id="f-plate" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="12" placeholder="ABCD12" value="' + esc(cur.plate) + '"></div></div>' +
       '<button class="btn primary block" id="btn-lookup">Buscar datos por patente</button>' +
       '<p class="muted small" id="lookup-status" style="margin:8px 0 0" aria-live="polite"></p>' +
-      '<div class="btn-row" style="margin-top:10px">' +
-      '<button class="btn" id="btn-paste">Pegar datos</button>' +
-      '<button class="btn" id="btn-photo">Foto del permiso</button></div>' +
-      '<input type="file" id="photo-input" accept="image/*" hidden>' +
-      '<p class="muted small" style="margin:8px 0 16px">Los datos leídos pueden fallar: compáralos con el papel del vehículo antes de pedir repuestos.</p>' +
-      '<div class="card"><div class="grid2 field">' +
+      '<div class="btn-row" style="margin-top:10px"><button class="btn" id="btn-paste">Pegar datos</button><button class="btn" id="btn-photo">Foto del permiso</button></div>' +
+      '<input type="file" id="photo-input" accept="image/*" hidden>';
+
+    if (hasData) {
+      html += '<section class="vehicle-summary-card">' +
+        '<div><div class="vehicle-summary-plate">' + esc(cur.plate || '—') + '</div><div class="vehicle-summary-name">' + esc(carLine) + '</div>' +
+        (subLine ? '<div class="vehicle-summary-meta">' + esc(subLine) + '</div>' : '') + '</div>' +
+        '<div class="vehicle-km"><span>Kilometraje</span><strong>' + esc(cur.km ? L.formatKm(cur.km) + ' km' : 'Sin registrar') + '</strong></div>' +
+        '<div class="vehicle-summary-actions"><button class="btn primary" data-tab-go="asistente">Consultar IA</button><button class="btn" data-tab-go="libreta">Libreta</button></div>' +
+      '</section>';
+    }
+
+    html += '<details class="vehicle-details"' + (!hasData ? ' open' : '') + '><summary>Datos técnicos</summary><div class="card details-card"><div class="grid2 field">' +
       '<div><label for="f-marca">Marca</label><input id="f-marca" autocomplete="off" value="' + esc(cur.marca) + '"></div>' +
       '<div><label for="f-anio">Año</label><input id="f-anio" inputmode="numeric" maxlength="4" value="' + esc(cur.anio) + '"></div>' +
       '<div class="span2"><label for="f-modelo">Modelo</label><input id="f-modelo" autocomplete="off" value="' + esc(cur.modelo) + '"></div>' +
       '<div><label for="f-tipo">Tipo</label><input id="f-tipo" autocomplete="off" value="' + esc(cur.tipo) + '"></div>' +
       '<div><label for="f-color">Color</label><input id="f-color" autocomplete="off" value="' + esc(cur.color) + '"></div>' +
-      '<div class="span2"><label for="f-version">Versión o motor (ej. 1.6 AT, 2.0 Turbo)</label><input id="f-version" autocomplete="off" value="' + esc(cur.version) + '"></div>' +
+      '<div class="span2"><label for="f-version">Versión</label><input id="f-version" autocomplete="off" value="' + esc(cur.version) + '"></div>' +
       '<div><label for="f-combustible">Combustible</label><select id="f-combustible">' +
       ['', 'Gasolina', 'Diésel', 'Híbrido', 'Eléctrico', 'Gas'].map(function (o) { return '<option value="' + o + '"' + (cur.combustible === o ? ' selected' : '') + '>' + (o || 'Sin indicar') + '</option>'; }).join('') + '</select></div>' +
-      '<div><label for="f-km">Kilometraje (tablero)</label><input id="f-km" inputmode="numeric" value="' + esc(L.formatKm(cur.km)) + '"></div>' +
+      '<div><label for="f-km">Kilometraje</label><input id="f-km" inputmode="numeric" value="' + esc(L.formatKm(cur.km)) + '"></div>' +
       '<div class="span2"><label for="f-motor">N.° de motor</label><input id="f-motor" autocomplete="off" autocapitalize="characters" value="' + esc(cur.motor) + '"></div>' +
       '<div class="span2"><label for="f-chasis">Chasis / VIN</label><input id="f-chasis" autocomplete="off" autocapitalize="characters" value="' + esc(cur.chasis) + '"></div>' +
       '<div><label for="f-procedencia">Procedencia</label><input id="f-procedencia" autocomplete="off" value="' + esc(cur.procedencia) + '"></div>' +
       '<div><label for="f-fabricante">Fabricante</label><input id="f-fabricante" autocomplete="off" value="' + esc(cur.fabricante) + '"></div>' +
-      '</div></div>' +
-      (extraHtml ? '<div class="card" style="margin-top:12px"><h3>Antecedentes adicionales</h3><div class="grid2 field" style="margin-top:10px">' + extraHtml + '</div></div>' : '') +
+      '</div></div></details>' +
+      (extraHtml ? '<details class="vehicle-details"><summary>Antecedentes adicionales</summary><div class="card details-card"><div class="grid2 field">' + extraHtml + '</div></div></details>' : '') +
       '<div class="btn-row" style="margin-top:12px"><button class="btn primary" id="btn-save">Guardar vehículo</button><button class="btn" id="btn-clear">Vehículo nuevo</button></div>' +
-      '<div style="margin-top:24px"><h3>Guardados</h3>' +
-      (savedPlates.length ? savedPlates.map(function (p) {
+      '<div style="margin-top:24px"><h3>Recientes</h3>' +
+      (savedPlates.length ? '<div class="recent-vehicles">' + savedPlates.map(function (p) {
         var v = db.vehicles[p];
-        return '<div class="saved-item"><button class="saved-load" data-load="' + esc(p) + '"><span class="mini-plate">' + esc(p) + '</span><span>' + esc([v.marca, v.modelo, v.anio].filter(Boolean).join(' ')) + '</span></button><button class="saved-del" data-del="' + esc(p) + '" aria-label="Borrar ' + esc(p) + '">×</button></div>';
-      }).join('') : '<p class="muted" style="margin-top:6px">Aún no hay vehículos guardados.</p>') + '</div>';
+        return '<button class="recent-chip" data-load="' + esc(p) + '"><span>' + esc(p) + '</span><small>' + esc([v.marca, v.modelo].filter(Boolean).join(' ')) + '</small></button>';
+      }).join('') + '</div>' : '<p class="muted" style="margin-top:6px">Aún no hay vehículos guardados.</p>') + '</div>';
+    return html;
+  }
+
+  function messageIsLong(text) {
+    text = String(text || '');
+    return text.length > 950 || text.split('\n').length > 13;
+  }
+
+  function renderChatMessage(m, index) {
+    var roleClass = m.role === 'user' ? 'user' : 'model' + (m.error ? ' error' : '');
+    var body = m.role === 'user' ? esc(m.text) : md(m.text);
+    var longClass = m.role === 'model' && !m.error && messageIsLong(m.text) ? ' collapsible' : '';
+    var html = '<div class="msg-wrap ' + (m.role === 'user' ? 'user-wrap' : 'model-wrap') + '">' +
+      '<div class="msg ' + roleClass + '"><div class="msg-content' + longClass + '" data-msg-content="' + index + '">' + body + '</div>' +
+      (longClass ? '<button class="msg-more" data-msg-expand="' + index + '">Ver más</button>' : '') + '</div>';
+    if (m.role === 'model' && !m.error) {
+      html += '<div class="msg-actions" aria-label="Acciones de la respuesta">' +
+        '<button data-msg-copy="' + index + '">Copiar</button>' +
+        '<button data-msg-save="' + index + '">Guardar</button>' +
+        '<button data-msg-checklist="' + index + '">Checklist</button>' +
+      '</div>';
+    }
+    return html + '</div>';
+  }
+
+  function openVehicleSheet() {
+    var rows = [
+      ['Patente', cur.plate], ['Vehículo', [cur.marca, cur.modelo, cur.version, cur.anio].filter(Boolean).join(' ')],
+      ['Kilometraje', cur.km ? L.formatKm(cur.km) + ' km' : ''], ['Combustible', cur.combustible],
+      ['Motor', cur.motor], ['VIN / Chasis', cur.chasis], ['Transmisión', cur.transmision], ['Color', cur.color]
+    ].filter(function (r) { return r[1]; });
+    openSheet('<h3>' + esc(cur.plate || 'Vehículo') + '</h3><div class="vehicle-sheet-list">' +
+      rows.map(function (r) { return '<div><span>' + esc(r[0]) + '</span><strong>' + esc(r[1]) + '</strong></div>'; }).join('') +
+      '</div><div class="btn-row" style="margin-top:16px"><button class="btn" data-sheet-close>Cerrar</button><button class="btn primary" id="sheet-go-vehicle">Abrir ficha</button></div>',
+      function (sheet) {
+        $('[data-sheet-close]', sheet).addEventListener('click', closeSheet);
+        $('#sheet-go-vehicle', sheet).addEventListener('click', function () { closeSheet(); setTab('vehiculo'); });
+      });
+  }
+
+  function openAssistantActions() {
+    var links = L.searchLinks(cur);
+    function qbtn(i) { return '<button class="action-sheet-item" data-quick="' + i + '">' + esc(QUICK[i][0]) + '</button>'; }
+    var html = '<div class="action-sheet-head"><div><h3>Acciones rápidas</h3><p class="muted small">Para ' + esc(cur.plate || 'el vehículo actual') + '</p></div><button class="sheet-x" data-sheet-close aria-label="Cerrar">×</button></div>' +
+      '<div class="action-category"><div class="action-category-title">Mantención</div><div class="action-grid">' + [0,1,3,4].map(qbtn).join('') + '</div></div>' +
+      '<div class="action-category"><div class="action-category-title">Diagnóstico</div><div class="action-grid">' + [5,6,7].map(qbtn).join('') + '</div></div>';
+    if (links.length) {
+      html += '<div class="action-category"><div class="action-category-title">Repuestos y catálogos</div><div class="action-grid">' +
+        links.map(function (l) { return '<a class="action-sheet-item" href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + '</a>'; }).join('') + '</div></div>';
+    }
+    openSheet(html, function (sheet) { $('[data-sheet-close]', sheet).addEventListener('click', closeSheet); });
+  }
+
+  function getChatMessage(index) {
+    return (db.chats[chatKey()] || [])[Number(index)] || null;
+  }
+
+  function copyChatMessage(index) {
+    var m = getChatMessage(index);
+    if (!m) return;
+    var done = function () { toast('Respuesta copiada.'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(m.text).then(done, function () { toast('No pude copiarla automáticamente.'); });
+    else {
+      var ta = document.createElement('textarea'); ta.value = m.text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) { toast('No pude copiarla automáticamente.'); }
+      ta.remove();
+    }
+  }
+
+  function saveAiMessage(index) {
+    var m = getChatMessage(index);
+    if (!m || !L.isPlateOk(cur.plate)) { toast('Carga y guarda un vehículo antes de guardar el diagnóstico.'); return; }
+    openSheet('<h3>Guardar en Libreta</h3>' +
+      '<div class="field"><label for="ai-save-title">Título</label><input id="ai-save-title" value="Diagnóstico IA"></div>' +
+      '<div class="field" style="margin-top:12px"><label for="ai-save-note">Contenido</label><textarea id="ai-save-note" style="min-height:190px">' + esc(m.text) + '</textarea></div>' +
+      '<div class="btn-row" style="margin-top:14px"><button class="btn" data-sheet-close>Cancelar</button><button class="btn primary" id="ai-save-confirm">Guardar</button></div>',
+      function (sheet) {
+        $('[data-sheet-close]', sheet).addEventListener('click', closeSheet);
+        $('#ai-save-confirm', sheet).addEventListener('click', function () {
+          var title = $('#ai-save-title', sheet).value.trim() || 'Diagnóstico IA';
+          var note = $('#ai-save-note', sheet).value.trim();
+          var list = db.log[cur.plate] = db.log[cur.plate] || [];
+          list.unshift({ id: uid(), fecha: todayISO(), km: cur.km || '', trabajo: title, notas: note, source: 'ai' });
+          persist(['log']); closeSheet(); toast('Guardado en la Libreta.');
+        });
+      });
+  }
+
+  function checklistFromText(text) {
+    var items = String(text || '').split('\n').map(function (line) {
+      return line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim();
+    }).filter(function (line) {
+      return line && !/^(Resumen|Pasos|Verificar|Advertencia|Causas probables):?$/i.test(line) && line.length > 5;
+    });
+    var unique = [];
+    items.forEach(function (item) { if (unique.indexOf(item) < 0) unique.push(item); });
+    return unique.slice(0, 12);
+  }
+
+  function saveChecklistFromMessage(index) {
+    var m = getChatMessage(index);
+    if (!m || !L.isPlateOk(cur.plate)) { toast('Carga y guarda un vehículo antes de crear un checklist.'); return; }
+    var items = checklistFromText(m.text);
+    if (!items.length) { toast('No encontré pasos claros para convertir en checklist.'); return; }
+    var list = db.log[cur.plate] = db.log[cur.plate] || [];
+    list.unshift({ id: uid(), fecha: todayISO(), km: cur.km || '', trabajo: 'Checklist IA', notas: '', source: 'ai', checklist: items.map(function (x) { return { text: x, done: false }; }) });
+    persist(['log']); toast('Checklist guardado en la Libreta.');
   }
 
   function assistantView() {
@@ -616,66 +820,62 @@
     var th = db.chats[key] || [];
     var plateLabel = L.isPlateOk(cur.plate) ? cur.plate : 'SIN PATENTE';
     var mainVehicle = [cur.marca, cur.modelo, cur.anio].filter(Boolean).join(' ') || 'Vehículo sin identificar';
-    var vehicleMeta = [cur.combustible, cur.km ? L.formatKm(cur.km) + ' km' : ''].filter(Boolean).join(' · ');
-    var vehicleDetail = [cur.version, cur.motor ? 'Motor ' + cur.motor : '', cur.chasis ? 'VIN ' + cur.chasis : ''].filter(Boolean).join(' · ');
+    var vehicleMeta = [cur.combustible, cur.cilindrada, cur.km ? L.formatKm(cur.km) + ' km' : ''].filter(Boolean).join(' · ');
     var html = '<h2>Asistente</h2>';
     if (!hasCar) {
-      html += '<div class="notice" style="margin:12px 0">Carga una patente y los datos del vehículo para que la IA pueda responder con mayor precisión. <button class="link-btn" data-tab-go="vehiculo">Ir a Vehículo</button></div>';
+      html += '<div class="notice assistant-notice">Carga una patente para que la IA responda con contexto. <button class="link-btn" data-tab-go="vehiculo">Cargar vehículo</button></div>';
     }
     if (!(db.settings.apiKey || '').trim()) {
-      html += '<div class="notice" style="margin:0 0 12px">Falta la clave gratuita de Gemini. <button class="link-btn" data-tab-go="ajustes">Pegarla en Ajustes</button></div>';
+      html += '<div class="notice assistant-notice">Falta la clave de Gemini. <button class="link-btn" data-tab-go="ajustes">Abrir Ajustes</button></div>';
     }
+
+    var starter = !th.length && !busy ? '<div class="assistant-starter"><div class="starter-title">¿Qué necesitas revisar?</div><div class="starter-grid">' +
+      [0,1,2,5,6,7].map(function (i) { return '<button data-quick="' + i + '">' + esc(QUICK[i][0]) + '</button>'; }).join('') + '</div></div>' : '';
 
     html += '<section class="assistant-chat-window whatsapp-chat" aria-label="Chat con el asistente">' +
       '<div class="assistant-chat-head whatsapp-head">' +
-        '<div class="assistant-avatar" aria-hidden="true">' + ICONS.vehiculo + '</div>' +
-        '<div class="assistant-contact">' +
-          '<div class="assistant-contact-name">' + esc(plateLabel) + '</div>' +
-          '<div class="assistant-contact-car">' + esc(mainVehicle) + '</div>' +
-          (vehicleMeta ? '<div class="assistant-contact-meta">' + esc(vehicleMeta) + '</div>' : '') +
-          (vehicleDetail ? '<div class="assistant-contact-detail">' + esc(vehicleDetail) + '</div>' : '') +
-        '</div>' +
-        (th.length ? '<button class="assistant-clear-icon" id="btn-clear-chat" aria-label="Borrar historial" title="Borrar historial">×</button>' : '') +
+        '<button class="assistant-contact-button" id="btn-vehicle-sheet" aria-label="Ver ficha del vehículo">' +
+          '<div class="assistant-avatar" aria-hidden="true">' + ICONS.vehiculo + '</div>' +
+          '<div class="assistant-contact">' +
+            '<div class="assistant-contact-name">' + esc(plateLabel) + '</div>' +
+            '<div class="assistant-contact-car">' + esc(mainVehicle) + '</div>' +
+            (vehicleMeta ? '<div class="assistant-contact-meta">' + esc(vehicleMeta) + '</div>' : '') +
+          '</div>' +
+        '</button>' +
+        (th.length ? '<button class="assistant-clear-icon" id="btn-clear-chat" aria-label="Nueva conversación" title="Nueva conversación">×</button>' : '') +
       '</div>' +
-      '<div class="thread assistant-thread whatsapp-thread" id="chat-thread" aria-live="polite">' + th.map(function (m) {
-        return '<div class="msg ' + (m.role === 'user' ? 'user' : 'model' + (m.error ? ' error' : '')) + '">' + (m.role === 'user' ? esc(m.text) : md(m.text)) + '</div>';
-      }).join('') + (busy ? '<div class="msg model typing"><span class="spinner"></span> Consultando…</div>' : '') + '<div id="thread-end"></div></div>' +
+      '<div class="thread assistant-thread whatsapp-thread" id="chat-thread" aria-live="polite">' + starter + th.map(renderChatMessage).join('') +
+        (busy ? '<div class="msg-wrap model-wrap"><div class="msg model typing"><span class="spinner"></span> Consultando…</div></div>' : '') + '<div id="thread-end"></div></div>' +
       (pendingImage ? '<div class="assistant-attachment small muted">Foto lista para enviar. <button class="link-btn" id="btn-unattach">Quitar</button></div>' : '') +
       '<form class="composer assistant-composer whatsapp-composer" id="composer">' +
-        '<button type="button" class="assistant-photo-btn whatsapp-photo" id="btn-attach" aria-label="Adjuntar foto" title="Adjuntar foto">＋</button>' +
-        '<textarea id="chat-input" rows="2" placeholder="Escribe un mensaje…" aria-label="Mensaje"></textarea>' +
+        '<button type="button" class="composer-action-btn assistant-action-btn" id="btn-assistant-actions" aria-label="Acciones rápidas" title="Acciones rápidas">⚡</button>' +
+        '<button type="button" class="composer-action-btn assistant-photo-btn" id="btn-attach" aria-label="Adjuntar foto" title="Adjuntar foto">＋</button>' +
+        '<textarea id="chat-input" rows="1" placeholder="Escribe un mensaje…" aria-label="Mensaje"></textarea>' +
         '<button class="whatsapp-send" type="submit" aria-label="Enviar"' + (busy ? ' disabled' : '') + '>Enviar</button>' +
       '</form><input type="file" id="chat-photo" accept="image/*" hidden>' +
       '</section>';
-
-    html += '<div class="assistant-quick-block"><div class="assistant-section-title">Preguntas rápidas a la IA</div><div class="chips assistant-chips-below" role="group" aria-label="Consultas rápidas">' +
-      QUICK.map(function (q, i) { return '<button class="chip" data-quick="' + i + '"' + (busy ? ' disabled' : '') + '>' + esc(q[0]) + '</button>'; }).join('') + '</div></div>';
-
-    var links = L.searchLinks(cur);
-    if (links.length) {
-      html += '<div class="assistant-recommendations"><div class="assistant-section-title">Recomendaciones para este vehículo</div>' +
-        '<p class="muted small">Búsquedas rápidas para confirmar compatibilidad y catálogos en Google.</p><div class="links assistant-recommendation-links">' +
-        links.map(function (l) { return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + '</a>'; }).join('') + '</div></div>';
-    }
     return html;
   }
 
   function logView() {
-    var html = '<h2>Libreta de mantención</h2>';
+    var html = '<h2>Libreta</h2>';
     if (!L.isPlateOk(cur.plate)) {
-      return html + '<div class="empty card" style="margin-top:14px"><p>Escribe la patente en la pestaña Vehículo para ver o crear su historial.</p><button class="btn primary" data-tab-go="vehiculo">Ir a Vehículo</button></div>';
+      return html + '<div class="empty card" style="margin-top:14px"><p>Carga un vehículo para ver o crear su historial.</p><button class="btn primary" data-tab-go="vehiculo">Cargar vehículo</button></div>';
     }
     var list = db.log[cur.plate] || [];
     html += '<div class="summary"><div class="name">' + esc(cur.plate) + '</div><div class="meta">' + esc(vehicleName() || 'Sin marca ni modelo') + '</div></div>';
     html += '<button class="btn primary block" id="btn-add-entry">Registrar trabajo</button><div style="margin-top:16px">';
-    if (!list.length) html += '<div class="empty muted"><p>Todavía no hay trabajos registrados para esta patente.</p></div>';
+    if (!list.length) html += '<div class="empty muted"><p>Todavía no hay trabajos, diagnósticos ni checklists guardados.</p></div>';
     html += list.map(function (e) {
       var next = [e.nextKm ? L.formatKm(e.nextKm) + ' km' : '', e.nextFecha ? L.formatDate(e.nextFecha) : ''].filter(Boolean).join(' o ');
+      var checklist = Array.isArray(e.checklist) && e.checklist.length ? '<div class="saved-checklist">' + e.checklist.map(function (item, i) {
+        return '<label><input type="checkbox" data-check-entry="' + esc(e.id) + '" data-check-index="' + i + '"' + (item.done ? ' checked' : '') + '><span>' + esc(item.text) + '</span></label>';
+      }).join('') + '</div>' : '';
       return '<div class="entry"><div class="head"><span class="title">' + esc(e.trabajo) + '</span><span class="muted small">' + esc(L.formatDate(e.fecha)) + '</span></div>' +
-        '<div class="muted small">' + esc(e.km ? L.formatKm(e.km) + ' km' : 'Sin kilometraje') + '</div>' +
-        (e.notas ? '<div style="margin-top:6px">' + esc(e.notas) + '</div>' : '') +
+        '<div class="muted small">' + esc(e.km ? L.formatKm(e.km) + ' km' : 'Sin kilometraje') + (e.source === 'ai' ? ' · IA' : '') + '</div>' +
+        (e.notas ? '<div class="entry-notes">' + esc(e.notas) + '</div>' : '') + checklist +
         (next ? '<div class="small" style="margin-top:6px">Próximo: ' + esc(next) + '</div>' : '') +
-        '<div class="actions"><button class="btn" data-remind="' + esc(e.id) + '">Recordatorio</button><button class="btn danger" data-delentry="' + esc(e.id) + '">Borrar</button></div></div>';
+        '<div class="actions">' + (!checklist ? '<button class="btn" data-remind="' + esc(e.id) + '">Recordatorio</button>' : '') + '<button class="btn danger" data-delentry="' + esc(e.id) + '">Borrar</button></div></div>';
     }).join('') + '</div>';
     return html;
   }
@@ -683,22 +883,25 @@
   function settingsView() {
     return '<h2>Ajustes</h2><div class="stack" style="margin-top:14px">' +
       '<div class="card"><h3>Inteligencia artificial (Gemini)</h3>' +
-      '<p class="muted small" style="margin:6px 0 12px">Usa la clave gratuita de Google AI Studio. Se guarda solo en este teléfono. El plan gratuito tiene límites por minuto y por día, así que no es ilimitado.</p>' +
+      '<p class="muted small" style="margin:6px 0 12px">Usa la clave de Google AI Studio. Se guarda solo en este teléfono.</p>' +
       '<p style="margin-bottom:12px"><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--text)">Crear mi clave en Google AI Studio</a></p>' +
       '<div class="field"><label for="s-key">Clave de Gemini</label><input id="s-key" type="password" autocomplete="off" spellcheck="false" value="' + esc(db.settings.apiKey) + '"></div>' +
-      '<div class="field" style="margin-top:12px"><label for="s-model">Modelo (déjalo vacío para elegirlo solo)</label><input id="s-model" autocomplete="off" spellcheck="false" placeholder="' + esc(db.settings.auto || 'automático') + '" value="' + esc(db.settings.model) + '"></div>' +
+      '<div class="field" style="margin-top:12px"><label for="s-model">Modelo (vacío = automático)</label><input id="s-model" autocomplete="off" spellcheck="false" placeholder="' + esc(db.settings.auto || 'automático') + '" value="' + esc(db.settings.model) + '"></div>' +
       '<div class="btn-row" style="margin-top:12px"><button class="btn" id="btn-detect">Detectar modelo</button><button class="btn primary" id="btn-test">Probar conexión</button></div>' +
       '<p class="small" id="test-out" style="margin-top:10px" aria-live="polite"></p></div>' +
+      '<div class="card"><h3>Protección de consultas</h3>' +
+      '<p class="muted small" style="margin:6px 0 10px">Opcional. Si defines <strong>APP_TOKEN</strong> en Render, pega aquí el mismo valor. Se guarda solo en este teléfono y protege las consultas de patente contra uso externo casual.</p>' +
+      '<div class="field"><label for="s-app-token">Token THOKAR</label><input id="s-app-token" type="password" autocomplete="off" spellcheck="false" value="' + esc(db.settings.appToken || '') + '"></div></div>' +
       '<div class="card"><h3>Búsqueda automática por patente</h3>' +
-      '<p class="muted small" style="margin:6px 0 8px">La consulta pasa por el backend de THOKAR y usa Boostr API. La clave de Boostr se guarda sólo como variable de entorno en Render y nunca se envía al teléfono.</p>' +
-      '<p class="muted small">Los campos disponibles dependen de tu plan de Boostr. THOKAR solicita únicamente la ficha del vehículo y no pide información del propietario.</p></div>' +
-      '<div class="card"><h3>Respaldo</h3><p class="muted small" style="margin:6px 0 12px">Vehículos, libreta y conversaciones. Descárgalo de vez en cuando por si cambias de teléfono o borras los datos del navegador.</p>' +
+      '<p class="muted small" style="margin:6px 0 8px">La consulta pasa por el backend de THOKAR y usa Boostr API. BOOSTR_API_KEY permanece únicamente en Render.</p>' +
+      '<p class="muted small">Estado del backend: ' + esc(backendState === 'ok' ? 'conectado' : backendState === 'error' ? 'con error' : 'comprobando') + (backendBuild ? ' · ' + esc(backendBuild) : '') + '</p></div>' +
+      '<div class="card"><h3>Respaldo</h3><p class="muted small" style="margin:6px 0 12px">Vehículos, libreta y conversaciones. Descárgalo antes de cambiar de teléfono o borrar datos del navegador.</p>' +
       '<div class="btn-row"><button class="btn" id="btn-export">Descargar respaldo</button><button class="btn" id="btn-import">Importar respaldo</button></div><input type="file" id="import-input" accept="application/json,.json" hidden></div>' +
       '<div class="card"><h3>Instalar en el teléfono</h3>' +
-      '<p class="muted small" style="margin:6px 0 10px">Android (Chrome): menú ⋮ y luego "Instalar app". iPhone (Safari): botón Compartir y luego "Agregar a pantalla de inicio".</p>' +
+      '<p class="muted small" style="margin:6px 0 10px">Android (Chrome): menú ⋮ → Instalar app. iPhone (Safari): Compartir → Agregar a pantalla de inicio.</p>' +
       (installEvent ? '<button class="btn primary block" id="btn-install">Instalar ahora</button>' : '') + '</div>' +
       (storageOk ? '' : '<div class="notice">Este navegador no deja guardar datos. Lo que escribas se perderá al cerrar la app.</div>') +
-      '<p class="muted small">THOKAR — Ingeniería que mueve</p></div>';
+      '<p class="muted small">THOKAR · versión ' + APP_BUILD + '</p></div>';
   }
 
   function render() {
@@ -706,10 +909,11 @@
     var view = tab === 'vehiculo' ? vehicleView() : tab === 'asistente' ? assistantView() : tab === 'libreta' ? logView() : settingsView();
     app.innerHTML = view;
     renderTabs();
+    if (tab === 'asistente') scrollChatEnd();
   }
 
   /* ---------- Eventos ---------- */
-  document.addEventListener('input', onField);
+  document.addEventListener('input', function (e) { onField(e); if (e.target.id === 'chat-input') resizeChatInput(e.target); });
   document.addEventListener('change', function (e) {
     if (e.target.id === 'f-combustible') onField(e);
     if (e.target.id === 'photo-input') { readPhoto(e.target.files[0]); e.target.value = ''; }
@@ -720,6 +924,12 @@
     }
     if (e.target.id === 's-key') { db.settings.apiKey = e.target.value.trim(); persist(['settings']); toast('Clave guardada.'); }
     if (e.target.id === 's-model') { db.settings.model = e.target.value.trim(); persist(['settings']); }
+    if (e.target.id === 's-app-token') { db.settings.appToken = e.target.value.trim(); persist(['settings']); toast('Token THOKAR guardado en este teléfono.'); }
+    if (e.target.dataset.checkEntry) {
+      var entry = (db.log[cur.plate] || []).filter(function (x) { return x.id === e.target.dataset.checkEntry; })[0];
+      var idx = Number(e.target.dataset.checkIndex);
+      if (entry && entry.checklist && entry.checklist[idx]) { entry.checklist[idx].done = e.target.checked; persist(['log']); }
+    }
   });
   document.addEventListener('submit', function (e) {
     if (e.target.id === 'composer') {
@@ -740,11 +950,19 @@
     if (t.dataset.tabGo) return setTab(t.dataset.tabGo);
     if (t.dataset.load) return loadVehicle(t.dataset.load);
     if (t.dataset.del) return deleteVehicle(t.dataset.del);
-    if (t.dataset.quick) return ask(QUICK[+t.dataset.quick][1]);
+    if (t.dataset.quick !== undefined) { if ($('#sheet-root').innerHTML) closeSheet(); return ask(QUICK[+t.dataset.quick][1]); }
+    if (t.dataset.msgCopy !== undefined) return copyChatMessage(t.dataset.msgCopy);
+    if (t.dataset.msgSave !== undefined) return saveAiMessage(t.dataset.msgSave);
+    if (t.dataset.msgChecklist !== undefined) return saveChecklistFromMessage(t.dataset.msgChecklist);
+    if (t.dataset.msgExpand !== undefined) { var c = $('[data-msg-content="' + t.dataset.msgExpand + '"]'); if (c) c.classList.toggle('expanded'); t.textContent = c && c.classList.contains('expanded') ? 'Ver menos' : 'Ver más'; return; }
     if (t.dataset.remind) return openReminder(t.dataset.remind);
     if (t.dataset.delentry) return deleteEntry(t.dataset.delentry);
     switch (t.id) {
       case 'btn-lookup': return lookupPlate();
+      case 'btn-assistant-actions': return openAssistantActions();
+      case 'btn-vehicle-sheet': return openVehicleSheet();
+      case 'btn-retry-backend': return wakeBackend();
+      case 'btn-update-reload': return window.location.reload();
       case 'btn-attach': return $('#chat-photo').click();
       case 'btn-unattach': pendingImage = ''; return render();
       case 'btn-paste': return openPaste();
@@ -763,10 +981,30 @@
 
   window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); installEvent = e; if (tab === 'ajustes') render(); });
   window.addEventListener('offline', function () { toast('Sin internet. El asistente necesita conexión.'); });
+  document.addEventListener('visibilitychange', updateWakeLock);
+  window.addEventListener('focus', updateWakeLock);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncKeyboardState);
+    window.visualViewport.addEventListener('scroll', syncKeyboardState);
+  }
+  document.addEventListener('focusin', syncKeyboardState);
+  document.addEventListener('focusout', function () { setTimeout(syncKeyboardState, 80); });
 
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').then(function (reg) {
+        reg.addEventListener('updatefound', function () {
+          var nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener('statechange', function () {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) showUpdateBanner('Hay una versión nueva de THOKAR disponible.');
+          });
+        });
+      }).catch(function () {});
+    });
   }
 
   render();
+  wakeBackend();
+  updateWakeLock();
 })();

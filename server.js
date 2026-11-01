@@ -18,6 +18,20 @@ app.use((req, res, next) => {
   next();
 });
 
+
+function requireAppToken(req, res, next) {
+  const expected = String(process.env.APP_TOKEN || '').trim();
+  if (!expected) return next();
+  const got = String(req.get('X-THOKAR-TOKEN') || '').trim();
+  if (!got || got !== expected) {
+    return res.status(401).json({
+      ok: false,
+      error: { code: 'APP_AUTH', message: 'Token de acceso THOKAR inválido o ausente.' }
+    });
+  }
+  next();
+}
+
 // Límite local conservador. Boostr documenta además su propio rate-limit.
 const buckets = new Map();
 function rateLimit(req, res, next) {
@@ -58,11 +72,12 @@ app.get('/healthz', (req, res) => {
     vehicleLookup: 'boostr',
     configured: Boolean(String(process.env.BOOSTR_API_KEY || '').trim()),
     layout: 'flat',
-    build: '4.0.4-chat-first'
+    protected: Boolean(String(process.env.APP_TOKEN || '').trim()),
+    build: '4.1.0-ux'
   });
 });
 
-app.get('/api/vehiculo/:patente', rateLimit, async (req, res) => {
+app.get('/api/vehiculo/:patente', requireAppToken, rateLimit, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const plate = cleanPlate(req.params.patente);
 

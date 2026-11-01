@@ -5,6 +5,8 @@ services:
     healthCheckPath: /healthz
     autoDeploy: true
     envVars:
+      - key: APP_TOKEN
+        sync: false
       - key: BOOSTR_API_KEY
         sync: false
       - key: BOOSTR_TIMEOUT_MS

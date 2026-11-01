@@ -1,132 +1,59 @@
-# THOKAR 4.0.4 — Chat primero
+# THOKAR 4.1.0 — UX móvil / taller
 
-Cambios de esta versión:
+Esta versión mantiene la arquitectura plana, Render, Boostr y la PWA, pero mejora la experiencia móvil.
 
-- La sección Asistente usa una ventana de chat grande, sin ocupar toda la pantalla.
-- La cabecera del chat muestra la patente como contacto y debajo marca, modelo, año, combustible, km, versión/motor/VIN cuando existan.
-- El historial tiene scroll interno y el compositor queda fijo al pie del chat.
-- Las preguntas rápidas a Gemini están debajo de la ventana.
-- Debajo se agregan búsquedas/recomendaciones para Aceite y filtro, Bujías, Pastillas delanteras, Filtro de aire, Filtro de cabina, Distribución y Amortiguadores.
-- Se quitó el logo grande del contenido de la aplicación. El logo original se conserva en los iconos PWA/Android/iPhone.
-- Build: `4.0.4-chat-first`.
+## Cambios principales
 
----
+- Asistente tipo chat con `100dvh` y mejor manejo del teclado móvil.
+- La barra inferior se oculta mientras escribes para dejar más espacio al chat.
+- Botón ⚡ junto al cuadro de mensaje: abre Mantención, Diagnóstico y búsquedas de repuestos/catálogos.
+- Cuando el chat está vacío aparecen 6 accesos grandes como punto de partida.
+- La cabecera del chat es tocable y abre la ficha resumida del vehículo.
+- Cada respuesta de IA tiene: **Copiar**, **Guardar** y **Checklist**.
+- Guardar lleva la respuesta directamente a la Libreta del vehículo.
+- Checklist convierte pasos de la IA en casillas marcables dentro de la Libreta.
+- Respuestas largas se contraen con **Ver más / Ver menos**.
+- La IA recibe instrucciones para responder con Resumen, Pasos y Verificar cuando corresponde.
+- La app despierta/comprueba el backend al abrir y muestra `Conectando…` mientras Render responde.
+- Aviso visible si hay una versión nueva de la PWA.
+- Pantalla despierta mientras estás en Asistente, cuando el navegador lo permite.
+- Ficha Vehículo: resumen compacto, kilometraje visible, botones Consultar IA/Libreta y datos técnicos desplegables.
+- Vehículos recientes como accesos horizontales.
+- Controles táctiles de 48 px o más en acciones principales.
+- Build: `4.1.0-ux`.
 
-# THOKAR Taller 4.0 — Boostr API + Render
+## Seguridad opcional para las consultas Boostr
 
-Esta versión elimina por completo Playwright y la automatización de PatenteChile. La búsqueda por patente se hace desde el backend de THOKAR contra la API oficial de Boostr.
+La API de patente ya tenía rate-limit. Esta versión añade protección opcional con `APP_TOKEN`.
 
-## Arquitectura
+En Render → Environment puedes crear:
 
-`THOKAR (navegador) -> /api/vehiculo/:patente -> backend Node/Render -> Boostr API`
+- `APP_TOKEN`: una cadena larga que inventes tú.
 
-La API key de Boostr **nunca va en app.js ni en el navegador**. Sólo se configura como variable de entorno secreta en Render.
+Luego en THOKAR → Ajustes → **Token THOKAR**, pega exactamente el mismo valor. El token se guarda solo en ese teléfono.
 
-## Archivos importantes
+Si NO configuras `APP_TOKEN` en Render, la app sigue funcionando como antes; la protección es opcional.
 
-- `server.js`: endpoint propio de THOKAR y servidor de la PWA.
-- `boostrProvider.js`: llamada a `https://api.boostr.cl/vehicle/{patente}.json` y mapeo de datos.
-- `package.json`: ya no incluye Playwright.
-- `Dockerfile`: usa `node:22-alpine`, mucho más liviano que la imagen anterior con Chromium.
-- `render.yaml`: declara `BOOSTR_API_KEY` como variable secreta (`sync: false`).
+`BOOSTR_API_KEY` continúa guardándose solo en Render.
 
-## 1. Conseguir API key de Boostr
+## Actualizar en GitHub / Render
 
-Solicita/contrata tu API key en Boostr. La consulta de patentes requiere `X-API-KEY`.
-
-El plan gratuito vigente documenta hasta 5 consultas diarias; los campos extendidos (VIN/chasis, color, kilometraje, combustible, fabricante, procedencia, puertas, versión, cilindrada y transmisión) dependen del plan contratado.
-
-## 2. Reemplazar archivos en GitHub
-
-Sube todos los archivos de este ZIP a la raíz de tu repositorio y reemplaza los existentes.
-
-Si aún aparecen del proyecto anterior, puedes borrar de GitHub estos archivos porque ya no se usan:
-
-- `patenteChileProvider.js`
-- `vehicleParser.js`
-- `vehicleParser.test.js`
-
-El archivo nuevo que debe existir es:
-
-- `boostrProvider.js`
-- `boostrProvider.test.js`
-
-## 3. Configurar la API key en Render
-
-En Render abre tu servicio THOKAR y entra a:
-
-**Environment -> Environment Variables -> Add Environment Variable**
-
-Agrega exactamente:
-
-- Key: `BOOSTR_API_KEY`
-- Value: `TU_API_KEY_REAL_DE_BOOSTR`
-
-No uses comillas y no pongas la clave dentro de GitHub.
-
-Variables opcionales ya soportadas:
-
-- `BOOSTR_TIMEOUT_MS=12000`
-- `PLATE_REQUESTS_PER_10_SECONDS=4`
-- `BOOSTR_BASE_URL=https://api.boostr.cl`
-
-## 4. Volver a desplegar
-
-En Render usa:
-
-**Manual Deploy -> Clear build cache & deploy**
-
-## 5. Comprobar que quedó bien
-
-Abre:
-
-`https://TU-DOMINIO.onrender.com/healthz`
-
-Debe responder parecido a:
+1. Reemplaza los archivos del repositorio con los de este ZIP.
+2. En Render: **Manual Deploy → Clear build cache & deploy**.
+3. Comprueba `/healthz`. Debe mostrar:
 
 ```json
 {
   "ok": true,
-  "app": "THOKAR Taller",
   "vehicleLookup": "boostr",
   "configured": true,
   "layout": "flat",
-  "build": "4.0.0-boostr"
+  "build": "4.1.0-ux"
 }
 ```
 
-Si `configured` sale `false`, falta `BOOSTR_API_KEY` en Render.
+Si usas `APP_TOKEN`, `/healthz` además mostrará `"protected": true`.
 
-## Datos que THOKAR puede mapear
+## PWA instalada
 
-Según lo que incluya tu plan de Boostr, THOKAR reconoce:
-
-- patente y dígito verificador
-- marca, modelo, año y tipo
-- número de motor
-- VIN/chasis
-- color
-- combustible
-- kilometraje registrado
-- fabricante
-- país y región de procedencia
-- puertas
-- versión
-- cilindrada/tamaño de motor
-- transmisión
-- código SII
-- tasación fiscal
-
-THOKAR no envía `include=owner` y el backend usa una lista explícita de campos técnicos; si Boostr devolviera un objeto `owner`, se descarta.
-
-## Notas de límites
-
-Boostr documenta un rate-limit general de hasta 5 solicitudes cada 10 segundos. THOKAR aplica además un límite local conservador de 4 cada 10 segundos por IP.
-## Cambio 4.0.2 — Asistente
-
-- El chat y su historial ahora viven dentro de una ventana/panel de altura fija.
-- El historial hace scroll dentro del panel, no en toda la página.
-- La caja para escribir es más grande y queda en la parte inferior de la ventana.
-- Las consultas rápidas quedan dentro de la misma ventana.
-- El resto de THOKAR no fue modificado.
-
+El Service Worker usa una caché nueva (`v12-ux`). Si Android mantiene una versión anterior, cierra y vuelve a abrir THOKAR. Si persiste, desinstala la PWA y vuelve a instalarla desde Chrome.

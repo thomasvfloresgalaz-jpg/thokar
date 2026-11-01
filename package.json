@@ -1,6 +1,6 @@
 {
   "name": "thokar-taller",
-  "version": "4.0.4-chat-first",
+  "version": "4.1.0-ux",
   "private": true,
   "description": "THOKAR Taller con backend Node y consulta de patentes mediante Boostr API.",
   "main": "server.js",

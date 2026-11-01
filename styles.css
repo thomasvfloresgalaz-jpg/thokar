@@ -442,3 +442,169 @@ p { margin: 0; }
   .plate input { font-size: 46px; }
   .grid2 { grid-template-columns: 1fr; }
 }
+
+/* ---------- UX 4.1 ---------- */
+
+/* Estado del backend / actualización */
+.connection-pill {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  min-height: 36px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(21, 23, 27, .96);
+  color: var(--text);
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  box-shadow: 0 8px 26px rgba(0,0,0,.45);
+}
+.connection-pill.error-pill { color: #ffd7d9; border-color: #7f1d1d; }
+.spinner.mini { width: 14px; height: 14px; border-width: 2px; }
+.update-banner {
+  position: fixed;
+  left: 12px; right: 12px;
+  bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom) + 10px);
+  z-index: 45;
+  max-width: 536px;
+  margin: 0 auto;
+  padding: 10px 10px 10px 14px;
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #20242b;
+  box-shadow: 0 10px 28px rgba(0,0,0,.5);
+  font-size: 14px;
+}
+.update-banner span { flex: 1; }
+.update-banner button { min-height: 40px; border: 0; border-radius: 9px; padding: 0 13px; background: var(--red); color: #000; font-weight: 700; }
+
+/* Vehículo compacto */
+.vehicle-summary-card {
+  margin-top: 16px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, #171a20, #111317);
+}
+.vehicle-summary-plate { font-family: var(--font-display); font-size: 30px; font-weight: 700; letter-spacing: .08em; }
+.vehicle-summary-name { margin-top: 2px; font-size: 18px; font-weight: 600; }
+.vehicle-summary-meta { margin-top: 2px; color: var(--muted); font-size: 14px; }
+.vehicle-km { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.vehicle-km span { color: var(--muted); font-size: 13px; }
+.vehicle-km strong { font-size: 20px; }
+.vehicle-summary-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 12px; }
+.vehicle-details { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.vehicle-details summary { min-height: 52px; display: flex; align-items: center; padding: 0 15px; font-weight: 700; cursor: pointer; list-style: none; }
+.vehicle-details summary::-webkit-details-marker { display:none; }
+.vehicle-details summary::after { content: '⌄'; margin-left: auto; color: var(--muted); font-size: 20px; }
+.vehicle-details[open] summary::after { transform: rotate(180deg); }
+.details-card { border: 0; border-top: 1px solid var(--line); border-radius: 0; }
+.recent-vehicles { display: flex; gap: 9px; overflow-x: auto; padding: 8px 0 4px; scrollbar-width: none; }
+.recent-vehicles::-webkit-scrollbar { display:none; }
+.recent-chip { flex: 0 0 auto; min-width: 122px; min-height: 58px; text-align:left; padding: 8px 11px; border:1px solid var(--line); border-radius: 10px; background:var(--surface); }
+.recent-chip span { display:block; font-family:var(--font-display); font-size:19px; font-weight:700; letter-spacing:.06em; }
+.recent-chip small { display:block; margin-top:2px; color:var(--muted); max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Chat: cabecera activa, inicio y acciones */
+.assistant-notice { margin: 10px 0; }
+.assistant-chat-window {
+  height: calc(100dvh - var(--tabs-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 58px);
+}
+.assistant-contact-button {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+}
+.assistant-contact-button:active { opacity: .78; }
+.assistant-starter { margin: auto; width: 100%; max-width: 390px; padding: 22px 4px; }
+.starter-title { text-align:center; color:#aebac1; font-weight:600; margin-bottom:12px; }
+.starter-grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+.starter-grid button { min-height:52px; padding:9px 10px; border:1px solid #31404a; border-radius:11px; background:#172229; color:#e9edef; text-align:left; font-weight:600; }
+.starter-grid button:active { background:#21313a; }
+
+.msg-wrap { max-width: 100%; margin: 5px 0 9px; }
+.msg-wrap.user-wrap { display:flex; flex-direction:column; align-items:flex-end; }
+.msg-wrap.model-wrap { display:flex; flex-direction:column; align-items:flex-start; }
+.whatsapp-thread .msg { margin:0; }
+.msg-content.collapsible { max-height: 310px; overflow:hidden; position:relative; }
+.msg-content.collapsible:not(.expanded)::after { content:''; position:absolute; left:0; right:0; bottom:0; height:72px; background:linear-gradient(transparent,#202c33); pointer-events:none; }
+.msg-content.expanded { max-height:none; }
+.msg-more { border:0; background:transparent; color:#b9c5cc; font-weight:600; padding:8px 2px 0; min-height:36px; }
+.msg-actions { display:flex; gap:4px; margin-top:3px; }
+.msg-actions button { min-height:34px; border:0; border-radius:7px; padding:5px 8px; background:transparent; color:#9eabb3; font-size:12px; }
+.msg-actions button:active { background:#172229; color:#fff; }
+.ai-section-line + div, .ai-section-line + ul, .ai-section-line + ol { margin-top:4px; }
+.msg code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:rgba(255,255,255,.08); padding:1px 4px; border-radius:4px; }
+
+.whatsapp-composer {
+  grid-template-columns: 44px 44px minmax(0,1fr) auto;
+  gap: 6px;
+  padding: 8px;
+}
+.composer-action-btn {
+  width:44px;
+  min-height:48px;
+  border:0;
+  border-radius:24px;
+  background:#2a3942;
+  color:#c2cdd2;
+  font-size:24px;
+  line-height:1;
+}
+.assistant-action-btn { color:#ffd15c; font-size:21px; }
+.whatsapp-composer textarea { min-height:48px; max-height:128px; padding:13px 14px 11px; }
+.whatsapp-send { min-height:48px; padding:0 15px; }
+
+/* Cuando aparece el teclado, el chat usa el espacio que deja visualViewport y la barra inferior se oculta. */
+body.keyboard-open .tabs { display:none; }
+body.keyboard-open #app { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+body.keyboard-open .assistant-chat-window {
+  height: calc(100dvh - env(safe-area-inset-top) - 58px);
+  margin-bottom: 0;
+}
+body.keyboard-open .update-banner { display:none; }
+
+/* Hoja de acciones rápidas */
+.action-sheet-head { display:flex; align-items:flex-start; gap:12px; }
+.action-sheet-head > div { flex:1; }
+.sheet-x { width:44px; height:44px; border:1px solid var(--line); border-radius:50%; background:transparent; color:var(--muted); font-size:24px; }
+.action-category { margin-top:18px; }
+.action-category-title { font-family:var(--font-display); font-size:18px; font-weight:700; margin-bottom:8px; }
+.action-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.action-sheet-item { min-height:50px; padding:9px 11px; border:1px solid var(--line); border-radius:10px; background:#101216; color:var(--text); text-decoration:none; text-align:left; font-weight:600; display:flex; align-items:center; }
+.action-sheet-item:active { background:#1b1e24; }
+.vehicle-sheet-list > div { display:grid; grid-template-columns:110px 1fr; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); }
+.vehicle-sheet-list span { color:var(--muted); font-size:13px; }
+.vehicle-sheet-list strong { overflow-wrap:anywhere; }
+
+/* Libreta: contenido IA y checklist */
+.entry-notes { margin-top:8px; white-space:pre-wrap; line-height:1.45; }
+.saved-checklist { margin-top:10px; display:grid; gap:7px; }
+.saved-checklist label { display:grid; grid-template-columns:26px 1fr; gap:8px; align-items:start; min-height:36px; }
+.saved-checklist input { width:20px; height:20px; margin-top:1px; accent-color:var(--red); }
+.saved-checklist input:checked + span { color:var(--muted); text-decoration:line-through; }
+
+/* Más cómodos para uso con una mano */
+.chip { min-height:48px; }
+.tab { min-height:56px; }
+
+@media (max-width: 390px) {
+  .whatsapp-composer { grid-template-columns: 40px 40px minmax(0,1fr) auto; gap:5px; padding:7px; }
+  .composer-action-btn { width:40px; min-height:46px; }
+  .whatsapp-send { min-height:46px; padding:0 12px; }
+  .starter-grid { gap:7px; }
+  .starter-grid button { min-height:50px; font-size:14px; }
+}
