@@ -1,8 +1,8 @@
 {
-  "name": "thokar-taller",
-  "version": "5.8.0-prototype.8",
+  "name": "thokar-ios-zero",
+  "version": "0.3.0",
   "private": true,
-  "description": "THOKAR Prototipo 5.8.0 · Precios, cotización y descuentos integrados sobre Hablar 5.7.1.",
+  "description": "THOKAR iOS Zero 3 · prototipo iOS con ficha pegable, registro detallado y diagnóstico IA.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

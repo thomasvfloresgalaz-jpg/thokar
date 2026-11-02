@@ -95,7 +95,7 @@ function geminiConfig() {
   return {
     apiKey: String(process.env.GEMINI_API_KEY || '').trim(),
     model: String(process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim(),
-    fallbackModel: String(process.env.GEMINI_FALLBACK_MODEL || 'gemini-3.6-flash').trim()
+    fallbackModel: String(process.env.GEMINI_FALLBACK_MODEL || 'gemini-flash-latest').trim()
   };
 }
 
@@ -215,9 +215,9 @@ app.get('/healthz', (req, res) => {
     boostrConfigured: isBoostrConfigured(),
     geminiConfigured: Boolean(geminiConfig().apiKey),
     model: geminiConfig().model,
-    layout: 'liquid-motion-mobile',
+    layout: 'ios-zero-3',
     protected: tokenReady,
-    build: 'prototipo-5.8.0-pricing-quotes'
+    build: 'ios-zero-3'
   });
 });
 
