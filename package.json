@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "5.4.0-prototype.5",
+  "version": "5.5.0-prototype.5",
   "private": true,
-  "description": "THOKAR Prototipo 5.4 · chat independiente, pestañas sin salto y hojas adaptadas al teclado.",
+  "description": "THOKAR Prototipo 5.5 · chat independiente, pestañas sin salto y hojas adaptadas al teclado.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

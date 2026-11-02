@@ -22,9 +22,9 @@ test('Consultar abre búsqueda de patente y no duplica botón de búsqueda en In
   assert.doesNotMatch(app,/id=\"empty-search\"/);
 });
 
-test('assets 5.4 usan el mismo bust de caché',()=>{
-  assert.match(html,/styles\.css\?v=p54/);
-  assert.match(html,/app\.js\?v=p54/);
-  assert.match(sw,/styles\.css\?v=p54/);
-  assert.match(sw,/app\.js\?v=p54/);
+test('assets 5.5 usan el mismo bust de caché',()=>{
+  assert.match(html,/styles\.css\?v=p55/);
+  assert.match(html,/app\.js\?v=p55/);
+  assert.match(sw,/styles\.css\?v=p55/);
+  assert.match(sw,/app\.js\?v=p55/);
 });

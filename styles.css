@@ -133,3 +133,132 @@ body.nav-minimized .liquid-tabbar{width:214px;height:58px}.liquid-tabbar .nav-it
 .mileage-input-wrap input{border:0;background:transparent;border-radius:0;min-width:0;font-family:var(--mono);font-variant-numeric:tabular-nums}
 .mileage-input-wrap span{font-size:14px;color:var(--muted);font-weight:700}
 @media(max-width:720px){.mileage-editor{grid-template-columns:1fr}.mileage-editor .btn{width:100%}}
+
+/* ===== Prototipo 5.5 · interacción final / Liquid Glass reforzado ===== */
+:root{
+  --glass-bg:rgba(43,36,39,.58);
+  --glass-border:rgba(255,255,255,.27);
+  --glass-top:rgba(255,255,255,.58);
+}
+html[data-theme="dia"]{
+  --glass-bg:rgba(255,252,250,.70);
+  --glass-border:rgba(255,255,255,.82);
+  --glass-top:rgba(255,255,255,.98);
+}
+
+/* Cristal solo en controles flotantes. */
+.floating-control,.liquid-tabbar,.liquid-segment,.composer,.modal-sheet,.update-banner,.connection-pill,.toast{
+  position:relative;
+  isolation:isolate;
+}
+.floating-control::before,.liquid-tabbar::before,.liquid-segment::before,.composer::before,.modal-sheet::before,.update-banner::before,.connection-pill::before,.toast::before{
+  content:"";
+  position:absolute;
+  pointer-events:none;
+  z-index:-1;
+  inset:1px 1px auto 1px;
+  height:46%;
+  border-radius:inherit;
+  background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.035) 52%,transparent);
+  opacity:.9;
+}
+.floating-control::after,.liquid-tabbar::after,.liquid-segment::after,.composer::after,.modal-sheet::after{
+  content:"";
+  position:absolute;
+  pointer-events:none;
+  z-index:5;
+  width:150px;height:150px;
+  left:calc(var(--glass-x,50%) - 75px);
+  top:calc(var(--glass-y,50%) - 75px);
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,.28),rgba(255,255,255,.08) 28%,transparent 68%);
+  opacity:0;
+  transform:scale(.72);
+  transition:opacity .14s ease,transform .24s ease;
+  mix-blend-mode:screen;
+}
+.glass-touch::after{opacity:.72;transform:scale(1)}
+html[data-glass-level="2"] .floating-control,html[data-glass-level="2"] .liquid-tabbar,html[data-glass-level="2"] .liquid-segment,html[data-glass-level="2"] .composer,html[data-glass-level="2"] .modal-sheet,
+html[data-glass-level="3"] .floating-control,html[data-glass-level="3"] .liquid-tabbar,html[data-glass-level="3"] .liquid-segment,html[data-glass-level="3"] .composer,html[data-glass-level="3"] .modal-sheet{
+  background:color-mix(in srgb,var(--glass-bg) 92%,transparent);
+  border-color:var(--glass-border);
+  border-top-color:var(--glass-top);
+  box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 -1px 0 rgba(255,255,255,.06) inset,0 14px 40px rgba(15,5,7,.22),0 34px 90px rgba(15,5,7,.15);
+}
+html[data-glass-level="2"] .liquid-tabbar,html[data-glass-level="2"] .liquid-segment,html[data-glass-level="2"] .composer,html[data-glass-level="2"] .modal-sheet{
+  backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
+}
+html[data-glass-level="3"] .liquid-tabbar,html[data-glass-level="3"] .liquid-segment,html[data-glass-level="3"] .composer,html[data-glass-level="3"] .modal-sheet{
+  backdrop-filter:blur(17px) saturate(185%) url("#liquid-lens");
+  -webkit-backdrop-filter:blur(17px) saturate(185%);
+}
+
+/* Barra inferior: gota deslizante con resorte controlado por JS. */
+.liquid-tabbar{--nav-pos:0;--nav-stretch:1;overflow:hidden}
+.nav-drop{
+  left:7px;
+  transform:translateX(calc(var(--nav-pos) * 100%)) scaleX(var(--nav-stretch));
+  transform-origin:center;
+  transition:none!important;
+  background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.035)),color-mix(in srgb,var(--surface) 52%,transparent);
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:0 1px 0 rgba(255,255,255,.24) inset,0 10px 24px rgba(0,0,0,.10);
+}
+.nav-drop[data-active="home"],.nav-drop[data-active="consult"],.nav-drop[data-active="record"]{transform:translateX(calc(var(--nav-pos) * 100%)) scaleX(var(--nav-stretch))}
+.nav-item{transition:color .16s ease,transform .18s ease}.nav-item:active{transform:scale(.96)}
+
+/* Segmento Hablar / Registro / Datos: estático bajo la ficha, gota fluida. */
+.workspace-tabs{--segment-stretch:1;position:relative!important;top:auto!important}
+.segment-thumb{transform:translateX(calc(var(--segment-pos) * 100%)) scaleX(var(--segment-stretch));transition:none!important;background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.025)),color-mix(in srgb,var(--surface) 56%,transparent);border:1px solid rgba(255,255,255,.08)}
+
+/* Chat: ventana independiente sin espacio negro al final. */
+.workspace-talk-active .workspace-scroll{padding-bottom:0}
+.workspace-main.talk-shell{height:var(--talk-window-height,520px);min-height:0!important;max-height:none!important;margin-bottom:0;padding-bottom:0}
+.talk{height:100%;min-height:0}
+.talk-thread{padding-bottom:92px;scroll-padding-bottom:100px}
+.quick-start-shell{display:block}
+.composer-wrap{bottom:8px}
+
+/* Hoja/modal: entrada y salida fluidas, el fondo también acompaña. */
+.overlay{transition:opacity .18s ease,background .18s ease}
+.overlay.modal-entering{opacity:0;background:rgba(0,0,0,0)}
+.overlay.modal-ready{opacity:1}
+.overlay.modal-leaving{opacity:0;background:rgba(0,0,0,0)}
+.modal-sheet{box-shadow:0 -1px 0 rgba(255,255,255,.15),0 -18px 70px rgba(0,0,0,.24)}
+.modal-sheet.open-full{min-height:min(72dvh,calc(var(--vh) - 4px))}
+.custom-zone-query{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.custom-zone-query label{display:block;font-size:13px;font-weight:750;color:var(--muted);margin-bottom:8px}
+.custom-zone-query textarea{min-height:96px;margin-bottom:10px}
+
+/* Búsqueda: nunca enseña detrás la ficha anterior. */
+.lookup-screen{display:grid;place-items:center;overflow:hidden;padding-bottom:calc(106px + env(safe-area-inset-bottom))}
+.lookup-shell{width:min(100%,560px);text-align:center;padding:34px 24px;animation:lookup-in .38s both}
+.lookup-mark{display:grid;place-items:center;width:64px;height:64px;margin:0 auto 18px;border-radius:22px;background:var(--accent-soft);color:var(--accent)}
+.lookup-mark svg{width:28px;height:28px}.lookup-plate{font-size:44px;letter-spacing:.06em;margin:10px 0 12px}.lookup-shell p{color:var(--muted);line-height:1.55;max-width:420px;margin:0 auto 22px}
+.lookup-skeleton{display:grid;gap:10px}.lookup-skeleton i{display:block;height:18px;border-radius:999px;background:linear-gradient(100deg,var(--surface-2) 30%,var(--surface-3) 46%,var(--surface-2) 62%);background-size:240% 100%;animation:skeleton-sheen 1.2s linear infinite}.lookup-skeleton i:nth-child(2){width:84%;margin:auto}.lookup-skeleton i:nth-child(3){width:66%;margin:auto}.lookup-skeleton i:nth-child(4){width:48%;margin:auto}
+@keyframes lookup-in{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes skeleton-sheen{to{background-position:-140% 0}}
+
+/* Entrada del vehículo con continuidad en vez de aparición seca. */
+.liquid-workspace{animation:workspace-in .38s both}
+@keyframes workspace-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* Registro / próximos trabajos: texto completo, tipo visible y multilínea. */
+.service-meter{padding:13px 14px}
+.meter-kind{font-size:11px;font-weight:800;color:var(--tertiary);margin-bottom:5px;text-transform:none}
+.meter-head{align-items:flex-start}.meter-head strong{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;line-height:1.35;display:block;flex:1;min-width:0}.meter-head em{flex:0 0 auto;margin-left:8px}
+.meter-detail{line-height:1.4;margin-top:2px}
+.timeline-copy{min-width:0;flex:1}.timeline-title{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.38}.timeline-notes{overflow-wrap:anywhere}.next-work{margin-top:12px;padding:12px 13px;border-radius:14px;background:var(--surface-2);display:flex;flex-direction:column;gap:4px}.next-work span{font-size:11px;color:var(--tertiary);font-weight:800}.next-work strong{font-size:14px;line-height:1.4}.next-work small{color:var(--muted)}
+
+/* El bloque de identificación siempre conserva jerarquía clara. */
+.identity-ok{display:grid!important;grid-template-columns:auto 1fr;align-items:start!important}.identity-ok>div{min-width:0}.identity-ok strong,.identity-ok small{white-space:normal!important}
+
+@media(max-width:720px){
+  .lookup-plate{font-size:38px}
+  .modal-sheet.open-full{min-height:min(76dvh,calc(var(--vh) - 4px))}
+  .action-grid.zone-prompt-grid{grid-template-columns:1fr 1fr}
+  .service-meter{padding:12px}
+  .meter-head{display:grid;grid-template-columns:1fr auto}
+}
+@media(prefers-reduced-motion:reduce){.lookup-shell,.liquid-workspace,.lookup-skeleton i{animation:none!important}.overlay{transition:opacity .1s linear}.nav-item{transition:none!important}}
