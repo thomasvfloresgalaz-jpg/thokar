@@ -288,8 +288,44 @@ html[data-glass-level="3"] .liquid-tabbar,html[data-glass-level="3"] .liquid-seg
 }
 .keyboard-open .liquid-tabbar{bottom:calc(10px + env(safe-area-inset-bottom))}
 
-/* Prototipo 5.5.2 · alineación uniforme Hablar / Registro / Datos */
+/* Prototipo 5.5.3 · alineación uniforme y navegación desacoplada */
 .workspace-scroll,.workspace-main{overflow-anchor:none!important}
 .workspace-tabs{scroll-margin-top:8px}
 body.workspace-aligning .workspace-main{pointer-events:none}
 @media (prefers-reduced-motion:reduce){body.workspace-aligning .workspace-main{opacity:.995}}
+
+
+/* Prototipo 5.5.3 · navegación desacoplada y ancla uniforme */
+.workspace-main{contain:layout style;}
+.workspace-tabs{scroll-snap-align:start;transform:translateZ(0);backface-visibility:hidden;}
+.workspace-scroll{scroll-behavior:auto;scroll-snap-type:none;}
+.view-tab,.segment-thumb,.nav-drop{transform:translateZ(0);backface-visibility:hidden;}
+body.workspace-aligning .workspace-tabs{will-change:transform;}
+@media (prefers-reduced-motion:no-preference){
+  .workspace-main{transition:opacity 120ms linear;}
+  body.workspace-aligning .workspace-main{opacity:.985;}
+}
+
+
+/* Prototipo 5.5.4 · compositor del chat siempre libre de la barra inferior */
+.workspace-main.view-talk{--chat-nav-clearance:0px}
+.workspace-main.view-talk .composer-wrap{
+  bottom:calc(8px + var(--chat-nav-clearance));
+  z-index:78;
+}
+.workspace-main.view-talk .talk-thread{
+  padding-bottom:calc(96px + var(--chat-nav-clearance));
+  scroll-padding-bottom:calc(106px + var(--chat-nav-clearance));
+}
+.workspace-main.view-talk .attach-preview{
+  bottom:calc(78px + var(--chat-nav-clearance));
+  z-index:77;
+}
+.workspace-main.view-talk .jump-latest{
+  bottom:calc(84px + var(--chat-nav-clearance));
+  z-index:77;
+}
+.keyboard-open .workspace-main.view-talk{--chat-nav-clearance:0px!important}
+.keyboard-open .workspace-main.view-talk .composer-wrap{bottom:8px}
+.keyboard-open .workspace-main.view-talk .attach-preview{bottom:76px}
+.keyboard-open .workspace-main.view-talk .jump-latest{bottom:82px}

@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "5.5.2-prototype.5",
+  "version": "5.5.4-prototype.5",
   "private": true,
-  "description": "THOKAR Prototipo 5.5.2 · pestañas alineadas al mismo límite superior con movimiento de resorte.",
+  "description": "THOKAR Prototipo 5.5.4 · compositor de chat protegido de la barra inferior.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
