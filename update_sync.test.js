@@ -6,7 +6,7 @@ test('frontend, backend y service worker comparten el mismo build/caché de Prot
   const app = fs.readFileSync('./app.js','utf8');
   const server = fs.readFileSync('./server.js','utf8');
   const sw = fs.readFileSync('./sw.js','utf8');
-  assert.match(app, /APP_BUILD='prototipo-5.5.8-chat-contained-layout'/);
-  assert.match(server, /build:\s*'prototipo-5.5.8-chat-contained-layout'/);
-  assert.match(sw, /thokar-prototipo-5.5.8-chat-contained-layout/);
+  assert.match(app, /APP_BUILD='prototipo-5.5.8-chat-contained-nav-stable'/);
+  assert.match(server, /build:\s*'prototipo-5.5.8-chat-contained-nav-stable'/);
+  assert.match(sw, /thokar-prototipo-5.5.8-chat-contained-nav-stable/);
 });

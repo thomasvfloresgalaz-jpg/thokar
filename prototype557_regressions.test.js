@@ -9,5 +9,5 @@ assert(css.includes('html[data-theme="dia"] .liquid-tabbar'),'Modo Día debe ten
 assert(app.includes("seg.addEventListener('click'"),'Las pestañas superiores deben ser tap-only');
 assert(!app.includes("seg.addEventListener('pointermove'"),'No debe existir arrastre horizontal del selector superior');
 assert(app.includes("main.style.setProperty('--talk-composer-clearance'"),'La reserva del chat debe calcularse desde el compositor real');
-assert(sw.includes('5.5.8-chat-contained-layout'),'SW debe estar sincronizado con 5.5.8');
+assert(sw.includes('5.5.8-chat-contained-nav-stable'),'SW debe estar sincronizado con el build actual');
 console.log('prototype557_regressions: ok');
