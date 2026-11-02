@@ -1,6 +1,6 @@
 const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');
 const app=fs.readFileSync('app.js','utf8'),css=fs.readFileSync('styles.css','utf8'),server=fs.readFileSync('server.js','utf8');
-test('clipboard refuses silent cross-plate replacement and motor parser is normalized',()=>{assert.match(app,/Los datos no coinciden/);assert.match(app,/plateCore\(pastedPlate\)!==plateCore\(currentPlate\)/);assert.match(app,/número motor/);});
+test('clipboard refuses silent cross-plate replacement and motor parser is normalized',()=>{assert.match(app,/Los datos no coinciden/);assert.match(app,/plateCore\(pastedPlate\)!==plateCore\(currentPlate\)/);assert.match(app,/parseClipboardVehicle/);assert.match(app,/motor/);});
 test('plate field forces uppercase',()=>{assert.match(app,/autocapitalize="characters"/);assert.match(app,/toUpperCase\(\)/);assert.match(css,/text-transform:uppercase/);});
 test('record has currency percent affixes and workflow tabs',()=>{assert.match(app,/discountAffix/);assert.match(app,/data-r-tab="diagnosis"/);assert.match(app,/data-r-tab="tasks"/);assert.match(css,/affix-input/);});
 test('bitacora is animated and status-coded',()=>{assert.match(css,/logPageIn/);assert.match(css,/log-done/);assert.match(css,/log-open/);assert.match(app,/✓/);});

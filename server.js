@@ -216,9 +216,9 @@ app.get('/healthz', (req, res) => {
     boostrConfigured: isBoostrConfigured(),
     geminiConfigured: Boolean(geminiConfig().apiKey),
     model: geminiConfig().model,
-    layout: 'zero-5.1',
+    layout: 'zero-5.2',
     protected: tokenReady,
-    build: 'zero-5.1'
+    build: 'zero-5.2'
   });
 });
 
