@@ -299,7 +299,7 @@ body.workspace-aligning .workspace-main{pointer-events:none}
 .workspace-main{contain:layout style;}
 .workspace-tabs{scroll-snap-align:start;transform:translateZ(0);backface-visibility:hidden;}
 .workspace-scroll{scroll-behavior:auto;scroll-snap-type:none;}
-.view-tab,.segment-thumb,.nav-drop{transform:translateZ(0);backface-visibility:hidden;}
+.view-tab{transform:translateZ(0);backface-visibility:hidden;} .segment-thumb,.nav-drop{backface-visibility:hidden;}
 body.workspace-aligning .workspace-tabs{will-change:transform;}
 @media (prefers-reduced-motion:no-preference){
   .workspace-main{transition:opacity 120ms linear;}
@@ -338,3 +338,28 @@ body.workspace-aligning .workspace-tabs{will-change:transform;}
 .keyboard-open .workspace-main.view-talk .composer-wrap{bottom:8px}
 .keyboard-open .workspace-main.view-talk .attach-preview{bottom:78px}
 .keyboard-open .workspace-main.view-talk .jump-latest{bottom:82px}
+
+/* Prototipo 5.5.6 · geometría estable + Liquid Glass realmente móvil */
+/* No sobrescribir el transform que posiciona las gotas. */
+.segment-thumb,.nav-drop{backface-visibility:hidden;will-change:transform}
+
+/* Cabecera de marca legible sobre cualquier contenido al hacer scroll. */
+.workspace-brand{
+  position:relative;isolation:isolate;padding:9px 18px 8px;border-radius:999px;
+  background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.035)),color-mix(in srgb,var(--surface) 58%,transparent);
+  border:1px solid rgba(255,255,255,.10);box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 8px 24px rgba(0,0,0,.08);
+  backdrop-filter:blur(18px) saturate(175%);-webkit-backdrop-filter:blur(18px) saturate(175%);
+}
+html[data-theme="dia"] .workspace-brand{border-color:rgba(20,20,20,.08);box-shadow:0 1px 0 rgba(255,255,255,.72) inset,0 8px 24px rgba(40,30,20,.08)}
+
+/* Hablar ocupa sólo el espacio realmente visible entre pestañas y navegación. */
+.workspace-main.view-talk{min-height:220px!important;max-height:none!important;overflow:visible}
+.workspace-main.view-talk .talk{height:100%;max-height:100%;overflow:hidden}
+.workspace-main.view-talk .talk-thread{min-width:0;overflow-x:hidden;padding-bottom:112px;scroll-padding-bottom:120px}
+.workspace-main.view-talk .message,.workspace-main.view-talk .assistant-card{max-width:100%;min-width:0;overflow-wrap:anywhere}
+.workspace-main.view-talk .message-actions{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
+.workspace-main.view-talk .message-actions::-webkit-scrollbar{display:none}
+.workspace-main.view-talk .composer-wrap{box-sizing:border-box;max-width:none}
+
+/* La altura reservada durante el cambio de pestaña no debe sobrevivir a la estabilización. */
+body:not(.workspace-aligning) .workspace-main:not(.view-talk){min-height:0}

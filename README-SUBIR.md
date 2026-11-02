@@ -1,41 +1,13 @@
-# THOKAR · Prototipo 5.5.5 · Nav + Anchor Fix
+# THOKAR · Prototipo 5.5.6 · Geometry + Liquid Glass Fix
 
-Prototipo desplegable para GitHub -> Render -> PWA Android. Conserva vehículos, chats, Registro, fotos, respaldo, Gemini, Wake Lock y proveedores.
+Versión de prueba posterior a 5.5.5.
 
-## Build y caché
+## Correcciones principales
+- El cambio a Hablar conserva el ancla visual antes de reemplazar contenido, evitando el salto momentáneo al inicio de la ficha.
+- Hablar calcula su alto desde el viewport visible real y la barra inferior, sin imponer un mínimo que desborde pantallas pequeñas.
+- Las gotas Liquid Glass de ambas barras vuelven a desplazarse físicamente: se eliminó una regla CSS posterior que anulaba sus transforms.
+- La cabecera THOKAR incorpora una tira de vidrio borroso para mantener legibilidad sobre la ficha.
+- La tarjeta superior usa el kilometraje manual y, si no existe, el kilometraje registrado por la fuente del vehículo.
+- Datos y Registro mantienen altura natural al salir de Hablar.
 
-- Build frontend/backend: `prototipo-5.5-final-polish`
-- Service Worker: `thokar-prototipo-5.5-final-polish`
-- package: `5.2.0-prototype.5`
-
-## Correcciones de esta versión
-
-- Hablar / Registro / Datos ya no reconstruyen toda la pantalla del vehículo al cambiar de pestaña. Solo cambia el contenido de la vista seleccionada.
-- Al seleccionar una pestaña, el scroll exterior se posiciona en el selector/contenido, no en el encabezado del vehículo.
-- Hablar funciona como una ventana independiente con su propio scroll. Si ya hay conversación, abre mostrando los mensajes más recientes.
-- El compositor vive dentro de la ventana de chat y se adapta a la altura visible del teclado.
-- Las opciones de sistemas del automóvil quedan en una cuadrícula compacta; se eliminó el dibujo intermedio del auto.
-- Las hojas de diagnóstico se abren completas automáticamente.
-- La hoja Buscar vehículo usa `visualViewport` y la variable `--vh`, por lo que se recoloca sobre el teclado sin arrastrarla manualmente.
-- Se conserva Liquid Motion, la barra inferior, Datos, plantilla pegable, VIN/motor manuales y las fuentes vehiculares del Prototipo 5.
-
-## Variables Render
-
-Mantén las mismas variables que en Prototipo 5: `APP_TOKEN`, `GEMINI_API_KEY`, `GEMINI_MODEL`; opcionales `RESTART_API_KEY`, `BOOSTR_API_KEY` y los timeouts/límites existentes.
-
-## Despliegue
-
-1. Sube el contenido de esta carpeta a la raíz de GitHub.
-2. Render -> Manual Deploy -> Clear build cache & deploy.
-3. `/healthz` debe mostrar `"build":"prototipo-5.5-final-polish"`.
-4. En Android prueba: cambiar pestañas, abrir Hablar con un chat largo, Buscar patente con teclado abierto y una consulta guiada desde los cuadros de sistemas.
-
-Los datos anteriores se conservan porque las claves de almacenamiento no cambian.
-
-
-Cambios 5.4:
-- La plantilla manual sincroniza motor/VIN con la ficha activa.
-- Kilometraje actual editable desde Datos y guardado por patente.
-- Consultar en la barra inferior abre siempre la búsqueda de patente.
-- Se elimina la búsqueda duplicada del Inicio.
-- Se corrige el bloque visual de Identificación disponible.
+No hay migración de datos ni cambios de backend/API.

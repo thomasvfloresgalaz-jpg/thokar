@@ -9,7 +9,8 @@ test('las tres vistas usan un ancla geométrica uniforme con rango de scroll gar
   assert.match(app, /function workspaceTabsTarget\(\)/);
   assert.match(app, /function stabilizeWorkspaceTabs\(ms\)/);
   assert.match(app, /function alignWorkspaceTabs\(animated\)/);
-  assert.match(app, /response:\.26,damping:\.94/);
+  assert.match(app, /sc\.scrollTop=target/);
+  assert.match(app, /alignWorkspaceTabs\(false\)/);
   assert.match(css, /workspace-scroll,.workspace-main\{overflow-anchor:none!important\}/);
   assert.match(app, /main\.style\.setProperty\('min-height',[^;]+,'important'\)/);
   assert.match(app, /target-maxScroll\+12/);

@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "5.5.5-prototype.5",
+  "version": "5.5.6-prototype.5",
   "private": true,
-  "description": "THOKAR Prototipo 5.5.5 · navegación y chat estabilizados.",
+  "description": "THOKAR Prototipo 5.5.6 · geometría, kilometraje y Liquid Glass estabilizados.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
