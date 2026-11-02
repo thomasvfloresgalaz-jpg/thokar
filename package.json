@@ -1,8 +1,8 @@
 {
   "name": "thokar-ios-zero",
-  "version": "0.3.0",
+  "version": "0.4.1",
   "private": true,
-  "description": "THOKAR iOS Zero 3 · prototipo iOS con ficha pegable, registro detallado y diagnóstico IA.",
+  "description": "THOKAR ZERO 4.1 · ficha, registro detallado, diagnóstico IA y cobro para clientes.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

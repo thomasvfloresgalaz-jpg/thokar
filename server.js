@@ -95,7 +95,7 @@ function geminiConfig() {
   return {
     apiKey: String(process.env.GEMINI_API_KEY || '').trim(),
     model: String(process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim(),
-    fallbackModel: String(process.env.GEMINI_FALLBACK_MODEL || 'gemini-flash-latest').trim()
+    fallbackModel: String(process.env.GEMINI_FALLBACK_MODEL || 'gemini-3.6-flash').trim()
   };
 }
 
@@ -121,7 +121,8 @@ function validateGeminiBody(input) {
   }
   const cfg = input.generationConfig && typeof input.generationConfig === 'object' ? input.generationConfig : {};
   out.generationConfig = {
-    temperature: Number.isFinite(Number(cfg.temperature)) ? Math.max(0, Math.min(1.5, Number(cfg.temperature))) : 0.3
+    temperature: Number.isFinite(Number(cfg.temperature)) ? Math.max(0, Math.min(1.5, Number(cfg.temperature))) : 0.3,
+    thinkingConfig: { thinkingLevel: 'low' }
   };
   if (cfg.responseMimeType === 'application/json') out.generationConfig.responseMimeType = 'application/json';
   return out;
@@ -151,7 +152,7 @@ async function googleGeminiFetch(mode, input, signal, modelOverride) {
   const suffix = mode === 'stream' ? ':streamGenerateContent?alt=sse' : ':generateContent';
   const response = await fetch(`${GEMINI_BASE}/models/${encodeURIComponent(selectedModel)}${suffix}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-Taller/Prototipo-3' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-Taller/Prototipo-4' },
     body: JSON.stringify(body), signal
   });
   if (!response.ok) {
@@ -184,7 +185,7 @@ async function googleGeminiFetchResilient(mode, input, outerSignal) {
     const ctl = new AbortController();
     const onAbort = () => ctl.abort();
     if (outerSignal) outerSignal.addEventListener('abort', onAbort, { once: true });
-    const perAttemptMs = mode === 'stream' ? 42_000 : 38_000;
+    const perAttemptMs = mode === 'stream' ? 30_000 : 27_000;
     const timer = setTimeout(() => ctl.abort(), perAttemptMs);
     try {
       const response = await googleGeminiFetch(mode, input, ctl.signal, attempts[attempt]);
@@ -215,9 +216,9 @@ app.get('/healthz', (req, res) => {
     boostrConfigured: isBoostrConfigured(),
     geminiConfigured: Boolean(geminiConfig().apiKey),
     model: geminiConfig().model,
-    layout: 'ios-zero-3',
+    layout: 'zero-4.1',
     protected: tokenReady,
-    build: 'ios-zero-3'
+    build: 'zero-4.1'
   });
 });
 

@@ -5,5 +5,5 @@ test('record is itemized and live',()=>{assert.match(app,/partsItems/);assert.ma
 test('log can edit share and status',()=>{assert.match(app,/Editar/);assert.match(app,/Compartir/);assert.match(app,/Descuento THOKAR/);assert.match(app,/toggleLog/);});
 test('chat has animated thinking and retry',()=>{assert.match(app,/thinking/);assert.match(app,/retry-ai/);assert.match(css,/@keyframes typing/);assert.match(css,/glass-composer/);});
 test('no horizontal record scrolling',()=>{assert.match(css,/overflow-x:hidden/);assert.match(css,/grid-template-columns:minmax\(0,1fr\)/);});
-test('gemini uses supported endpoint with current fallback',()=>{assert.match(server,/generateContent/);assert.match(server,/gemini-flash-latest/);assert.match(server,/x-goog-api-key/);});
-test('cache is zero3',()=>assert.match(sw,/thokar-ios-zero-3/));
+test('gemini uses supported endpoint with current fallback',()=>{assert.match(server,/generateContent/);assert.match(server,/gemini-3.6-flash/);assert.match(server,/x-goog-api-key/);});
+test('cache is zero41',()=>assert.match(sw,/thokar-zero-4.1/));
