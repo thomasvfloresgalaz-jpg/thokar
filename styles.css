@@ -533,3 +533,8 @@ body.workspace-talk-active.keyboard-open .liquid-tabbar{display:none!important}
   body.workspace-talk-active .workspace-main.view-talk{width:calc(100% - 28px)!important}
   body.workspace-talk-active .workspace-scroll{padding-top:10px!important}
 }
+/* 5.8.0 · precios y cotización */
+.price-editor{margin-top:18px;padding:16px;border:1px solid var(--line);border-radius:var(--r-inner);background:var(--surface-2)}
+.price-summary{margin-top:14px;padding:13px 14px;border-radius:16px;background:var(--surface-2);border:1px solid var(--line);display:grid;gap:8px}.price-summary>div,.quote-preview>div{display:flex;justify-content:space-between;gap:16px;align-items:center}.price-summary span,.quote-preview span{color:var(--muted);font-size:13px}.price-summary .discount b{color:var(--success)}.price-summary .price-total{padding-top:8px;border-top:1px solid var(--line)}.price-summary .price-total strong,.quote-total strong{font-size:20px;color:var(--text)}
+.quote-preview{margin:18px 0;padding:16px;border-radius:20px;background:var(--surface-2);border:1px solid var(--line);display:grid;gap:10px}.quote-preview .quote-total{padding-top:10px;border-top:1px solid var(--line)}
+.record-actions{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:560px){.record-actions{grid-template-columns:1fr 1fr}.record-actions .primary{grid-column:1/-1}}

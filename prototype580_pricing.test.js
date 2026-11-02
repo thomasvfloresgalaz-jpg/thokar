@@ -1,0 +1,12 @@
+const fs=require('fs'), assert=require('assert');
+const app=fs.readFileSync('app.js','utf8'), css=fs.readFileSync('styles.css','utf8'), sw=fs.readFileSync('sw.js','utf8');
+assert(app.includes("hourRate:'20000'"),'hora-hombre base 20.000');
+assert(app.includes('function openQuote()'),'cotizador disponible');
+assert(app.includes('discountType'),'descuento porcentaje/fijo');
+assert(app.includes('Descuento THOKAR'),'descuento visible al cliente');
+assert(app.includes("id=\"open-quote\""),'botón Cotizar en Registro');
+assert(app.includes('price-hour-rate'),'tarifa editable en Ajustes');
+assert(app.includes('pricingSummary(e)'),'precio guardado en registros');
+assert(css.includes('.quote-preview'),'estilos cotización');
+assert(sw.includes('p580'),'cache 5.8.0');
+console.log('prototype580_pricing.test.js OK');

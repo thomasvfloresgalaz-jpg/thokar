@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "5.7.1-prototype.7",
+  "version": "5.8.0-prototype.8",
   "private": true,
-  "description": "THOKAR Prototipo 5.7.1 · Hablar a pantalla completa con compositor siempre visible.",
+  "description": "THOKAR Prototipo 5.8.0 · Precios, cotización y descuentos integrados sobre Hablar 5.7.1.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
