@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "5.5.7-prototype.5",
+  "version": "5.5.8-prototype.1",
   "private": true,
-  "description": "THOKAR Prototipo 5.5.7 · chat vertical, Liquid Glass día y navegación estabilizados.",
+  "description": "THOKAR Prototipo 5.5.8 · chat contenido, scroll vertical y navegación sin solapes.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

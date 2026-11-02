@@ -1,4 +1,4 @@
-# THOKAR · Prototipo 5.5.7 · Chat vertical + Day Glass Fix
+# THOKAR · Prototipo 5.5.8 · Chat contenido + viewport fix
 
 Versión de prueba posterior a 5.5.5.
 

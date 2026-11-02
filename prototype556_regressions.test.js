@@ -19,7 +19,7 @@ test('5.5.6 preserva el scroll antes de montar Hablar',()=>{
 
 test('5.5.6 ajusta Hablar al viewport sin mínimo forzado de 390px',()=>{
   const a=fs.readFileSync('./app.js','utf8');
-  assert.match(a,/available=Math\.max\(220,bottom-top\)/);
+  assert.match(a,/available=Math\.max\(220,Math\.floor\(bottom-top\)\)/);
   assert.doesNotMatch(a,/available=Math\.max\(390/);
   assert.match(a,/vv\?vv\.offsetTop:0/);
 });

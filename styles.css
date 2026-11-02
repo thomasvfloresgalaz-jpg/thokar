@@ -392,3 +392,16 @@ html[data-theme="dia"] .nav-drop,html[data-theme="dia"] .segment-thumb{
   .keyboard-open .liquid-tabbar{transform:translateY(18px)}
   .workspace-tabs{width:calc(100vw - 36px)}
 }
+
+/* Prototipo 5.5.8 · chat contenido: una sola geometría, sin capas cruzadas */
+.workspace-talk-active .workspace-scroll{padding-bottom:0!important}
+.workspace-main.view-talk{box-sizing:border-box;overflow:hidden!important;min-height:220px!important}
+.workspace-main.view-talk .talk{position:relative;height:100%!important;min-height:0!important;overflow:hidden!important}
+/* El compositor pertenece a la ventana Hablar. Ya no se posiciona contra el viewport. */
+.workspace-main.view-talk .composer-wrap{position:absolute!important;left:10px!important;right:10px!important;bottom:8px!important;width:auto!important;max-width:none!important;z-index:18}
+.workspace-main.view-talk .attach-preview{position:absolute!important;left:12px!important;right:12px!important;bottom:78px!important;width:auto!important;z-index:17}
+.workspace-main.view-talk .jump-latest{position:absolute!important;right:18px!important;bottom:82px!important;z-index:17}
+.workspace-main.view-talk .talk-thread{height:auto;min-height:0;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain;touch-action:pan-y;padding-bottom:var(--talk-composer-clearance,112px)!important;scroll-padding-bottom:var(--talk-composer-clearance,112px)!important}
+.keyboard-open .workspace-main.view-talk .composer-wrap{bottom:8px!important}
+.keyboard-open .workspace-main.view-talk .attach-preview{bottom:78px!important}
+.keyboard-open .workspace-main.view-talk .jump-latest{bottom:82px!important}
