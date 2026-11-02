@@ -8,5 +8,5 @@ assert(app.includes("id=\"open-quote\""),'botón Cotizar en Registro');
 assert(app.includes('price-hour-rate'),'tarifa editable en Ajustes');
 assert(app.includes('pricingSummary(e)'),'precio guardado en registros');
 assert(css.includes('.quote-preview'),'estilos cotización');
-assert(sw.includes('p580'),'cache 5.8.0');
+assert(sw.includes('v100'),'cache 5.8.0');
 console.log('prototype580_pricing.test.js OK');

@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "5.8.0-prototype.8",
+  "version": "1.0.0",
   "private": true,
-  "description": "THOKAR Prototipo 5.8.0 · Precios, cotización y descuentos integrados sobre Hablar 5.7.1.",
+  "description": "THOKAR 1.0.0 · versión oficial con cotización, visuales automotrices, lanzamiento animado y Liquid Glass reforzado.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

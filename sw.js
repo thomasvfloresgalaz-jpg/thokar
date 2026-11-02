@@ -1,6 +1,6 @@
-/* THOKAR Prototipo 5.8.0 · network-first y activación manual */
-const CACHE='thokar-prototipo-5.8.0-pricing-quotes';
-const SHELL=['./','index.html','styles.css?v=p580','lib.js?v=p580','app.js?v=p580','manifest.webmanifest?v=p580','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
+/* THOKAR 1.0.0 oficial · network-first y activación manual */
+const CACHE='thokar-1.0.0-official-liquid-launch';
+const SHELL=['./','index.html','styles.css?v=v100','lib.js?v=v100','app.js?v=v100','manifest.webmanifest?v=v100','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','assets/car-side.png','assets/engine.png','assets/brakes.png','assets/suspension.png','assets/steering.png','assets/battery.png','assets/transmission.png','assets/cooling.png','assets/fuel.png','assets/scan.png','assets/oil.png','assets/codes.png','assets/checklist.png','assets/chat.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)))});
 self.addEventListener('message',event=>{if(event.data&&event.data.type==='SKIP_WAITING')self.skipWaiting()});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});

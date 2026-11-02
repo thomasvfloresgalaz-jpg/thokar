@@ -8,23 +8,24 @@
   <title>THOKAR · Ingeniería que mueve</title>
   <meta name="description" content="THOKAR: diagnóstico asistido, identidad vehicular y registro de servicio.">
   <meta name="robots" content="noindex, nofollow">
-  <link rel="manifest" href="manifest.webmanifest?v=p580">
+  <link rel="manifest" href="manifest.webmanifest?v=v100">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="THOKAR">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="styles.css?v=p580">
+  <link rel="stylesheet" href="styles.css?v=v100">
 </head>
 <body>
   <svg aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden"><defs><filter id="liquid-lens" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="1" seed="7" result="noise"/><feGaussianBlur in="noise" stdDeviation="1.2" result="softNoise"/><feDisplacementMap in="SourceGraphic" in2="softNoise" scale="5" xChannelSelector="R" yChannelSelector="G"/></filter></defs></svg>
+  <div id="launch-splash" class="launch-splash" aria-hidden="true"><div class="launch-orb"></div><div class="launch-logo"><img src="icon-192.png" alt=""><strong>THOKAR</strong><span>Ingeniería que mueve</span></div><div class="launch-sheen"></div></div>
   <main id="app" aria-live="polite"><section class="preboot"><div class="preboot-brand">THOKAR — Ingeniería que mueve</div><div class="preboot-status">Preparando tu taller…</div></section></main>
   <div id="overlay-root"></div>
   <div id="toast-root"></div>
   <div id="connection-root"></div>
   <div id="update-root"></div>
-  <script src="lib.js?v=p580"></script>
+  <script src="lib.js?v=v100"></script>
   <script>
 (function(){
   function recover(){
@@ -41,6 +42,9 @@
   setTimeout(function(){if(!window.THOKAR_APP_READY){var a=document.getElementById('app');if(a&&a.querySelector('.preboot'))a.querySelector('.preboot-status').textContent='Actualizando archivos locales…'}},1800);
 })();
   </script>
-  <script src="app.js?v=p580"></script>
+  <script src="app.js?v=v100"></script>
+<script>
+(function(){var splash=document.getElementById('launch-splash');if(!splash)return;requestAnimationFrame(function(){document.documentElement.classList.add('launching')});setTimeout(function(){splash.classList.add('is-opening');document.documentElement.classList.add('app-reveal')},700);setTimeout(function(){splash.remove();document.documentElement.classList.remove('launching');document.documentElement.classList.remove('app-reveal')},2050)})();
+</script>
 </body>
 </html>

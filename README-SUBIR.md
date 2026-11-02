@@ -1,4 +1,4 @@
-# THOKAR · Prototipo 5.8.0 · Hablar a pantalla completa
+# THOKAR · THOKAR 1.0.0 oficial · Hablar a pantalla completa
 
 Parte de 5.7.0 y conserva el contenido nuevo del chat. Al entrar a Hablar, la ficha del vehículo sale de escena y el área útil se reparte entre las pestañas superiores, conversación, compositor y navegación inferior.
 
@@ -15,5 +15,5 @@ Parte de 5.7.0 y conserva el contenido nuevo del chat. Al entrar a Hablar, la fi
 ## Despliegue
 Reemplaza los archivos del repositorio por los de este ZIP, haz commit/push y espera el deploy de Render. En THOKAR pulsa **Actualizar** cuando aparezca el aviso de versión.
 
-Build: `prototipo-5.8.0-talk-fullscreen`  
-Cache bust: `p580`
+Build: `thokar-1.0.0-official-liquid-launch`  
+Cache bust: `v100`
