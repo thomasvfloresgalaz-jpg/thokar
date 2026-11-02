@@ -444,3 +444,29 @@ body.workspace-talk-active .workspace-scroll{overscroll-behavior-y:none}
 /* La navegación vuelve a su tamaño original máximo; nunca usa 100vw + offsets. */
 body.nav-minimized .liquid-tabbar,.liquid-tabbar{left:50%!important;right:auto!important;width:min(calc(100% - 28px),520px)!important;max-width:520px!important;height:70px!important;transform:translateX(-50%)!important;box-sizing:border-box!important}
 .keyboard-open .liquid-tabbar{transform:translate(-50%,18px)!important}
+
+/* 5.6.2 — Hablar usa un marco de viewport independiente del documento.
+   La cuadrícula 5.6.1 se conserva: estado / mensajes / compositor. */
+.workspace-main.view-talk{
+  contain:layout style paint!important;
+  padding:0 10px 8px!important;
+  overflow:hidden!important;
+  border-radius:26px;
+}
+.workspace-main.view-talk .talk{
+  width:100%!important;height:100%!important;min-height:0!important;
+  display:grid!important;grid-template-rows:auto minmax(0,1fr) auto!important;
+  overflow:hidden!important;
+}
+.workspace-main.view-talk .talk-thread{
+  min-height:0!important;overflow-y:auto!important;overflow-x:hidden!important;
+  padding:8px 10px 14px!important;scroll-padding-bottom:14px!important;
+}
+.workspace-main.view-talk .composer-wrap{
+  position:relative!important;inset:auto!important;grid-row:3!important;
+  width:100%!important;margin:6px 0 0!important;flex:none!important;
+}
+/* El contenido de la página no puede quedar por encima del marco del chat. */
+body.workspace-talk-active .workspace-scroll{overflow-y:hidden!important;touch-action:none}
+body.workspace-talk-active .workspace-tabs{position:relative;z-index:58}
+body.workspace-talk-active .liquid-tabbar{z-index:70}

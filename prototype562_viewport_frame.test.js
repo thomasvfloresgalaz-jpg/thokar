@@ -1,0 +1,13 @@
+const fs=require('fs');
+const assert=require('assert');
+const app=fs.readFileSync('app.js','utf8');
+const css=fs.readFileSync('styles.css','utf8');
+assert(app.includes("prototipo-5.6.2-talk-viewport-frame"));
+assert(app.includes("main.style.setProperty('position','fixed','important')"));
+assert(app.includes("nr.top-10"));
+assert(app.includes("main.style.setProperty('height',available+'px','important')"));
+assert(app.includes("['height','max-height','min-height','position','top','bottom','left','right','width','z-index','margin']"));
+assert(css.includes('5.6.2 — Hablar usa un marco de viewport independiente del documento'));
+assert(css.includes('grid-template-rows:auto minmax(0,1fr) auto!important'));
+assert(css.includes('body.workspace-talk-active .workspace-scroll{overflow-y:hidden!important;touch-action:none}'));
+console.log('prototype562_viewport_frame: ok');
