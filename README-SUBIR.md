@@ -1,4 +1,4 @@
-# THOKAR · THOKAR 1.0.0 oficial · Hablar a pantalla completa
+# THOKAR · THOKAR 1.0 RC1 oficial · Hablar a pantalla completa
 
 Parte de 5.7.0 y conserva el contenido nuevo del chat. Al entrar a Hablar, la ficha del vehículo sale de escena y el área útil se reparte entre las pestañas superiores, conversación, compositor y navegación inferior.
 
