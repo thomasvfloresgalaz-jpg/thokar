@@ -411,3 +411,19 @@ body.nav-minimized .liquid-tabbar{width:min(calc(100% - 28px),520px);height:70px
 .keyboard-open .workspace-main.view-talk .attach-preview{bottom:82px!important}
 .keyboard-open .workspace-main.view-talk .jump-latest{bottom:86px!important}
 .workspace-main.view-talk .talk-thread{padding-bottom:var(--talk-composer-clearance,112px)!important;scroll-padding-bottom:var(--talk-composer-clearance,112px)!important}
+
+
+/* 5.6.0 — chat viewport is a hard frame between the view tabs and bottom nav. */
+.workspace-main.view-talk{min-height:0!important;overflow:hidden!important;padding-bottom:0!important}
+.workspace-main.view-talk .talk{height:100%!important;min-height:0!important;display:grid!important;grid-template-rows:auto minmax(0,1fr);position:relative;overflow:hidden!important}
+.workspace-main.view-talk .talk-thread{min-height:0!important;height:auto!important;overflow-y:auto!important;overflow-x:hidden!important;padding-bottom:var(--talk-composer-clearance,96px)!important;scroll-padding-bottom:var(--talk-composer-clearance,96px)!important}
+.workspace-main.view-talk .composer-wrap{position:absolute!important;left:8px!important;right:8px!important;bottom:8px!important;max-width:none!important;z-index:20!important}
+.workspace-main.view-talk .attach-preview{position:absolute!important;left:10px!important;right:10px!important;bottom:82px!important;z-index:19!important}
+.workspace-main.view-talk .jump-latest{position:absolute!important;right:16px!important;bottom:86px!important;z-index:19!important}
+.workspace-main.view-talk.talk-compact .chat-autosave{padding-top:7px;padding-bottom:5px}
+.workspace-main.view-talk.talk-tight .chat-autosave{position:absolute;left:0;right:0;top:0;z-index:3;padding:5px 12px;background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.workspace-main.view-talk.talk-tight .talk{grid-template-rows:minmax(0,1fr)}
+.workspace-main.view-talk.talk-tight .talk-thread{padding-top:28px}
+/* Bottom navigation never changes size or horizontal anchor while scrolling. */
+body.nav-minimized .liquid-tabbar,.liquid-tabbar{height:70px!important}
+@media(max-width:620px){body.nav-minimized .liquid-tabbar,.liquid-tabbar{left:18px!important;right:18px!important;width:auto!important;max-width:none!important;transform:none!important}}
