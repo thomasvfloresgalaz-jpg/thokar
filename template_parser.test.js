@@ -27,3 +27,33 @@ test('la plantilla tipo PatenteChile extrae motor, chasis y ficha técnica', () 
   assert.equal(v.procedencia,'CANADÁ');
   assert.equal(v.cilindrada,'2.0 L');
 });
+
+test('la plantilla móvil pegada en dos columnas extrae todos los datos importantes', () => {
+  const c=boot();
+  const raw=`Patente \tHTXW90-2
+Tipo \tAUTOMOVIL
+Marca \tMITSUBISHI
+Modelo \tLANCER 2.4
+Año \t2009
+Color \tROJO
+N°  Motor \t4B1200972
+N° Chasis \tJA3AU86WX9U603075
+Procedencia \tJAPAN
+Fabricante \tMITSUBISHI CAR
+Tipo de sello \tSELLO VERDE
+Combustible \tGASOLINA`;
+  const v=c.THOKAR_PARSE_VEHICLE_TEMPLATE(raw);
+  assert.equal(v.plate,'HTXW90');
+  assert.equal(v.tipo,'AUTOMOVIL');
+  assert.equal(v.marca,'MITSUBISHI');
+  assert.equal(v.modelo,'LANCER 2.4');
+  assert.equal(v.cilindrada,'2.4 L');
+  assert.equal(v.anio,'2009');
+  assert.equal(v.color,'ROJO');
+  assert.equal(v.motor,'4B1200972');
+  assert.equal(v.chasis,'JA3AU86WX9U603075');
+  assert.equal(v.procedencia,'JAPAN');
+  assert.equal(v.fabricante,'MITSUBISHI CAR');
+  assert.equal(v.tipoSello,'SELLO VERDE');
+  assert.equal(v.combustible,'GASOLINA');
+});

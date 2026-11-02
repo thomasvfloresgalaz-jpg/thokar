@@ -1,5 +1,5 @@
 /* THOKAR Prototipo 3 · network-first y activación manual */
-const CACHE='thokar-prototipo-5.2-chat-window';
+const CACHE='thokar-prototipo-5.3-mobile-template';
 const SHELL=['./','index.html','styles.css?v=p52','lib.js?v=p52','app.js?v=p52','manifest.webmanifest?v=p52','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)))});
 self.addEventListener('message',event=>{if(event.data&&event.data.type==='SKIP_WAITING')self.skipWaiting()});
