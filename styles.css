@@ -329,3 +329,12 @@ body.workspace-aligning .workspace-tabs{will-change:transform;}
 .keyboard-open .workspace-main.view-talk .composer-wrap{bottom:8px}
 .keyboard-open .workspace-main.view-talk .attach-preview{bottom:76px}
 .keyboard-open .workspace-main.view-talk .jump-latest{bottom:82px}
+
+
+/* Prototipo 5.5.5 · navegación sincronizada, chat estable y geometría aislada */
+.workspace-main.view-talk .composer-wrap{position:fixed;left:var(--talk-overlay-left,10px);right:var(--talk-overlay-right,10px);bottom:var(--talk-overlay-bottom,96px);z-index:78}
+.workspace-main.view-talk .attach-preview{position:fixed;left:var(--talk-overlay-left,12px);right:var(--talk-overlay-right,12px);bottom:calc(var(--talk-overlay-bottom,96px) + 70px);z-index:77}
+.workspace-main.view-talk .jump-latest{position:fixed;right:calc(var(--talk-overlay-right,10px) + 8px);bottom:calc(var(--talk-overlay-bottom,96px) + 74px);z-index:77}
+.keyboard-open .workspace-main.view-talk .composer-wrap{bottom:8px}
+.keyboard-open .workspace-main.view-talk .attach-preview{bottom:78px}
+.keyboard-open .workspace-main.view-talk .jump-latest{bottom:82px}

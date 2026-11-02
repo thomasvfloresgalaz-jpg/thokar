@@ -1,4 +1,4 @@
-# THOKAR · Prototipo 5.5.4 · Nav + Anchor Fix
+# THOKAR · Prototipo 5.5.5 · Nav + Anchor Fix
 
 Prototipo desplegable para GitHub -> Render -> PWA Android. Conserva vehículos, chats, Registro, fotos, respaldo, Gemini, Wake Lock y proveedores.
 
