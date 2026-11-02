@@ -427,3 +427,20 @@ body.nav-minimized .liquid-tabbar{width:min(calc(100% - 28px),520px);height:70px
 /* Bottom navigation never changes size or horizontal anchor while scrolling. */
 body.nav-minimized .liquid-tabbar,.liquid-tabbar{height:70px!important}
 @media(max-width:620px){body.nav-minimized .liquid-tabbar,.liquid-tabbar{left:18px!important;right:18px!important;width:auto!important;max-width:none!important;transform:none!important}}
+
+/* 5.6.1 — método nuevo: Hablar es una cuadrícula estable, no overlays calculados. */
+body.workspace-talk-active .workspace-scroll{overscroll-behavior-y:none}
+.workspace-main.view-talk{min-height:0!important;overflow:hidden!important;padding:0 10px 8px!important}
+.workspace-main.view-talk .talk{height:100%!important;min-height:0!important;display:grid!important;grid-template-rows:auto minmax(0,1fr) auto!important;overflow:hidden!important;position:relative}
+.workspace-main.view-talk .chat-autosave{grid-row:1;position:relative!important;inset:auto!important}
+.workspace-main.view-talk .talk-thread{grid-row:2;min-height:0!important;height:auto!important;overflow-y:auto!important;overflow-x:hidden!important;padding:8px 10px 14px!important;scroll-padding-bottom:14px!important}
+.workspace-main.view-talk .composer-wrap{grid-row:3;position:relative!important;inset:auto!important;left:auto!important;right:auto!important;bottom:auto!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;margin:6px 0 0!important;z-index:20!important}
+.workspace-main.view-talk .composer{width:100%!important;box-sizing:border-box!important}
+.workspace-main.view-talk .attach-preview{position:absolute!important;left:10px!important;right:10px!important;bottom:78px!important;z-index:21!important}
+.workspace-main.view-talk .jump-latest{position:absolute!important;right:16px!important;bottom:84px!important;z-index:21!important}
+.workspace-main.view-talk.talk-compact .chat-autosave,.workspace-main.view-talk.talk-tight .chat-autosave{position:relative!important;inset:auto!important;padding:8px 12px!important;background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.workspace-main.view-talk.talk-tight .talk{grid-template-rows:auto minmax(0,1fr) auto!important}
+.workspace-main.view-talk.talk-tight .talk-thread{padding-top:8px!important}
+/* La navegación vuelve a su tamaño original máximo; nunca usa 100vw + offsets. */
+body.nav-minimized .liquid-tabbar,.liquid-tabbar{left:50%!important;right:auto!important;width:min(calc(100% - 28px),520px)!important;max-width:520px!important;height:70px!important;transform:translateX(-50%)!important;box-sizing:border-box!important}
+.keyboard-open .liquid-tabbar{transform:translate(-50%,18px)!important}
