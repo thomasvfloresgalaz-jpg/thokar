@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "6.2.4-prototype.4.1",
+  "version": "5.0.0-prototype.5",
   "private": true,
-  "description": "THOKAR Prototipo 4.1 · interfaz soft glass, bugfix visual y pegado de datos faltantes.",
+  "description": "THOKAR Prototipo 5 · Liquid Motion, actualización corregida y datos vehiculares preservados.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

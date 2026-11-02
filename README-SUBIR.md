@@ -1,37 +1,53 @@
-# THOKAR · Prototipo 3
+# THOKAR · Prototipo 5 · Liquid Motion
 
-Prototipo 4.1 de THOKAR basado en la rama estable 6.2.3. Mantiene el flujo GitHub -> Render -> PWA Android y todos los datos locales existentes. Añade una interfaz más suave tipo glass, mejora del banner de actualización y pegado de ficha externa para completar VIN / motor / procedencia.
+Prototipo desplegable de THOKAR para GitHub -> Render -> PWA Android. Conserva las claves `thokar.*`, chats, registros, vehículos, fotos, respaldo, Gemini, Wake Lock y proveedores de datos.
 
-## Qué cambia
+## Build y caché
 
-- Interfaz completamente rediseñada: cálida, suave y táctil, con tema Noche/Día/Automático.
-- Build: `prototipo-3-warm-identity`.
-- Service Worker: `thokar-prototipo-3-warm-identity`.
-- La búsqueda vehicular consulta primero fuentes gratuitas/complementarias y deja Boostr como respaldo o complemento manual.
-- AutoRiesgo agent lookup se usa únicamente para `vehicle_data`; THOKAR no conserva ni muestra datos de propietario.
-- PRT/reSTART y SII complementan marca/modelo/año y datos inequívocos; nunca se elige una motorización ambigua.
-- VIN y número de motor quedan destacados en Datos.
-- Si falta VIN/motor puedes:
-  1. leerlos desde una foto del padrón/PRT/grabado y confirmarlos antes de guardar;
-  2. usar “Completar con Boostr” manualmente (consume una consulta de tu plan).
-- Gemini no debe inferir VIN, número de motor ni cilindrada exacta ausente.
+- Build frontend/backend: `prototipo-5-liquid-motion`
+- Service Worker: `thokar-prototipo-5-liquid-motion`
+- package: `5.0.0-prototype.5`
 
-## Importante sobre PRT
+Frontend, backend y Service Worker usan el mismo identificador para evitar el bucle de “Hay una versión nueva disponible”.
 
-Los registros oficiales SGPRT contemplan número de motor, número de chasis y VIN cuando existe. Sin embargo, este prototipo todavía NO descarga ni indexa automáticamente los archivos crudos mensuales de PRT: la fuente PRT integrada es reSTART. El índice crudo oficial se deja para un prototipo posterior cuando podamos validar de forma robusta su formato y coste de procesamiento en Render.
+## Cambios principales
 
-## Variables de Render
+- Rediseño Liquid Motion inspirado en patrones de vidrio flotante, adaptado a Android.
+- El vidrio se usa solo en controles flotantes: navegación inferior, selector Hablar/Registro/Datos, compositor, avisos y hojas.
+- Tarjetas, tablas, Registro y Datos son superficies opacas.
+- Barra inferior: Inicio / Consultar / Libreta; se contrae al bajar y reaparece al subir.
+- Hoja de búsqueda arrastrable con tres puntos de anclaje y física de resorte.
+- Selector Hablar / Registro / Datos con pulgar móvil y resorte.
+- Efectos de vidrio: Completo / Reducido / Apagado. La app detecta Nivel 1/2/3 y puede degradar el efecto si el dispositivo va lento.
+- Botones con respuesta elástica al toque.
+- Diseño Día/Noche conservado.
+- Plantilla pegable para completar patente, tipo, marca, modelo, año, color, N.º motor, chasis/VIN, procedencia, fabricante, sello y combustible.
+- VIN / número de motor confirmados manualmente siguen teniendo prioridad para IA y repuestos.
+
+## Fuentes vehiculares
+
+La consulta mantiene:
+
+1. AutoRiesgo gratuito cuando entrega ficha técnica.
+2. PRT/reSTART.
+3. Cruce SII conservador.
+4. Boostr como fallback/complemento manual.
+5. Foto o plantilla pegada como confirmación manual.
+
+THOKAR no inventa VIN, número de motor ni cilindrada exacta.
+
+## Variables Render
 
 Obligatorias:
 
-- `APP_TOKEN` — 32+ caracteres, debe coincidir con Ajustes.
+- `APP_TOKEN` — 32+ caracteres.
 - `GEMINI_API_KEY`
 - `GEMINI_MODEL`
 
-Opcionales / proveedores:
+Opcionales:
 
-- `RESTART_API_KEY` — opcional; reSTART puede funcionar sin key con límites menores.
-- `BOOSTR_API_KEY` — respaldo/complemento manual.
+- `RESTART_API_KEY`
+- `BOOSTR_API_KEY`
 - `AUTORIESGO_TIMEOUT_MS=12000`
 - `RESTART_TIMEOUT_MS=12000`
 - `BOOSTR_TIMEOUT_MS=12000`
@@ -39,15 +55,16 @@ Opcionales / proveedores:
 - `AI_REQUESTS_PER_MINUTE=30`
 - `PLATE_CACHE_MS=21600000`
 
-No pongas ninguna clave en `app.js`, GitHub o el navegador.
+Nunca pongas claves en GitHub ni en el frontend.
 
 ## Despliegue
 
 1. Descomprime el ZIP.
-2. Sube **el contenido** de la carpeta a la raíz del repositorio de GitHub.
-3. En Render: **Manual Deploy -> Clear build cache & deploy**.
-4. Comprueba `/healthz`.
-5. Debe aparecer: `"build":"prototipo-3-warm-identity"`.
-6. Abre primero desde Chrome Android. Cuando confirme la nueva interfaz, abre/instala la PWA.
+2. Sube **el contenido de la carpeta** a la raíz de GitHub.
+3. Render -> **Manual Deploy -> Clear build cache & deploy**.
+4. Abre `/healthz`.
+5. Debe mostrar: `"build":"prototipo-5-liquid-motion"`.
+6. Abre la URL desde Chrome Android y prueba Inicio, búsqueda, Hablar, Registro, Datos y Ajustes.
+7. En Ajustes > Efectos de vidrio podrás ver el nivel activo detectado en tu teléfono.
 
-Los datos de versiones anteriores conservan las mismas claves de almacenamiento (`thokar.*`), por lo que no se hace una migración destructiva.
+Los datos anteriores se mantienen porque no se cambian las claves de almacenamiento.
