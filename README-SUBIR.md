@@ -1,4 +1,4 @@
-# THOKAR · Prototipo 5.5 · Chat Window Fix
+# THOKAR · Prototipo 5.5.2 · Aligned Tabs
 
 Prototipo desplegable para GitHub -> Render -> PWA Android. Conserva vehículos, chats, Registro, fotos, respaldo, Gemini, Wake Lock y proveedores.
 

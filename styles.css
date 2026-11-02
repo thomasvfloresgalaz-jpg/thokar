@@ -262,3 +262,34 @@ html[data-glass-level="3"] .liquid-tabbar,html[data-glass-level="3"] .liquid-seg
   .meter-head{display:grid;grid-template-columns:1fr auto}
 }
 @media(prefers-reduced-motion:reduce){.lookup-shell,.liquid-workspace,.lookup-skeleton i{animation:none!important}.overlay{transition:opacity .1s linear}.nav-item{transition:none!important}}
+
+/* --- Prototipo 5.5.1 · Android bottom safe-area hotfix --- */
+:root{--android-browser-nav-lift:0px}
+@media (max-width:900px) and (pointer:coarse){
+  :root{--android-browser-nav-lift:56px}
+}
+@media (display-mode:standalone){
+  :root{--android-browser-nav-lift:0px}
+}
+@media (display-mode:fullscreen){
+  :root{--android-browser-nav-lift:0px}
+}
+.liquid-tabbar{
+  bottom:calc(14px + env(safe-area-inset-bottom) + var(--android-browser-nav-lift));
+}
+.screen{
+  padding-bottom:calc(124px + env(safe-area-inset-bottom) + var(--android-browser-nav-lift));
+}
+.workspace-scroll{
+  padding-bottom:calc(120px + env(safe-area-inset-bottom) + var(--android-browser-nav-lift));
+}
+.toast{
+  bottom:calc(94px + env(safe-area-inset-bottom) + var(--android-browser-nav-lift));
+}
+.keyboard-open .liquid-tabbar{bottom:calc(10px + env(safe-area-inset-bottom))}
+
+/* Prototipo 5.5.2 · alineación uniforme Hablar / Registro / Datos */
+.workspace-scroll,.workspace-main{overflow-anchor:none!important}
+.workspace-tabs{scroll-margin-top:8px}
+body.workspace-aligning .workspace-main{pointer-events:none}
+@media (prefers-reduced-motion:reduce){body.workspace-aligning .workspace-main{opacity:.995}}
