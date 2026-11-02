@@ -8,5 +8,5 @@ assert(app.includes("id=\"open-quote\""),'botón Cotizar en Registro');
 assert(app.includes('price-hour-rate'),'tarifa editable en Ajustes');
 assert(app.includes('pricingSummary(e)'),'precio guardado en registros');
 assert(css.includes('.quote-preview'),'estilos cotización');
-assert(sw.includes('thokar-ios26-prototype-1'),'cache versionado');
+assert(sw.includes('thokar-ios-rethink-3'),'cache versionado');
 console.log('prototype580_pricing.test.js OK');

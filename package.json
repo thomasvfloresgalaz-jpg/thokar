@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "0.9.0-ios26-prototype",
+  "version": "0.9.0-ios-rethink-3",
   "private": true,
-  "description": "THOKAR iOS 26 visual prototype — complete interface experiment preserving THOKAR data and backend logic.",
+  "description": "THOKAR iOS rethink prototype 3 — four-command dock and iOS typography.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

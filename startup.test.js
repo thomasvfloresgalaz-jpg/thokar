@@ -20,6 +20,6 @@ test('la interfaz inicia con vehículos guardados y renderiza Inicio', () => {
   vm.createContext(c);
   vm.runInContext(fs.readFileSync('./app.js','utf8'), c, {filename:'app.js'});
   assert.equal(c.THOKAR_APP_READY, true);
-  assert.match(app.innerHTML, /¿Qué vehículo vemos hoy\?/);
+  assert.match(app.innerHTML, /Taller/);
   assert.match(app.innerHTML, /GZGJ74/);
 });

@@ -1,6 +1,6 @@
 /* THOKAR iOS 26 Prototype · network-first y activación manual */
-const CACHE='thokar-ios26-prototype-1';
-const SHELL=['./','index.html','styles.css?v=p901','lib.js?v=p901','app.js?v=p901','manifest.webmanifest?v=p901','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','assets/car-side.png','assets/engine.png','assets/brakes.png','assets/suspension.png','assets/steering.png','assets/battery.png','assets/transmission.png','assets/cooling.png','assets/fuel.png','assets/scan.png','assets/oil.png','assets/codes.png','assets/checklist.png','assets/chat.png'];
+const CACHE='thokar-ios-rethink-3';
+const SHELL=['./','index.html','styles.css?v=p902','lib.js?v=p902','app.js?v=p902','manifest.webmanifest?v=p902','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','assets/car-side.png','assets/engine.png','assets/brakes.png','assets/suspension.png','assets/steering.png','assets/battery.png','assets/transmission.png','assets/cooling.png','assets/fuel.png','assets/scan.png','assets/oil.png','assets/codes.png','assets/checklist.png','assets/chat.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)))});
 self.addEventListener('message',event=>{if(event.data&&event.data.type==='SKIP_WAITING')self.skipWaiting()});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
