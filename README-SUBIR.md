@@ -1,11 +1,11 @@
-# THOKAR · Prototipo 5.3 · Chat Window Fix
+# THOKAR · Prototipo 5.4 · Chat Window Fix
 
 Prototipo desplegable para GitHub -> Render -> PWA Android. Conserva vehículos, chats, Registro, fotos, respaldo, Gemini, Wake Lock y proveedores.
 
 ## Build y caché
 
-- Build frontend/backend: `prototipo-5.3-mobile-template`
-- Service Worker: `thokar-prototipo-5.3-mobile-template`
+- Build frontend/backend: `prototipo-5.4-template-km`
+- Service Worker: `thokar-prototipo-5.4-template-km`
 - package: `5.2.0-prototype.5`
 
 ## Correcciones de esta versión
@@ -27,7 +27,15 @@ Mantén las mismas variables que en Prototipo 5: `APP_TOKEN`, `GEMINI_API_KEY`, 
 
 1. Sube el contenido de esta carpeta a la raíz de GitHub.
 2. Render -> Manual Deploy -> Clear build cache & deploy.
-3. `/healthz` debe mostrar `"build":"prototipo-5.3-mobile-template"`.
+3. `/healthz` debe mostrar `"build":"prototipo-5.4-template-km"`.
 4. En Android prueba: cambiar pestañas, abrir Hablar con un chat largo, Buscar patente con teclado abierto y una consulta guiada desde los cuadros de sistemas.
 
 Los datos anteriores se conservan porque las claves de almacenamiento no cambian.
+
+
+Cambios 5.4:
+- La plantilla manual sincroniza motor/VIN con la ficha activa.
+- Kilometraje actual editable desde Datos y guardado por patente.
+- Consultar en la barra inferior abre siempre la búsqueda de patente.
+- Se elimina la búsqueda duplicada del Inicio.
+- Se corrige el bloque visual de Identificación disponible.

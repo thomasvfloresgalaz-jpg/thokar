@@ -120,3 +120,16 @@ body.nav-minimized .liquid-tabbar{width:214px;height:58px}.liquid-tabbar .nav-it
   .talk-thread{padding-left:10px;padding-right:10px}
   .sheet-search{grid-template-columns:1fr}.sheet-search .btn{width:100%}
 }
+
+/* --- Prototipo 5.4 adjustments --- */
+.identity-ok{align-items:flex-start;gap:12px;padding:16px 18px}
+.identity-ok>span{flex:0 0 auto;font-size:24px;line-height:1;color:var(--success);margin-top:1px}
+.identity-ok>div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.identity-ok strong{display:block;font-size:17px;line-height:1.25;color:var(--text)}
+.identity-ok small{display:block;font-size:13px;line-height:1.45;color:var(--muted);margin:0}
+.mileage-editor{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end}
+.mileage-editor .field{margin:0}
+.mileage-input-wrap{display:flex;align-items:center;gap:10px;background:var(--field);border:1px solid var(--line);border-radius:18px;padding-right:16px;overflow:hidden}
+.mileage-input-wrap input{border:0;background:transparent;border-radius:0;min-width:0;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.mileage-input-wrap span{font-size:14px;color:var(--muted);font-weight:700}
+@media(max-width:720px){.mileage-editor{grid-template-columns:1fr}.mileage-editor .btn{width:100%}}
