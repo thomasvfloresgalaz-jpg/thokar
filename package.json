@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "6.2.3-prototype.2",
+  "version": "6.2.3-prototype.3",
   "private": true,
-  "description": "THOKAR Prototipo 2 · rediseño móvil integrado + fuentes vehiculares experimentales + Gemini.",
+  "description": "THOKAR Prototipo 3 · interfaz cálida, identidad vehicular multifuente y Gemini.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

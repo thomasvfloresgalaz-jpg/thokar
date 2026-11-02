@@ -1,14 +1,14 @@
 {
-  "name": "THOKAR Taller · Prototipo 2",
+  "name": "THOKAR · Ingeniería que mueve",
   "short_name": "THOKAR",
-  "description": "Diagnóstico, datos y registro de servicio por vehículo.",
+  "description": "Diagnóstico asistido, identidad vehicular y registro de servicio para taller.",
   "lang": "es-CL",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0B0C0F",
-  "theme_color": "#0B0C0F",
+  "background_color": "#0F0D0E",
+  "theme_color": "#0F0D0E",
   "icons": [
     {
       "src": "icon-192.png",

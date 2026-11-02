@@ -115,7 +115,7 @@ async function lookupVehicle(plate) {
       method: 'GET',
       headers: {
         accept: 'application/json',
-        'user-agent': 'THOKAR-Taller/4.1'
+        'user-agent': 'THOKAR-Taller/Prototipo-3'
       },
       signal: controller.signal
     });

@@ -120,7 +120,7 @@ async function restartFetch(pathname, query) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const headers = { accept: 'application/json', 'user-agent': 'THOKAR-Taller/Prototipo-1' };
+    const headers = { accept: 'application/json', 'user-agent': 'THOKAR-Taller/Prototipo-3' };
     if (apiKey) headers['x-api-key'] = apiKey;
     const response = await fetch(url, { method: 'GET', headers, signal: controller.signal });
     const payload = await response.json().catch(() => ({}));

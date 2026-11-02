@@ -1,74 +1,46 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { mergeVehicle } = require('./vehicleProvider');
 
-function response(status, payload, headers = {}) {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    headers: { get(name) { return headers[String(name).toLowerCase()] || ''; } },
-    async json() { return payload; }
-  };
-}
-
-test('usa PRT/reSTART como fuente principal y no toca Boostr si PRT encuentra el vehículo', async () => {
-  const oldFetch = global.fetch;
-  const oldKey = process.env.BOOSTR_API_KEY;
-  process.env.BOOSTR_API_KEY = 'test-key';
-  const urls = [];
-  global.fetch = async (url) => {
-    const u = String(url); urls.push(u);
-    if (u.includes('/vehiculos-revisiones/')) return response(200, { data: [{ attributes: { ppu:'GZGJ74', marca:'GREAT WALL', modelo:'HOVER', anio:'2015', fecha_revision:'2026-04-01' } }] });
-    if (u.includes('/vehiculos-tasacion')) return response(200, { data: [] });
-    if (u.includes('api.boostr.cl')) throw new Error('Boostr no debería llamarse');
-    throw new Error('URL inesperada '+u);
-  };
-  delete require.cache[require.resolve('./vehicleProvider')];
-  const { lookupVehicleMulti } = require('./vehicleProvider');
-  const out = await lookupVehicleMulti('GZGJ74');
-  assert.equal(out.vehicle.marca, 'GREAT WALL');
-  assert.match(out.source, /PRT\/reSTART/);
-  assert.equal(urls.some((u) => u.includes('api.boostr.cl')), false);
-  global.fetch = oldFetch;
-  if (oldKey === undefined) delete process.env.BOOSTR_API_KEY; else process.env.BOOSTR_API_KEY = oldKey;
+test('merge conserva identificadores ya obtenidos y completa vacíos', () => {
+  const got = mergeVehicle(
+    { plate: 'ABCD12', chasis: 'VIN-A', motor: '' },
+    { chasis: 'VIN-B', motor: 'MOTOR-1', marca: 'TOYOTA' }
+  );
+  assert.equal(got.chasis, 'VIN-A');
+  assert.equal(got.motor, 'MOTOR-1');
+  assert.equal(got.marca, 'TOYOTA');
 });
 
-test('usa Boostr sólo como fallback cuando PRT no encuentra la patente', async () => {
-  const oldFetch = global.fetch;
-  const oldKey = process.env.BOOSTR_API_KEY;
-  process.env.BOOSTR_API_KEY = 'test-key';
-  const urls = [];
-  global.fetch = async (url) => {
-    const u = String(url); urls.push(u);
-    if (u.includes('/vehiculos-revisiones/')) return response(404, { error:'not found' });
-    if (u.includes('api.boostr.cl')) return response(200, { status:'success', data:{ plate:'BCYT91', make:'TOYOTA', model:'YARIS', year:'2009', engine:'1NZ123456' } });
-    throw new Error('URL inesperada '+u);
-  };
-  delete require.cache[require.resolve('./vehicleProvider')];
-  const { lookupVehicleMulti } = require('./vehicleProvider');
-  const out = await lookupVehicleMulti('BCYT91');
-  assert.equal(out.vehicle.marca, 'TOYOTA');
-  assert.equal(out.source, 'Boostr fallback');
-  assert.equal(urls.some((u) => u.includes('api.boostr.cl')), true);
-  global.fetch = oldFetch;
-  if (oldKey === undefined) delete process.env.BOOSTR_API_KEY; else process.env.BOOSTR_API_KEY = oldKey;
+test('merge conserva arrays útiles de fuentes', () => {
+  const got = mergeVehicle({ plate: 'ABCD12' }, { siiCoincidencias: [{version:'2.0'}] });
+  assert.equal(got.siiCoincidencias.length, 1);
 });
 
-test('no gasta Boostr cuando reSTART sólo está rate-limited', async () => {
+test('si una fuente gratuita entrega una ficha útil no consume Boostr', async () => {
   const oldFetch = global.fetch;
   const oldKey = process.env.BOOSTR_API_KEY;
-  process.env.BOOSTR_API_KEY = 'test-key';
-  const urls = [];
+  process.env.BOOSTR_API_KEY = 'dummy-key';
+  const calls = [];
   global.fetch = async (url) => {
-    const u = String(url); urls.push(u);
-    if (u.includes('/vehiculos-revisiones/')) return response(429, { error:'rate' }, { 'retry-after':'8' });
-    if (u.includes('api.boostr.cl')) throw new Error('No debe gastar Boostr ante rate limit temporal');
-    throw new Error('URL inesperada '+u);
+    const u = String(url); calls.push(u);
+    if (u.includes('autoriesgo.cl')) return {
+      ok:true,status:200,headers:{get(){return null}},
+      json:async()=>({patente:'GZGJ74',vehicle_data:{plate:'GZGJ74',make:'GREAT WALL',model:'HOVER',year:2015,vin:'VIN123456789'}})
+    };
+    if (u.includes('vehiculos-revisiones')) return {ok:false,status:404,headers:{get(){return null}},json:async()=>({})};
+    if (u.includes('api.boostr')) throw new Error('Boostr no debía llamarse');
+    return {ok:false,status:404,headers:{get(){return null}},json:async()=>({})};
   };
-  delete require.cache[require.resolve('./vehicleProvider')];
-  const { lookupVehicleMulti } = require('./vehicleProvider');
-  await assert.rejects(() => lookupVehicleMulti('GZGJ74'), (e) => e && e.code === 'RESTART_RATE_LIMIT');
-  assert.equal(urls.some((u) => u.includes('api.boostr.cl')), false);
-  global.fetch = oldFetch;
-  if (oldKey === undefined) delete process.env.BOOSTR_API_KEY; else process.env.BOOSTR_API_KEY = oldKey;
+  try {
+    const { lookupVehicleMulti } = require('./vehicleProvider');
+    const got = await lookupVehicleMulti('GZGJ74');
+    assert.equal(got.vehicle.chasis, 'VIN123456789');
+    assert.equal(got.vehicle.marca, 'GREAT WALL');
+    assert.equal(calls.some((u)=>u.includes('api.boostr')), false);
+  } finally {
+    global.fetch = oldFetch;
+    if (oldKey === undefined) delete process.env.BOOSTR_API_KEY; else process.env.BOOSTR_API_KEY = oldKey;
+  }
 });

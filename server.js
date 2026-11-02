@@ -1,7 +1,7 @@
 const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
-const { lookupVehicleMulti, cleanPlate, isBoostrConfigured } = require('./vehicleProvider');
+const { lookupVehicleMulti, lookupBoostrSupplement, cleanPlate, isBoostrConfigured } = require('./vehicleProvider');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -84,11 +84,11 @@ const aiRateLimit = makeRateLimit({ windowMs: 60_000, limit: Math.max(2, Math.mi
 
 const plateCache = new Map();
 const PLATE_CACHE_MS = Math.max(60_000, Math.min(24 * 60 * 60 * 1000, Number(process.env.PLATE_CACHE_MS || 6 * 60 * 60 * 1000)));
-function getCachedVehicle(plate) {
+function getCachedLookup(plate) {
   const hit = plateCache.get(plate);
   if (!hit) return null;
   if (Date.now() - hit.at > PLATE_CACHE_MS) { plateCache.delete(plate); return null; }
-  return hit.result;
+  return hit.result || null;
 }
 
 function geminiConfig() {
@@ -151,7 +151,7 @@ async function googleGeminiFetch(mode, input, signal, modelOverride) {
   const suffix = mode === 'stream' ? ':streamGenerateContent?alt=sse' : ':generateContent';
   const response = await fetch(`${GEMINI_BASE}/models/${encodeURIComponent(selectedModel)}${suffix}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-Taller/Prototipo-1' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-Taller/Prototipo-3' },
     body: JSON.stringify(body), signal
   });
   if (!response.ok) {
@@ -207,16 +207,17 @@ app.get('/healthz', (req, res) => {
   res.json({
     ok: true,
     app: 'THOKAR Taller',
-    vehicleLookup: 'restart-prt+sii->boostr-fallback',
+    vehicleLookup: 'autoriesgo+prt+sii -> boostr fallback/manual',
     configured: true,
+    autoRiesgoConfigured: true,
     restartConfigured: true,
     restartKeyConfigured: Boolean(String(process.env.RESTART_API_KEY || '').trim()),
     boostrConfigured: isBoostrConfigured(),
     geminiConfigured: Boolean(geminiConfig().apiKey),
     model: geminiConfig().model,
-    layout: 'flat',
+    layout: 'warm-mobile',
     protected: tokenReady,
-    build: 'prototipo-2-product-redesign'
+    build: 'prototipo-3-warm-identity'
   });
 });
 
@@ -228,17 +229,30 @@ app.get('/api/vehiculo/:patente', plateRateLimit, async (req, res) => {
   if (!/^[A-Z0-9]{5,6}$/.test(plate)) {
     return res.status(400).json({ ok: false, error: { code: 'INVALID_PLATE', message: 'Patente inválida.' } });
   }
-  const cached = getCachedVehicle(plate);
-  if (cached) return res.json({ ok: true, source: cached.source + ' · caché THOKAR', cached: true, providers: cached.providers, vehicle: cached.vehicle });
+  const cached = getCachedLookup(plate);
+  if (cached) return res.json({ ok: true, source: cached.source + ' · caché THOKAR', providers: cached.providers, cached: true, vehicle: cached.vehicle });
   try {
     const result = await lookupVehicleMulti(plate);
     plateCache.set(plate, { at: Date.now(), result });
-    return res.json({ ok: true, source: result.source, cached: false, providers: result.providers, vehicle: result.vehicle });
+    return res.json({ ok: true, source: result.source, providers: result.providers, cached: false, vehicle: result.vehicle });
   } catch (error) {
     const status = Number(error.status || 502);
     const retryAfter = Number(error.retryAfter || 0);
     if (status === 429 && retryAfter > 0) res.setHeader('Retry-After', String(Math.ceil(retryAfter)));
-    return res.status(status).json({ ok: false, retryAfter, error: { code: error.code || 'LOOKUP_FAILED', retryAfter, message: error.message || 'No fue posible consultar la patente.' } });
+    return res.status(status).json({ ok: false, retryAfter: retryAfter || undefined, error: { code: error.code || 'LOOKUP_FAILED', retryAfter: retryAfter || undefined, message: error.message || 'No fue posible consultar la patente.' } });
+  }
+});
+
+app.get('/api/vehiculo/:patente/boostr', plateRateLimit, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const plate = cleanPlate(req.params.patente);
+  if (!/^[A-Z0-9]{5,6}$/.test(plate)) return res.status(400).json({ ok: false, error: { code: 'INVALID_PLATE', message: 'Patente inválida.' } });
+  try {
+    const result = await lookupBoostrSupplement(plate);
+    return res.json({ ok: true, source: result.source, providers: result.providers, vehicle: result.vehicle });
+  } catch (error) {
+    const status = Number(error.status || 502);
+    return res.status(status).json({ ok: false, error: { code: error.code || 'BOOSTR_FAILED', message: error.message || 'No fue posible consultar Boostr.' } });
   }
 });
 
