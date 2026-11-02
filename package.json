@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "6.2.3-prototype.1",
+  "version": "6.2.3-prototype.2",
   "private": true,
-  "description": "THOKAR Prototipo 1 · PRT/reSTART + SII como fuentes principales, Boostr fallback, Gemini.",
+  "description": "THOKAR Prototipo 2 · rediseño móvil integrado + fuentes vehiculares experimentales + Gemini.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

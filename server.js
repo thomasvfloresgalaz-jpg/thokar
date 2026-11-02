@@ -216,7 +216,7 @@ app.get('/healthz', (req, res) => {
     model: geminiConfig().model,
     layout: 'flat',
     protected: tokenReady,
-    build: 'prototipo-1-vehicle-sources'
+    build: 'prototipo-2-product-redesign'
   });
 });
 
