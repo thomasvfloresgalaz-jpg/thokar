@@ -159,3 +159,82 @@ html[data-theme="dia"]{--shadow-1:0 1px 0 rgba(255,255,255,.96) inset,0 10px 24p
   .system-stage-head{display:block}.system-stage-head span{display:block;text-align:left;margin-top:4px}
   .stage-engine{left:8%;top:19%}.stage-brakes{left:4%;bottom:10%}.stage-suspension{right:4%;top:18%}.stage-steering{left:28%;top:9%}.stage-electric{right:20%;top:4%}.stage-transmission{left:38%;bottom:6%}.stage-cooling{left:18%;bottom:14%}.stage-fuel{right:14%;bottom:12%}
 }
+
+/* --- Prototipo 4.1 · Soft Liquid Glass refresh --- */
+:root{
+  --glass:rgba(41,35,37,.52);
+  --glass-line:rgba(255,255,255,.14);
+  --shadow-1:0 1px 0 rgba(255,255,255,.09) inset,0 12px 26px rgba(28,12,15,.14),0 28px 72px rgba(28,12,15,.12);
+  --shadow-2:0 1px 0 rgba(255,255,255,.12) inset,0 18px 36px rgba(28,12,15,.18),0 34px 96px rgba(28,12,15,.16);
+  --r-card:28px;--r-inner:18px;--r-control:18px;--r-sheet:34px;
+}
+html[data-theme="dia"]{
+  --glass:rgba(255,250,247,.66);
+  --glass-line:rgba(66,44,48,.12);
+  --shadow-1:0 1px 0 rgba(255,255,255,.92) inset,0 10px 22px rgba(67,37,41,.08),0 24px 60px rgba(67,37,41,.07);
+  --shadow-2:0 1px 0 rgba(255,255,255,.98) inset,0 14px 28px rgba(67,37,41,.11),0 30px 74px rgba(67,37,41,.09);
+}
+body::before{content:"";position:fixed;pointer-events:none;left:50%;top:-8vh;transform:translateX(-50%);width:min(96vw,860px);height:42vh;background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 68%);opacity:.9;filter:blur(26px);z-index:0}
+#app,.screen,.workspace{position:relative;z-index:1}
+.floating-control,.back-btn,.icon-btn,.search-dock,.composer,.workspace-tabs,.update-banner,.connection-pill,.toast{
+  backdrop-filter:blur(22px) saturate(1.25);
+  -webkit-backdrop-filter:blur(22px) saturate(1.25);
+}
+.floating-control,.back-btn,.icon-btn{
+  background:color-mix(in srgb,var(--surface) 74%,transparent);
+  border-color:color-mix(in srgb,var(--text) 10%,transparent);
+}
+.btn{font-weight:700;letter-spacing:-.01em}
+.btn.primary{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 92%,#ff6a70),var(--accent-2));box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 12px 24px color-mix(in srgb,var(--accent) 22%,transparent)}
+.btn.secondary{background:color-mix(in srgb,var(--surface-2) 88%,transparent)}
+.case-card,.vehicle-hero,.data-section,.card,.timeline-item,.car-panel,.home-empty,.system-stage,.km-box,.identity-glance,.found-card,.service-item,.service-meter,.ai-step{
+  border:1px solid color-mix(in srgb,var(--text) 7%,transparent);
+  border-top-color:rgba(255,255,255,.12);
+}
+.case-card,.vehicle-hero,.data-section,.card,.timeline-item,.car-panel,.home-empty,.system-stage{
+  background:color-mix(in srgb,var(--surface) 88%,transparent);
+}
+.vehicle-hero{padding:24px 24px 18px;border-radius:30px}
+.vehicle-hero::after{content:"";position:absolute;inset:auto -8% -22% -8%;height:48%;background:radial-gradient(circle at 50% 20%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 72%);pointer-events:none}
+.active-plate,.plate-chip,.hero-spec span,.status-led,.source-pill,.ai-action,.quick-card,.filter-chip,.service-state{
+  backdrop-filter:blur(18px) saturate(1.2);
+  -webkit-backdrop-filter:blur(18px) saturate(1.2);
+}
+.active-plate,.plate-chip{border-radius:20px;padding:10px 15px;background:color-mix(in srgb,var(--accent) 11%,var(--surface-2));box-shadow:0 1px 0 rgba(255,255,255,.12) inset}
+.hero-title{font-size:30px;font-weight:760;letter-spacing:-.05em;margin-bottom:10px}
+.hero-spec{gap:10px}.hero-spec span{background:color-mix(in srgb,var(--surface-2) 85%,transparent);padding:8px 12px}
+.workspace-tabs,.search-dock,.composer,.update-banner,.connection-pill,.toast{
+  background:color-mix(in srgb,var(--glass) 100%,transparent);
+  border:1px solid var(--glass-line);
+  box-shadow:var(--shadow-2);
+}
+.workspace-tabs{padding:6px;margin:0 12px 12px;gap:6px}
+.view-tab{min-height:54px;border-radius:999px;background:transparent;border:0;font-weight:700}
+.view-tab[aria-selected="true"]{background:color-mix(in srgb,var(--surface) 60%,transparent);box-shadow:0 1px 0 rgba(255,255,255,.14) inset,0 10px 22px rgba(0,0,0,.08)}
+.view-tab[aria-selected="true"] svg{color:var(--accent)}
+.update-banner,.connection-pill{top:calc(14px + env(safe-area-inset-top));min-height:60px;padding:10px 12px 10px 16px;gap:12px}
+.update-copy{display:flex;flex-direction:column;gap:2px;min-width:0}.update-copy strong{font-size:11px;letter-spacing:.08em;color:var(--accent)}.update-copy span{font-size:14px;line-height:1.35}
+.update-cta{min-height:42px;padding:0 18px;flex:0 0 auto}
+.toast{min-height:58px;padding:12px 16px;border-radius:24px;line-height:1.4}
+.search-dock{padding:9px 10px;border-radius:30px}
+.composer{padding:7px;border-radius:30px}
+.composer .icon-btn{background:color-mix(in srgb,var(--surface) 72%,transparent);border:1px solid color-mix(in srgb,var(--text) 9%,transparent)}
+.composer .send{border-color:transparent}
+.data-priority-grid{gap:12px}
+.found-card{min-height:100px;padding:16px 15px 14px;border-radius:24px;background:color-mix(in srgb,var(--surface-2) 92%,transparent)}
+.found-card strong{font-size:15px}
+.identity-recovery,.identity-ok{border:1px solid color-mix(in srgb,var(--text) 7%,transparent)}
+.field textarea#identity-template{min-height:168px;border-radius:22px;line-height:1.5;padding:16px 18px;background:color-mix(in srgb,var(--field) 88%,transparent)}
+.template-actions{margin-top:14px;flex-wrap:wrap}.template-actions .btn{min-width:140px}
+.template-section{background:color-mix(in srgb,var(--surface) 84%,transparent)}
+.data-table{background:color-mix(in srgb,var(--surface-2) 90%,transparent);border:1px solid color-mix(in srgb,var(--text) 7%,transparent)}
+.data-row{min-height:62px;padding:10px 14px}
+.ai-doc{padding-bottom:24px}.ai-content{font-size:16px;line-height:1.62}.user-pill{border-radius:26px 26px 12px 26px}
+.system-stage{border-radius:32px;background:color-mix(in srgb,var(--surface) 86%,transparent)}
+.stage-hotspot,.system-card,.zone-btn{backdrop-filter:blur(16px) saturate(1.2);-webkit-backdrop-filter:blur(16px) saturate(1.2)}
+@media (max-width:720px){
+  .hero-title{font-size:26px}
+  .update-banner,.connection-pill{width:min(calc(100% - 20px),620px)}
+  .toast{width:min(calc(100% - 20px),560px)}
+  .template-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+}

@@ -1,6 +1,6 @@
 # THOKAR · Prototipo 3
 
-Prototipo desplegable de THOKAR basado en la rama estable 6.2.3. Mantiene el flujo GitHub -> Render -> PWA Android y todos los datos locales existentes.
+Prototipo 4.1 de THOKAR basado en la rama estable 6.2.3. Mantiene el flujo GitHub -> Render -> PWA Android y todos los datos locales existentes. Añade una interfaz más suave tipo glass, mejora del banner de actualización y pegado de ficha externa para completar VIN / motor / procedencia.
 
 ## Qué cambia
 

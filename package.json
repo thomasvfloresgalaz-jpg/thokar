@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "6.2.3-prototype.4",
+  "version": "6.2.4-prototype.4.1",
   "private": true,
-  "description": "THOKAR Prototipo 4 · interfaz suave, zonas visuales y datos priorizados.",
+  "description": "THOKAR Prototipo 4.1 · interfaz soft glass, bugfix visual y pegado de datos faltantes.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
