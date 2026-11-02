@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "5.7.0-prototype.7",
+  "version": "5.7.1-prototype.7",
   "private": true,
-  "description": "THOKAR Prototipo 5.7.0 · Hablar reconstruido desde cero con layout estable para Android.",
+  "description": "THOKAR Prototipo 5.7.1 · Hablar a pantalla completa con compositor siempre visible.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
