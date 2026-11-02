@@ -217,7 +217,7 @@ app.get('/healthz', (req, res) => {
     model: geminiConfig().model,
     layout: 'liquid-motion-mobile',
     protected: tokenReady,
-    build: 'thokar-ios-rethink-2'
+    build: 'prototipo-5.8.0-pricing-quotes'
   });
 });
 
