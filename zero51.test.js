@@ -1,0 +1,10 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
+const app=fs.readFileSync('app.js','utf8'),css=fs.readFileSync('styles.css','utf8'),html=fs.readFileSync('index.html','utf8'),sw=fs.readFileSync('sw.js','utf8'),manifest=fs.readFileSync('manifest.webmanifest','utf8');
+test('verifier digit after hyphen is ignored when comparing plates',()=>{assert.match(app,/raw\.includes\('-'\)\?raw\.split\('-'\)\[0\]/);assert.match(app,/plateCore\(pastedPlate\)!==plateCore\(currentPlate\)/)});
+test('delete vehicle cascades through every work status and drafts',()=>{assert.match(app,/state\.logs=state\.logs\.filter\(x=>plateCore\(x\.plate\)!==core\)/);assert.match(app,/removedIds/);assert.match(app,/Vehículo e historial eliminados/)});
+test('revealed swipe closes from outside tap and only one stays open',()=>{assert.match(app,/document\.addEventListener\('pointerdown'/);assert.match(app,/closeRevealedSwipes/);assert.match(app,/w\._closeSwipe/)});
+test('money inputs group thousands without prefixing sub-thousand values',()=>{assert.match(app,/n>=1000\?n\.toLocaleString\('es-CL'\):String\(n\)/);assert.match(app,/money-entry/);assert.match(app,/prettyInt\(item\.price/)});
+test('record supports service and next maintenance dates',()=>{assert.match(app,/rServiceDate/);assert.match(app,/rNextServiceDate/);assert.match(app,/Próximo mantenimiento/);assert.match(app,/serviceDate:/);assert.match(app,/nextServiceDate:/)});
+test('save control is no longer sticky above Android keyboard',()=>{assert.match(css,/\.record-savebar\{position:static!important/);assert.doesNotMatch(css,/ZERO 5\.1[^]*\.record-savebar\{position:sticky/)});
+test('ambient red background is precomposed without blur delay',()=>{assert.match(css,/ZERO 5\.1 — instant ambience/);assert.match(css,/filter:none!important/);assert.match(css,/radial-gradient\(circle at 104% 24%/)});
+test('ZERO 5.1 branding and cache have no iOS name',()=>{assert.match(html,/THOKAR ZERO 5\.1/);assert.match(sw,/thokar-zero-5-1/);assert.match(manifest,/"name":"THOKAR ZERO"/);assert.doesNotMatch(manifest,/iOS/)});

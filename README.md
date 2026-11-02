@@ -1,4 +1,5 @@
-# THOKAR ZERO · 2
-Iteración del prototipo desde cero. Mantiene la nueva arquitectura visual y reincorpora funciones permitidas: búsqueda real, IA, recomendaciones, registro con cotización/descuento en vivo, edición de hora-hombre, selectores tipo iOS, filtros de Bitácora y navegación Liquid Glass animada.
+# THOKAR ZERO 5.1
 
-Subir todos los archivos a la raíz del repositorio. Las claves externas permanecen en Render. Si APP_TOKEN está activo, se puede configurar desde Ajustes; la app también intenta reutilizar el token guardado por THOKAR anterior.
+Aplicación PWA de trabajo para THOKAR: consulta de vehículos, ficha, diagnóstico asistido, registro de trabajos, cotización, bitácora y recomendaciones.
+
+ZERO 5.1 refina el uso móvil diario: gestos de eliminación que se cierran al tocar fuera, borrado en cascada por vehículo, comparación de patentes sin considerar dígito verificador, valores monetarios con separador de miles, fechas de trabajo/mantenimiento y formulario compatible con el teclado de Android sin botón flotante.
