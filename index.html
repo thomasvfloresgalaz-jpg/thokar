@@ -1,50 +1,77 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-  <meta name="theme-color" content="#0F0D0E" id="theme-color-meta">
-  <meta name="color-scheme" content="light dark">
-  <title>THOKAR · Ingeniería que mueve</title>
-  <meta name="description" content="THOKAR: diagnóstico asistido, identidad vehicular y registro de servicio.">
-  <meta name="robots" content="noindex, nofollow">
-  <link rel="manifest" href="manifest.webmanifest?v=p902">
-  <link rel="icon" href="icon-192.png">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="THOKAR">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="styles.css?v=p902">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" content="#f2f2f7"><meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png">
+<title>THOKAR iOS Zero</title><link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <svg aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden"><defs><filter id="liquid-lens" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="1" seed="7" result="noise"/><feGaussianBlur in="noise" stdDeviation="1.2" result="softNoise"/><feDisplacementMap in="SourceGraphic" in2="softNoise" scale="5" xChannelSelector="R" yChannelSelector="G"/></filter></defs></svg>
-  <div id="launch-splash" class="launch-splash" aria-hidden="true"><div class="launch-panel"><div class="launch-logo"><img src="icon-192.png" alt=""><div class="launch-copy"><strong>THOKAR</strong><span>Ingeniería que mueve</span></div></div></div><div class="launch-sheen"></div></div>
-  <main id="app" aria-live="polite"><section class="preboot"><div class="preboot-brand">THOKAR — Ingeniería que mueve</div><div class="preboot-status">Preparando tu taller…</div></section></main>
-  <div id="overlay-root"></div>
-  <div id="toast-root"></div>
-  <div id="connection-root"></div>
-  <div id="update-root"></div>
-  <script src="lib.js?v=p902"></script>
-  <script>
-(function(){
-  function recover(){
-    var target='/?recovery='+Date.now();
-    var jobs=[];
-    try{if('serviceWorker' in navigator)jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister()}))}))}catch(e){}
-    try{if(window.caches)jobs.push(caches.keys().then(function(keys){return Promise.all(keys.map(function(k){return caches.delete(k)}))}))}catch(e){}
-    Promise.all(jobs).catch(function(){}).then(function(){location.href=target});
-    setTimeout(function(){location.href=target},1200);
-  }
-  window.THOKAR_RECOVER=recover;
-  document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-thokar-recover]');if(b){e.preventDefault();recover()}});
-  window.addEventListener('error',function(ev){setTimeout(function(){if(!window.THOKAR_APP_READY){var a=document.getElementById('app');if(a)a.innerHTML='<section class="preboot error"><div class="preboot-brand">THOKAR — Ingeniería que mueve</div><div class="preboot-status">No pude abrir la interfaz.</div><p class="preboot-detail">'+String((ev&&ev.message)||'Error de inicio').replace(/[<>&]/g,'')+'</p><button class="btn primary" type="button" data-thokar-recover="1">Recargar THOKAR</button></section>'}},50)});
-  setTimeout(function(){if(!window.THOKAR_APP_READY){var a=document.getElementById('app');if(a&&a.querySelector('.preboot'))a.querySelector('.preboot-status').textContent='Actualizando archivos locales…'}},1800);
-})();
-  </script>
-  <script src="app.js?v=p902"></script>
-<script>
-(function(){var splash=document.getElementById('launch-splash');if(!splash)return;requestAnimationFrame(function(){document.documentElement.classList.add('launching')});setTimeout(function(){splash.classList.add('is-opening');document.documentElement.classList.add('app-reveal')},1050);setTimeout(function(){splash.remove();document.documentElement.classList.remove('launching');document.documentElement.classList.remove('app-reveal')},2650)})();
-</script>
-</body>
-</html>
+<div id="app">
+  <div class="ambient a1"></div><div class="ambient a2"></div>
+  <header class="topbar">
+    <div><div class="eyebrow">THOKAR</div><h1 id="pageTitle">Resumen</h1></div>
+    <button class="glass-icon" id="profileBtn" aria-label="Perfil">TF</button>
+  </header>
+
+  <main id="content" class="content">
+    <section class="screen active" data-screen="home">
+      <article class="hero-card glass">
+        <div class="hero-copy"><span class="status-dot"></span><span class="muted">Taller disponible</span><h2>¿Qué auto vemos hoy?</h2><p>Consulta una patente o continúa un trabajo reciente.</p></div>
+        <button class="primary" data-go="new"><span>＋</span> Nueva atención</button>
+      </article>
+      <div class="section-head"><h3>Continuar</h3><button class="text-btn" data-go="cars">Ver todos</button></div>
+      <button class="vehicle-row" data-vehicle="BSTS97"><span class="car-glyph">⌁</span><span class="vehicle-main"><strong>TOYOTA YARIS</strong><small>BSTS97 · 2009 · 1NZ-FE</small></span><span class="chev">›</span></button>
+      <h3 class="section-title">Acciones</h3>
+      <div class="action-grid">
+        <button class="action-card" data-go="new"><span class="action-icon">⌕</span><strong>Consultar</strong><small>Buscar por patente</small></button>
+        <button class="action-card" data-go="log"><span class="action-icon">▤</span><strong>Bitácora</strong><small>Trabajos y cobros</small></button>
+        <button class="action-card" data-go="cars"><span class="action-icon">◇</span><strong>Vehículos</strong><small>Fichas guardadas</small></button>
+        <button class="action-card" data-go="settings"><span class="action-icon">⚙︎</span><strong>Ajustes</strong><small>App y precios</small></button>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="cars">
+      <div class="search glass"><span>⌕</span><input id="carFilter" placeholder="Buscar vehículo"></div>
+      <div class="list-group"><button class="vehicle-row inset" data-vehicle="BSTS97"><span class="car-glyph">⌁</span><span class="vehicle-main"><strong>TOYOTA YARIS</strong><small>BSTS97 · 2009 · 1NZ-FE</small></span><span class="chev">›</span></button></div>
+    </section>
+
+    <section class="screen" data-screen="new">
+      <article class="sheet-card"><div class="big-symbol">⌕</div><h2>Nueva atención</h2><p>Ingresa la patente. El vehículo quedará listo para diagnóstico y registro.</p><label>Patente</label><input class="plate-input" id="plateInput" maxlength="8" placeholder="ABCD12"><button class="primary full" id="lookupBtn">Consultar vehículo</button><div id="lookupState" class="lookup-state"></div></article>
+    </section>
+
+    <section class="screen" data-screen="log">
+      <div class="segmented glass"><button class="selected" data-logfilter="all">Todo</button><button data-logfilter="open">Pendiente</button><button data-logfilter="done">Listo</button></div>
+      <div class="timeline"><div class="timeline-item"><span class="timeline-dot"></span><div><small>2 NOV · BSTS97</small><strong>Diagnóstico de ralentí</strong><p>Revisión y seguimiento del Toyota Yaris.</p></div></div><div class="timeline-item"><span class="timeline-dot"></span><div><small>REGISTRO</small><strong>Historial THOKAR</strong><p>Los trabajos nuevos aparecerán aquí.</p></div></div></div>
+    </section>
+
+    <section class="screen" data-screen="settings">
+      <div class="settings-group"><h3>Apariencia</h3><button class="setting-row" id="themeToggle"><span>Modo</span><strong id="themeLabel">Día</strong></button><button class="setting-row"><span>Liquid Glass</span><strong>Máximo</strong></button></div>
+      <div class="settings-group"><h3>Precios</h3><button class="setting-row"><span>Hora hombre</span><strong>$20.000</strong></button><button class="setting-row"><span>Moneda</span><strong>CLP</strong></button></div>
+      <div class="settings-group"><h3>Aplicación</h3><div class="setting-row static"><span>Prototipo</span><strong>iOS Zero · 1</strong></div></div>
+    </section>
+
+    <section class="screen" data-screen="vehicle">
+      <button class="back-btn" id="backVehicle">‹ Volver</button>
+      <article class="vehicle-hero"><div class="plate">BSTS97</div><h2>TOYOTA YARIS</h2><p>2009 · 1NZ-FE · Gasolina</p><div class="metric-row"><div><small>Kilometraje</small><strong>400.473 km</strong></div><div><small>Estado</small><strong class="red">En revisión</strong></div></div></article>
+      <div class="section-head"><h3>Herramientas</h3></div>
+      <div class="tool-stack">
+        <button class="tool-row" data-panel="diagnose"><span class="tool-icon">✦</span><span><strong>Diagnosticar con THOKAR</strong><small>Conversación contextual del vehículo</small></span><b>›</b></button>
+        <button class="tool-row" data-panel="record"><span class="tool-icon">▤</span><span><strong>Registrar trabajo</strong><small>Notas, repuestos, precio y descuento</small></span><b>›</b></button>
+        <button class="tool-row" data-panel="data"><span class="tool-icon">ⓘ</span><span><strong>Ficha técnica</strong><small>Datos del vehículo y kilometraje</small></span><b>›</b></button>
+      </div>
+    </section>
+  </main>
+
+  <nav class="dock glass" id="dock">
+    <button class="dock-item active" data-go="home"><span>⌂</span><small>Resumen</small></button>
+    <button class="dock-item" data-go="cars"><span>◇</span><small>Autos</small></button>
+    <button class="dock-main" data-go="new" aria-label="Nueva atención"><span>＋</span></button>
+    <button class="dock-item" data-go="log"><span>▤</span><small>Bitácora</small></button>
+    <button class="dock-item" data-go="settings"><span>⚙︎</span><small>Ajustes</small></button>
+  </nav>
+
+  <div class="modal-backdrop" id="modalBackdrop"><section class="bottom-sheet" id="bottomSheet"><div class="grabber"></div><button class="sheet-close" id="sheetClose">Cerrar</button><div id="sheetBody"></div></section></div>
+</div>
+<script src="app.js"></script>
+</body></html>
