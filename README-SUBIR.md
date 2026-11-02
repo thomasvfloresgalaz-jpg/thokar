@@ -1,70 +1,33 @@
-# THOKAR · Prototipo 5.1 · Liquid Motion
+# THOKAR · Prototipo 5.2 · Chat Window Fix
 
-Prototipo desplegable de THOKAR para GitHub -> Render -> PWA Android. Conserva las claves `thokar.*`, chats, registros, vehículos, fotos, respaldo, Gemini, Wake Lock y proveedores de datos.
+Prototipo desplegable para GitHub -> Render -> PWA Android. Conserva vehículos, chats, Registro, fotos, respaldo, Gemini, Wake Lock y proveedores.
 
 ## Build y caché
 
-- Build frontend/backend: `prototipo-5-liquid-motion`
-- Service Worker: `thokar-prototipo-5-liquid-motion`
-- package: `5.0.0-prototype.5`
+- Build frontend/backend: `prototipo-5.2-chat-window`
+- Service Worker: `thokar-prototipo-5.2-chat-window`
+- package: `5.2.0-prototype.5`
 
-Frontend, backend y Service Worker usan el mismo identificador para evitar el bucle de “Hay una versión nueva disponible”.
+## Correcciones de esta versión
 
-## Cambios principales
-
-- Rediseño Liquid Motion inspirado en patrones de vidrio flotante, adaptado a Android.
-- El vidrio se usa solo en controles flotantes: navegación inferior, selector Hablar/Registro/Datos, compositor, avisos y hojas.
-- Tarjetas, tablas, Registro y Datos son superficies opacas.
-- Barra inferior: Inicio / Consultar / Libreta; se contrae al bajar y reaparece al subir.
-- Hoja de búsqueda arrastrable con tres puntos de anclaje y física de resorte.
-- Selector Hablar / Registro / Datos con pulgar móvil y resorte.
-- Efectos de vidrio: Completo / Reducido / Apagado. La app detecta Nivel 1/2/3 y puede degradar el efecto si el dispositivo va lento.
-- Botones con respuesta elástica al toque.
-- Diseño Día/Noche conservado.
-- Plantilla pegable para completar patente, tipo, marca, modelo, año, color, N.º motor, chasis/VIN, procedencia, fabricante, sello y combustible.
-- VIN / número de motor confirmados manualmente siguen teniendo prioridad para IA y repuestos.
-
-## Fuentes vehiculares
-
-La consulta mantiene:
-
-1. AutoRiesgo gratuito cuando entrega ficha técnica.
-2. PRT/reSTART.
-3. Cruce SII conservador.
-4. Boostr como fallback/complemento manual.
-5. Foto o plantilla pegada como confirmación manual.
-
-THOKAR no inventa VIN, número de motor ni cilindrada exacta.
+- Hablar / Registro / Datos ya no reconstruyen toda la pantalla del vehículo al cambiar de pestaña. Solo cambia el contenido de la vista seleccionada.
+- Al seleccionar una pestaña, el scroll exterior se posiciona en el selector/contenido, no en el encabezado del vehículo.
+- Hablar funciona como una ventana independiente con su propio scroll. Si ya hay conversación, abre mostrando los mensajes más recientes.
+- El compositor vive dentro de la ventana de chat y se adapta a la altura visible del teclado.
+- Las opciones de sistemas del automóvil quedan en una cuadrícula compacta; se eliminó el dibujo intermedio del auto.
+- Las hojas de diagnóstico se abren completas automáticamente.
+- La hoja Buscar vehículo usa `visualViewport` y la variable `--vh`, por lo que se recoloca sobre el teclado sin arrastrarla manualmente.
+- Se conserva Liquid Motion, la barra inferior, Datos, plantilla pegable, VIN/motor manuales y las fuentes vehiculares del Prototipo 5.
 
 ## Variables Render
 
-Obligatorias:
-
-- `APP_TOKEN` — 32+ caracteres.
-- `GEMINI_API_KEY`
-- `GEMINI_MODEL`
-
-Opcionales:
-
-- `RESTART_API_KEY`
-- `BOOSTR_API_KEY`
-- `AUTORIESGO_TIMEOUT_MS=12000`
-- `RESTART_TIMEOUT_MS=12000`
-- `BOOSTR_TIMEOUT_MS=12000`
-- `PLATE_REQUESTS_PER_MINUTE=12`
-- `AI_REQUESTS_PER_MINUTE=30`
-- `PLATE_CACHE_MS=21600000`
-
-Nunca pongas claves en GitHub ni en el frontend.
+Mantén las mismas variables que en Prototipo 5: `APP_TOKEN`, `GEMINI_API_KEY`, `GEMINI_MODEL`; opcionales `RESTART_API_KEY`, `BOOSTR_API_KEY` y los timeouts/límites existentes.
 
 ## Despliegue
 
-1. Descomprime el ZIP.
-2. Sube **el contenido de la carpeta** a la raíz de GitHub.
-3. Render -> **Manual Deploy -> Clear build cache & deploy**.
-4. Abre `/healthz`.
-5. Debe mostrar: `"build":"prototipo-5-liquid-motion"`.
-6. Abre la URL desde Chrome Android y prueba Inicio, búsqueda, Hablar, Registro, Datos y Ajustes.
-7. En Ajustes > Efectos de vidrio podrás ver el nivel activo detectado en tu teléfono.
+1. Sube el contenido de esta carpeta a la raíz de GitHub.
+2. Render -> Manual Deploy -> Clear build cache & deploy.
+3. `/healthz` debe mostrar `"build":"prototipo-5.2-chat-window"`.
+4. En Android prueba: cambiar pestañas, abrir Hablar con un chat largo, Buscar patente con teclado abierto y una consulta guiada desde los cuadros de sistemas.
 
-Los datos anteriores se mantienen porque no se cambian las claves de almacenamiento.
+Los datos anteriores se conservan porque las claves de almacenamiento no cambian.

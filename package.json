@@ -1,8 +1,8 @@
 {
   "name": "thokar-taller",
-  "version": "5.1.0-prototype.5",
+  "version": "5.2.0-prototype.5",
   "private": true,
-  "description": "THOKAR Prototipo 5.1 · Segmento estático, hablar compacto y modales completos.",
+  "description": "THOKAR Prototipo 5.2 · chat independiente, pestañas sin salto y hojas adaptadas al teclado.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
