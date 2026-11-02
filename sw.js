@@ -1,6 +1,6 @@
-/* THOKAR Prototipo 5.5.6 · network-first y activación manual */
-const CACHE='thokar-prototipo-5.5.6-geometry-liquidglass-fix';
-const SHELL=['./','index.html','styles.css?v=p556','lib.js?v=p556','app.js?v=p556','manifest.webmanifest?v=p556','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
+/* THOKAR Prototipo 5.5.7 · network-first y activación manual */
+const CACHE='thokar-prototipo-5.5.7-chat-vertical-dayglass-fix';
+const SHELL=['./','index.html','styles.css?v=p557','lib.js?v=p557','app.js?v=p557','manifest.webmanifest?v=p557','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)))});
 self.addEventListener('message',event=>{if(event.data&&event.data.type==='SKIP_WAITING')self.skipWaiting()});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});

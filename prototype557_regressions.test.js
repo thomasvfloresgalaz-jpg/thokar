@@ -1,0 +1,13 @@
+const fs=require('fs');
+const assert=require('assert');
+const css=fs.readFileSync('styles.css','utf8');
+const app=fs.readFileSync('app.js','utf8');
+const sw=fs.readFileSync('sw.js','utf8');
+assert(css.includes('touch-action:pan-y'),'La UI debe restringirse al desplazamiento vertical');
+assert(css.includes('--talk-composer-clearance'),'El chat debe reservar la altura real del compositor');
+assert(css.includes('html[data-theme="dia"] .liquid-tabbar'),'Modo Día debe tener terminación contrastada');
+assert(app.includes("seg.addEventListener('click'"),'Las pestañas superiores deben ser tap-only');
+assert(!app.includes("seg.addEventListener('pointermove'"),'No debe existir arrastre horizontal del selector superior');
+assert(app.includes("main.style.setProperty('--talk-composer-clearance'"),'La reserva del chat debe calcularse desde el compositor real');
+assert(sw.includes('5.5.7-chat-vertical-dayglass-fix'),'SW debe estar sincronizado con 5.5.7');
+console.log('prototype557_regressions: ok');

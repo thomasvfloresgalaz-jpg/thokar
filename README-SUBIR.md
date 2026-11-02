@@ -1,4 +1,4 @@
-# THOKAR · Prototipo 5.5.6 · Geometry + Liquid Glass Fix
+# THOKAR · Prototipo 5.5.7 · Chat vertical + Day Glass Fix
 
 Versión de prueba posterior a 5.5.5.
 

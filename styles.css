@@ -363,3 +363,32 @@ html[data-theme="dia"] .workspace-brand{border-color:rgba(20,20,20,.08);box-shad
 
 /* La altura reservada durante el cambio de pestaña no debe sobrevivir a la estabilización. */
 body:not(.workspace-aligning) .workspace-main:not(.view-talk){min-height:0}
+
+/* Prototipo 5.5.7 · chat vertical, modo Día contrastado y barras dentro del viewport */
+html,body,#app,.workspace,.workspace-scroll,.workspace-main{max-width:100%;overflow-x:hidden!important;overscroll-behavior-x:none;touch-action:pan-y}
+.workspace-tabs,.liquid-tabbar{touch-action:pan-y;max-width:calc(100vw - 28px)}
+.workspace-tabs{overflow:hidden}
+/* Las acciones ya no desplazan toda la experiencia lateralmente: se acomodan en varias líneas. */
+.workspace-main.view-talk .quick-start,.workspace-main.view-talk .ai-actions,.workspace-main.view-talk .message-actions{display:flex;flex-wrap:wrap;overflow-x:hidden!important;overscroll-behavior-x:none;max-width:100%}
+.workspace-main.view-talk .quick-card,.workspace-main.view-talk .ai-action{white-space:normal;text-align:center;flex:0 1 auto}
+/* Reserva exactamente la altura real del compositor fijo para que nunca tape el último mensaje. */
+.workspace-main.view-talk .talk-thread{padding-bottom:var(--talk-composer-clearance,112px)!important;scroll-padding-bottom:var(--talk-composer-clearance,112px)!important}
+.workspace-main.view-talk .composer{max-width:100%;overflow:hidden}
+.workspace-main.view-talk .composer textarea{min-width:0}
+/* El modo Día necesita un borde oscuro de terminación para que el vidrio no desaparezca sobre fondos blancos. */
+html[data-theme="dia"] .liquid-tabbar,html[data-theme="dia"] .liquid-segment,html[data-theme="dia"] .composer,html[data-theme="dia"] .floating-control,html[data-theme="dia"] .workspace-brand{
+  border-color:rgba(29,24,25,.24)!important;
+  border-top-color:rgba(29,24,25,.18)!important;
+  box-shadow:0 1px 0 rgba(255,255,255,.92) inset,0 -1px 0 rgba(29,24,25,.14) inset,0 10px 28px rgba(29,24,25,.12),0 28px 64px rgba(29,24,25,.09)!important;
+}
+html[data-theme="dia"] .nav-drop,html[data-theme="dia"] .segment-thumb{
+  border-color:rgba(29,24,25,.18)!important;
+  background:linear-gradient(180deg,rgba(255,255,255,.82),rgba(245,238,235,.58)),rgba(255,255,255,.54)!important;
+  box-shadow:0 1px 0 rgba(255,255,255,.96) inset,0 0 0 1px rgba(29,24,25,.035),0 8px 22px rgba(29,24,25,.10)!important;
+}
+/* Mantiene la barra inferior completamente dentro del ancho útil incluso en Chrome Android. */
+@media (max-width:560px){
+  .liquid-tabbar{width:calc(100vw - 36px);left:18px;right:18px;transform:none}
+  .keyboard-open .liquid-tabbar{transform:translateY(18px)}
+  .workspace-tabs{width:calc(100vw - 36px)}
+}

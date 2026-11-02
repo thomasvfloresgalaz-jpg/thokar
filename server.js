@@ -217,7 +217,7 @@ app.get('/healthz', (req, res) => {
     model: geminiConfig().model,
     layout: 'liquid-motion-mobile',
     protected: tokenReady,
-    build: 'prototipo-5.5.6-geometry-liquidglass-fix'
+    build: 'prototipo-5.5.7-chat-vertical-dayglass-fix'
   });
 });
 
