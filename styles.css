@@ -95,3 +95,67 @@ html[data-density="compact"] .data-row{min-height:46px}.source-list{display:grid
 }
 @media(min-width:850px){.workspace-top{height:46vh}.workspace-sheet.medium{height:58vh}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.001ms!important}}
+
+/* --- Prototipo 3.1 refinements --- */
+:root{--r-card:28px;--r-inner:18px;--r-control:18px;--shadow-1:0 1px 0 var(--top-light) inset,0 10px 24px rgba(38,16,19,.16),0 30px 64px rgba(38,16,19,.12);--shadow-2:0 1px 0 rgba(255,255,255,.08) inset,0 16px 34px rgba(38,16,19,.24),0 36px 82px rgba(38,16,19,.17)}
+html[data-theme="dia"]{--shadow-1:0 1px 0 rgba(255,255,255,.96) inset,0 10px 24px rgba(67,37,41,.08),0 28px 60px rgba(67,37,41,.06);--shadow-2:0 1px 0 rgba(255,255,255,.98) inset,0 14px 30px rgba(67,37,41,.10),0 32px 78px rgba(67,37,41,.08)}
+
+.workspace{display:flex;flex-direction:column;overflow:hidden}
+.workspace-top{height:auto;min-height:0;padding:max(18px,env(safe-area-inset-top)) 18px 0;overflow:visible}
+.vehicle-hero{padding:24px 22px 18px;border-radius:30px}
+.hero-title{margin-top:16px}
+.hero-metrics{margin-top:18px}
+.workspace-shell{position:relative;z-index:4;flex:1;min-height:0;margin-top:-18px;background:var(--surface-2);border-radius:32px 32px 0 0;box-shadow:0 -1px 0 var(--top-light),var(--shadow-2);display:flex;flex-direction:column;overflow:hidden}
+.workspace-main{flex:1;min-height:0;overflow:auto;padding:14px 16px calc(28px + env(safe-area-inset-bottom));overscroll-behavior-y:contain}
+.workspace-main.talk-shell{padding-bottom:calc(124px + env(safe-area-inset-bottom))}
+.workspace-sheet,.sheet-handle{display:none!important}
+.workspace-tabs{padding:14px 14px 0;background:linear-gradient(to bottom, color-mix(in srgb,var(--surface) 72%,transparent), transparent)}
+.view-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.view-tab{min-height:52px;border-radius:999px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-1)}
+.view-tab[aria-selected="true"]{background:color-mix(in srgb,var(--accent) 12%,var(--surface));border-color:color-mix(in srgb,var(--accent) 36%,var(--line))}
+
+.data-priority-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.found-card{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;min-height:92px;padding:14px 14px 12px;border-radius:22px;background:var(--surface-2);box-shadow:var(--shadow-1);border-top:1px solid var(--top-light)}
+.found-card span{display:block;font-size:12px;color:var(--tertiary);margin-bottom:8px}
+.found-card strong{display:block;font-size:14px;line-height:1.45;overflow-wrap:anywhere;color:var(--text)}
+.found-card strong.missing{font-family:var(--font);color:var(--muted);font-weight:650}
+.found-card .mini-copy{width:38px;height:38px;box-shadow:none}
+.found-card .mini-copy.ghost{opacity:0;pointer-events:none}
+.rich-recovery{margin-top:14px;padding:18px 18px 16px;border-radius:24px}
+.recovery-actions.stacked{display:grid;grid-template-columns:1fr;gap:10px}
+
+.systems-panel{padding:20px}
+.systems-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.top-grid{margin-bottom:14px}.bottom-grid{margin-top:14px}
+.system-card{display:flex;align-items:center;gap:12px;min-height:96px;padding:14px;border-radius:24px;background:var(--surface-2);box-shadow:var(--shadow-1);border-top:1px solid var(--top-light);text-align:left;transition:transform .18s ease,background .18s ease}
+.system-card:active{transform:scale(.99)}
+.system-card-copy{display:block;min-width:0}.system-card-tag{display:block;font-size:11px;color:var(--tertiary);margin-bottom:4px}.system-card strong{display:block;font-size:16px;line-height:1.15;letter-spacing:-.02em}.system-card small{display:block;font-size:12px;color:var(--muted);line-height:1.35;margin-top:5px}
+.system-card-thumb{position:relative;flex:0 0 62px;width:62px;height:62px;border-radius:20px;background:color-mix(in srgb,var(--accent) 9%,var(--surface-3));box-shadow:inset 0 1px 0 var(--top-light)}
+.system-card-thumb i,.system-card-thumb b{position:absolute;display:block;background:currentColor;border-radius:999px;color:color-mix(in srgb,var(--accent) 74%,var(--text))}
+.thumb-engine i{left:12px;right:12px;top:18px;height:16px;border-radius:10px}.thumb-engine b{width:10px;height:26px;right:10px;top:18px;border-radius:6px}
+.thumb-brakes i{inset:12px;border-radius:50%;background:transparent;border:6px solid color-mix(in srgb,var(--accent) 70%,var(--text))}.thumb-brakes b{width:12px;height:32px;right:12px;top:15px;border-radius:8px}
+.thumb-suspension i{width:12px;height:40px;left:25px;top:11px}.thumb-suspension b{width:30px;height:30px;left:16px;top:18px;background:transparent;border:3px solid color-mix(in srgb,var(--accent) 70%,var(--text));border-left-color:transparent;border-right-color:transparent;border-radius:10px}
+.thumb-steering i{inset:10px;border-radius:50%;background:transparent;border:5px solid color-mix(in srgb,var(--accent) 70%,var(--text))}.thumb-steering b{width:4px;height:28px;left:29px;top:17px}
+.thumb-electric i{left:11px;top:18px;width:40px;height:26px;border-radius:8px}.thumb-electric b{width:18px;height:4px;left:22px;top:13px;border-radius:0}
+.thumb-transmission i{left:10px;right:10px;top:24px;height:14px;border-radius:10px}.thumb-transmission b{width:16px;height:16px;left:23px;top:16px;border-radius:8px}
+.thumb-cooling i{left:11px;top:14px;width:40px;height:34px;border-radius:12px}.thumb-cooling b{width:28px;height:4px;left:17px;top:20px;box-shadow:0 8px 0 currentColor,0 16px 0 currentColor}
+.thumb-fuel i{left:10px;right:10px;top:18px;height:22px;border-radius:8px}.thumb-fuel b{width:14px;height:22px;right:10px;top:28px;border-radius:8px}
+.system-stage{position:relative;padding:18px;border-radius:28px;background:var(--surface);box-shadow:var(--shadow-2);border-top:1px solid var(--top-light);overflow:hidden}
+.system-stage:before{content:"";position:absolute;inset:auto -10% -20% -10%;height:42%;background:radial-gradient(circle at 50% 30%,color-mix(in srgb,var(--accent) 10%,transparent),transparent 72%);pointer-events:none}
+.system-stage-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px}.system-stage-head strong{font-size:20px;letter-spacing:-.03em}.system-stage-head span{font-size:13px;color:var(--muted);text-align:right}
+.system-figure{position:relative;border-radius:24px;background:color-mix(in srgb,var(--surface-2) 80%,transparent);padding:10px 6px 18px;overflow:hidden}
+.system-figure svg{display:block;width:100%;height:auto;max-width:720px;margin:auto}
+.stage-hotspot{position:absolute;min-height:36px;padding:0 11px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-line);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-size:11px;font-weight:700;box-shadow:var(--shadow-1)}
+.stage-engine{left:12%;top:28%}.stage-brakes{left:8%;bottom:14%}.stage-suspension{right:9%;top:25%}.stage-steering{left:30%;top:17%}.stage-electric{right:24%;top:11%}.stage-transmission{left:39%;bottom:11%}.stage-cooling{left:20%;bottom:18%}.stage-fuel{right:20%;bottom:16%}
+.car-shadow{fill:rgba(0,0,0,.12)}.car-body{fill:url(#bodyShade)}.car-body-line,.car-window-line,.door-line,.hood-line,.rear-line{stroke:color-mix(in srgb,var(--muted) 55%,transparent);stroke-width:3;fill:none}.car-window{fill:color-mix(in srgb,var(--info) 10%,rgba(255,255,255,.9))}.system-engine,.system-battery,.system-radiator,.system-transmission,.system-fuel,.system-brake{fill:color-mix(in srgb,var(--accent) 58%,rgba(255,255,255,.15));stroke:none}.system-brake{fill:color-mix(in srgb,var(--accent) 36%,rgba(255,255,255,.1))}.system-suspension,.system-steering{stroke:color-mix(in srgb,var(--accent) 80%,var(--text));stroke-width:8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+@media(max-width:720px){
+  .workspace-top{padding-left:12px;padding-right:12px}
+  .vehicle-hero{padding:20px 18px 16px;border-radius:28px}
+  .workspace-shell{margin-top:-14px;border-radius:28px 28px 0 0}
+  .workspace-main{padding:12px 12px calc(24px + env(safe-area-inset-bottom))}
+  .workspace-main.talk-shell{padding-bottom:calc(118px + env(safe-area-inset-bottom))}
+  .data-priority-grid,.systems-grid{grid-template-columns:1fr}
+  .system-stage-head{display:block}.system-stage-head span{display:block;text-align:left;margin-top:4px}
+  .stage-engine{left:8%;top:19%}.stage-brakes{left:4%;bottom:10%}.stage-suspension{right:4%;top:18%}.stage-steering{left:28%;top:9%}.stage-electric{right:20%;top:4%}.stage-transmission{left:38%;bottom:6%}.stage-cooling{left:18%;bottom:14%}.stage-fuel{right:14%;bottom:12%}
+}
