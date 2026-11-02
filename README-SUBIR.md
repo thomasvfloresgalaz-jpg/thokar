@@ -1,4 +1,4 @@
-# THOKAR · Prototipo 5 · Liquid Motion
+# THOKAR · Prototipo 5.1 · Liquid Motion
 
 Prototipo desplegable de THOKAR para GitHub -> Render -> PWA Android. Conserva las claves `thokar.*`, chats, registros, vehículos, fotos, respaldo, Gemini, Wake Lock y proveedores de datos.
 

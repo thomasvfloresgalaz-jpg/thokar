@@ -1,5 +1,5 @@
 /* THOKAR Prototipo 3 · network-first y activación manual */
-const CACHE='thokar-prototipo-5-liquid-motion';
+const CACHE='thokar-prototipo-5.1-liquid-motion';
 const SHELL=['./','index.html','styles.css?v=p5','lib.js?v=p5','app.js?v=p5','manifest.webmanifest?v=p5','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)))});
 self.addEventListener('message',event=>{if(event.data&&event.data.type==='SKIP_WAITING')self.skipWaiting()});
