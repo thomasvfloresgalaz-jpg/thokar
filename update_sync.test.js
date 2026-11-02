@@ -1,12 +1,2 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-
-test('frontend, backend y service worker comparten el mismo build/caché de Prototipo 5.6.2', () => {
-  const app = fs.readFileSync('./app.js','utf8');
-  const server = fs.readFileSync('./server.js','utf8');
-  const sw = fs.readFileSync('./sw.js','utf8');
-  assert.match(app, /APP_BUILD='prototipo-5.6.2-talk-viewport-frame'/);
-  assert.match(server, /build:\s*'prototipo-5.6.2-talk-viewport-frame'/);
-  assert.match(sw, /thokar-prototipo-5.6.2-talk-viewport-frame/);
-});
+const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');
+test('frontend, backend y service worker comparten build 5.7.0',()=>{const app=fs.readFileSync('app.js','utf8'),server=fs.readFileSync('server.js','utf8'),sw=fs.readFileSync('sw.js','utf8'),html=fs.readFileSync('index.html','utf8');assert.match(app,/APP_BUILD='prototipo-5\.7\.0-talk-rebuild'/);assert.match(server,/build:\s*'prototipo-5\.7\.0-talk-rebuild'/);assert.match(sw,/thokar-prototipo-5\.7\.0-talk-rebuild/);assert.match(html,/app\.js\?v=p570/)});
