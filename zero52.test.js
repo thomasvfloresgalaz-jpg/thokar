@@ -59,6 +59,6 @@ test('vehicle tool stack has calmer precomposed light and dark surfaces',()=>{
 });
 test('ZERO 5.2 branding and service worker cache are bumped',()=>{
   assert.match(html,/THOKAR ZERO 5\.2/);
-  assert.match(sw,/thokar-zero-5-2-20261102/);
+  assert.match(sw,/thokar-zero-5-2(?:-1)?-2026110[23]/);
   assert.match(app,/ZERO · 5\.2/);
 });

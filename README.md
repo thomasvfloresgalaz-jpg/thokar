@@ -1,17 +1,7 @@
-# THOKAR ZERO 5.2
+# THOKAR ZERO 5.2.1
 
-Aplicación web/PWA de trabajo para THOKAR.
+Versión incremental sobre ZERO 5.2.
 
-ZERO 5.2 refina la interacción móvil sin cambiar la arquitectura visual de ZERO: el swipe vuelve con animación inversa, el borrado de vehículos limpia variantes antiguas de patente e historial sin rerender completo, mejora el pegado del número de motor, suaviza las herramientas del vehículo, agrega $ a Hora hombre, omite el diagnóstico del mensaje cuando no existe y suma consultas breves con IA dentro de cada repuesto recomendado.
+Incluye historial persistente de Diagnosticar con THOKAR por vehículo, solicitudes de IA independientes para evitar bloqueo del segundo mensaje, diagnóstico automático únicamente para el trabajo pendiente, lista de tareas actualizada solo por acción explícita, Trabajos registrados dentro de cada vehículo, recomendaciones que priorizan Número de motor y archivo de Vehículos reparados con reactivación automática al volver a buscar la patente.
 
-## Ejecutar
-
-```bash
-npm start
-```
-
-## Probar
-
-```bash
-npm test
-```
+Archivar conserva ficha, trabajos, diagnósticos, tareas y chat. Eliminar borra definitivamente todos los datos asociados al vehículo.
