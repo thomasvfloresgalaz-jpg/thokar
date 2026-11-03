@@ -27,7 +27,9 @@ test('swipe closes with a reverse transition instead of instantly hiding',()=>{
   assert.match(app,/swipe-closing/);
   assert.match(app,/transform \.34s cubic-bezier/);
   assert.match(css,/\.swipe-wrap\.swipe-closing \.swipe-delete\{opacity:1!important/);
-  assert.match(app,/settle\(open\?dx<38:dx<-42\)/);
+  assert.match(app,/side==='delete'/);
+  assert.match(app,/side==='archive'/);
+  assert.match(app,/dx<-42\?'delete':\(arc&&dx>42\?'archive':null\)/);
 });
 test('vehicle deletion clears duplicate plate variants and avoids a full render',()=>{
   const start=app.indexOf('function confirmDeleteVehicle');
@@ -59,6 +61,6 @@ test('vehicle tool stack has calmer precomposed light and dark surfaces',()=>{
 });
 test('ZERO 5.2 branding and service worker cache are bumped',()=>{
   assert.match(html,/THOKAR ZERO 5\.2/);
-  assert.match(sw,/thokar-zero-5-2(?:-1)?-2026110[23]/);
+  assert.match(sw,/thokar-zero-5-2(?:-[12])?-2026110[23]/);
   assert.match(app,/ZERO · 5\.2/);
 });

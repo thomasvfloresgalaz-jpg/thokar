@@ -66,11 +66,11 @@ test('parts recommendations explicitly prioritize engine number',()=>{
   assert.match(app,/número de motor prioritario/);
 });
 
-test('ZERO 5.2.1 branding cache and backend build are bumped',()=>{
-  assert.match(html,/THOKAR ZERO 5\.2\.1/);
-  assert.match(app,/ZERO · 5\.2\.1/);
-  assert.match(sw,/thokar-zero-5-2-1-20261103/);
-  assert.match(sw,/app\.js\?v=zero521/);
-  assert.match(server,/build: 'zero-5\.2\.1'/);
-  assert.match(pkg,/"version": "0\.5\.2-1"/);
+test('current branding cache and backend build are bumped',()=>{
+  assert.match(html,/THOKAR ZERO 5\.2\.2/);
+  assert.match(app,/ZERO · 5\.2\.2/);
+  assert.match(sw,/thokar-zero-5-2-2-20261103/);
+  assert.match(sw,/app\.js\?v=zero522/);
+  assert.match(server,/build: 'zero-5\.2\.2'/);
+  assert.match(pkg,/"version": "0\.5\.2-2"/);
 });
