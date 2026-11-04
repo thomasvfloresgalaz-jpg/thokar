@@ -49,10 +49,10 @@ test('archiving is non destructive while deletion remains destructive',()=>{
 });
 
 test('ZERO 5.2.2 branding and cache are consistent',()=>{
-  assert.match(html,/THOKAR ZERO 5\.2\.2/);
-  assert.match(app,/ZERO · 5\.2\.2/);
-  assert.match(sw,/thokar-zero-5-2-2-20261103/);
-  assert.match(sw,/app\.js\?v=zero522/);
-  assert.match(server,/build: 'zero-5\.2\.2'/);
-  assert.match(pkg,/"version": "0\.5\.2-2"/);
+  assert.match(html,/THOKAR ZERO 5\.2\.3/);
+  assert.match(app,/ZERO · 5\.2\.3/);
+  assert.match(sw,/thokar-zero-5-2-3-20261104/);
+  assert.match(sw,/app\.js\?v=zero523/);
+  assert.match(server,/build: 'zero-5\.2\.3'/);
+  assert.match(pkg,/"version": "0\.5\.2-3"/);
 });
