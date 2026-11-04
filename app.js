@@ -47,7 +47,7 @@ function archiveScreen(){const vs=Object.values(state.archivedVehicles);return `
 function lookup(){return `<div class="center-card"><div class="round-icon">${icon('search')}</div><h2>Nueva atención</h2><p>Busca la patente usando el sistema THOKAR.</p><label>Patente</label><input class="plate-input" id="plateInput" maxlength="9" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ABCD12"><button class="red-btn full" id="lookupBtn">Consultar vehículo</button><div class="lookup-state" id="lookupState"></div></div>`}
 function log(){return `<div class="segmented glass" id="logSeg"><span class="seg-lens"></span><button data-filter="all">Todo</button><button data-filter="open">Pendiente</button><button data-filter="done">Listo</button></div><div class="log-viewport"><div id="logList" class="log-page">${renderLogs(state.logFilter)}</div></div>`}
 function renderLogs(f){const ls=state.logs.filter(x=>f==='all'||x.status===f);return ls.length?ls.map(x=>`<div class="swipe-wrap log-${x.status==='done'?'done':'open'}"><button class="swipe-delete delete-log" aria-hidden="true" data-delete-log="${x.id}">Eliminar</button><button class="log-row log-open" data-log="${x.id}"><i>${x.status==='done'?'✓':'!'}</i><div><small>${esc(x.date)} · ${esc(x.plate)}</small><span class="log-vehicle">${esc(x.vehicle||vehicleNameByPlate(x.plate))}</span><strong>${esc(x.title)}</strong><p>${esc(x.note||'Registro THOKAR')}</p><b>${money(x.total||0)}</b></div><em>›</em></button></div>`).join(''):'<div class="empty">No hay registros en esta categoría.</div>'}
-function settings(){return `<div class="settings-group"><h3>Apariencia</h3><button class="setting-row" id="themePicker"><span>Modo</span><strong>${state.settings.theme==='dark'?'Noche':'Día'} ›</strong></button><div class="setting-row static"><span>Liquid Glass</span><strong>Máximo</strong></div></div><div class="settings-group"><h3>Precios</h3><label class="setting-row editable"><span>Hora hombre</span><span class="money-input">$<input id="hourRate" inputmode="numeric" value="${prettyInt(state.settings.hourRate)}"></span></label><label class="setting-row editable"><span>Desplazamiento base</span><span class="money-input">$<input id="travelRate" inputmode="numeric" value="${prettyInt(state.settings.travel)}"></span></label></div><div class="settings-group"><h3>Conexión</h3><label class="setting-row editable"><span>Token THOKAR</span><input class="token-input" id="appToken" type="password" value="${esc(state.settings.appToken)}" placeholder="Opcional"></label></div><div class="settings-group"><h3>Aplicación</h3><div class="setting-row static"><span>Prototipo</span><strong>ZERO · 5.2.5</strong></div></div>`}
+function settings(){return `<div class="settings-group"><h3>Apariencia</h3><button class="setting-row" id="themePicker"><span>Modo</span><strong>${state.settings.theme==='dark'?'Noche':'Día'} ›</strong></button><div class="setting-row static"><span>Liquid Glass</span><strong>Máximo</strong></div></div><div class="settings-group"><h3>Precios</h3><label class="setting-row editable"><span>Hora hombre</span><span class="money-input">$<input id="hourRate" inputmode="numeric" value="${prettyInt(state.settings.hourRate)}"></span></label><label class="setting-row editable"><span>Desplazamiento base</span><span class="money-input">$<input id="travelRate" inputmode="numeric" value="${prettyInt(state.settings.travel)}"></span></label></div><div class="settings-group"><h3>Conexión</h3><label class="setting-row editable"><span>Token THOKAR</span><input class="token-input" id="appToken" type="password" value="${esc(state.settings.appToken)}" placeholder="Opcional"></label></div><div class="settings-group"><h3>Aplicación</h3><div class="setting-row static"><span>Versión oficial</span><strong>ZERO · 5.3.0</strong></div></div>`}
 const fichaFields=[['marca','Marca'],['modelo','Modelo'],['anio','Año'],['tipo','Tipo'],['color','Color'],['motor','Número de motor'],['chasis','VIN / Chasis'],['cilindrada','Cilindrada'],['combustible','Combustible'],['procedencia','Procedencia'],['fabricante','Fabricante']];
 function vehicle(){const v=state.vehicle||{},archived=state.viewingArchived||!!v._archived;const back=archived?'archive':'cars';return `<button class="back" data-go="${back}">‹ ${archived?'Reparados':'Vehículos'}</button><div class="vehicle-title"><span class="plate">${esc(plate(v))}</span>${archived?'<span class="archived-badge">Reparado</span>':''}<h2>${esc(carName(v))}</h2><p>${esc([v.anio,v.version,v.combustible].filter(Boolean).join(' · '))}</p></div><div class="data-card ficha-card"><div class="ficha-head"><h3>Ficha</h3>${archived?'':`<button class="paste-btn" id="pasteVehicle">${icon('paste')} Pegar datos</button>`}</div>${fichaFields.map(([k,label])=>`<div><span>${label}</span><strong>${esc(v[k]||'—')}</strong></div>`).join('')}</div><div class="tool-stack">${archived?'':`<button data-panel="ai"><span>${icon('spark')}</span><div><strong>Diagnosticar con THOKAR</strong><small>IA con historial propio de este vehículo</small></div><b>›</b></button><button data-panel="record"><span>${icon('note')}</span><div><strong>Registrar trabajo</strong><small>Detalle, precio, diagnóstico y tareas</small></div><b>›</b></button><button data-panel="parts"><span>${icon('car')}</span><div><strong>Repuestos recomendados</strong><small>Prioriza el número de motor</small></div><b>›</b></button>`}<button data-panel="history"><span>${icon('list')}</span><div><strong>Trabajos registrados</strong><small>Historial de esta patente</small></div><b>›</b></button></div><button class="archive-action ${archived?'reactivate':''}" id="archiveVehicleBtn">${archived?'Reactivar vehículo':'Archivar como reparado'}</button>`}
 function bind(){
@@ -108,15 +108,43 @@ async function pasteVehicleData(){try{if(!navigator.clipboard?.readText)throw ne
 function showLoading(msg){let el=$('#loadingOverlay');if(!el){el=document.createElement('div');el.id='loadingOverlay';el.className='loading-overlay';document.body.appendChild(el)}el.innerHTML=`<div class="loading-orb"><i></i><i></i><i></i></div><strong>${esc(msg)}</strong>`;requestAnimationFrame(()=>el.classList.add('show'))}
 function hideLoading(){const el=$('#loadingOverlay');if(el){el.classList.remove('show');setTimeout(()=>el.remove(),220)}}
 let sheetCloseTimer=null;
+const sheetPanel=sheet.closest('.bottom-sheet');
+const sheetFooter=$('#sheetFooter'),sheetHandle=$('#sheetHandle');
+let sheetSnap='normal',sheetNatural=0,sheetDrag=null,sheetGestureMoved=false;
+let sheetObserver=null,sheetMeasureFrame=0;
+function sheetViewportHeight(){return Math.max(200,backdrop.getBoundingClientRect().height||window.innerHeight)}
+function sheetHeights(){
+ const available=Math.max(220,sheetViewportHeight()-12);
+ const natural=Math.max(176,sheetNatural||176);
+ const normal=Math.min(natural,available*.78);
+ const compact=Math.min(normal,Math.max(175,available*.52));
+ const expanded=available*.96;
+ return {compact:Math.min(compact,expanded),normal:Math.max(compact,Math.min(normal,expanded)),expanded};
+}
+function setSheetHeight(px){sheetPanel.style.setProperty('--zero-sheet-height',`${Math.max(120,Math.round(px))}px`)}
+function measureSheetNatural(){
+ // Measure content at its natural height, NOT the flex-stretched viewport
+ // height from the previous sheet. Otherwise even one-row sheets open huge.
+ const previousFlex=sheet.style.flex,previousOverflow=sheet.style.overflow;
+ sheet.style.flex='0 0 auto';sheet.style.overflow='visible';
+ const contentHeight=sheet.scrollHeight;
+ sheet.style.flex=previousFlex;sheet.style.overflow=previousOverflow;
+ const head=sheetHandle.offsetHeight+$('#sheetClose').offsetHeight+8;
+ sheetNatural=Math.ceil(contentHeight+head+(sheetFooter.children.length?sheetFooter.scrollHeight:0)+10);
+}
+function applySheetSnap(){
+ if(!backdrop.classList.contains('open')||sheetDrag)return;
+ const sizes=sheetHeights();
+ setSheetHeight(sizes[sheetSnap]??sizes.normal);
+}
 function syncSheetViewport(){
  const vv=window.visualViewport;
  const top=vv?Math.max(0,vv.offsetTop):0;
  const bottom=vv?Math.max(0,window.innerHeight-vv.height-vv.offsetTop):0;
  backdrop.style.setProperty('--zero-sheet-top',`${Math.round(top)}px`);
  backdrop.style.setProperty('--zero-sheet-bottom',`${Math.round(bottom)}px`);
- // Do not scroll the background when the keyboard changes. Only scroll the
- // sheet's content enough to keep the currently edited field visible.
  if(!backdrop.classList.contains('open'))return;
+ applySheetSnap();
  requestAnimationFrame(()=>{
   const active=document.activeElement;
   if(!sheet.contains(active))return;
@@ -125,29 +153,84 @@ function syncSheetViewport(){
   else if(field.top<box.top+10)sheet.scrollTop-=box.top+10-field.top;
  });
 }
+function queueSheetMeasure(){
+ if(sheetMeasureFrame)cancelAnimationFrame(sheetMeasureFrame);
+ sheetMeasureFrame=requestAnimationFrame(()=>{sheetMeasureFrame=0;if(!backdrop.classList.contains('open'))return;measureSheetNatural();applySheetSnap()});
+}
 function openSheet(html){
  if(sheetCloseTimer!==null){clearTimeout(sheetCloseTimer);sheetCloseTimer=null}
- sheet.innerHTML=html;
- const panel=sheet.closest('.bottom-sheet');
- panel.classList.toggle('sheet-has-actions',!!sheet.querySelector('.log-detail + .sheet-actions'));
- panel.scrollTop=0;sheet.scrollTop=0;
- backdrop.classList.remove('closing');
+ sheetObserver?.disconnect();sheetObserver=null;
+ sheetFooter.replaceChildren();sheet.innerHTML=html;
+ // Only these actions remain pinned. All other forms scroll freely while typing.
+ const actions=sheet.querySelector(':scope > .sheet-actions');
+ const composer=sheet.querySelector(':scope > .composer.glass-composer');
+ if(actions)sheetFooter.appendChild(actions);
+ if(composer)sheetFooter.appendChild(composer);
+ sheetPanel.classList.toggle('sheet-has-actions',!!actions);
+ sheetPanel.classList.remove('sheet-dragging');sheetSnap='normal';sheetDrag=null;sheetNatural=0;
+ sheetPanel.style.removeProperty('--zero-sheet-height');
+ sheet.scrollTop=0;
+ backdrop.classList.remove('closing','ready');
  backdrop.classList.add('open');document.body.classList.add('sheet-open');
+ // First measure unconstrained intrinsic content, then snap to 78% of the
+ // actual visual viewport or natural height, whichever is shorter.
  syncSheetViewport();
+ measureSheetNatural();applySheetSnap();
+ sheetObserver=new MutationObserver(queueSheetMeasure);
+ sheetObserver.observe(sheet,{childList:true,subtree:true,characterData:true});
  requestAnimationFrame(()=>backdrop.classList.add('ready'));
 }
 function closeSheet(){
  if(!backdrop.classList.contains('open'))return;
+ sheetObserver?.disconnect();sheetObserver=null;
+ sheetDrag=null;sheetPanel.classList.remove('sheet-dragging');
  backdrop.classList.remove('ready');backdrop.classList.add('closing');
  if(sheetCloseTimer!==null)clearTimeout(sheetCloseTimer);
  sheetCloseTimer=setTimeout(()=>{
   sheetCloseTimer=null;
   if(backdrop.classList.contains('ready'))return;
   backdrop.classList.remove('open','closing');
-  document.body.classList.remove('sheet-open');sheet.innerHTML='';
-  sheet.closest('.bottom-sheet').classList.remove('sheet-has-actions');
+  document.body.classList.remove('sheet-open');sheet.innerHTML='';sheetFooter.replaceChildren();
+  sheetPanel.classList.remove('sheet-has-actions');sheetPanel.style.removeProperty('--zero-sheet-height');
  },360);
 }
+// The gray handle is a real 34px touch target. Dragging changes the sheet
+// height, keeping its lower edge fixed just above Android navigation.
+function moveSheetHandle(e){
+ if(!sheetDrag||e.pointerId!==sheetDrag.id)return;
+ const dy=e.clientY-sheetDrag.startY;
+ const height=Math.max(145,Math.min(sheetHeights().expanded,sheetDrag.startHeight-dy));
+ sheetDrag.dy=dy;sheetDrag.lastY=e.clientY;
+ sheetGestureMoved=sheetGestureMoved||Math.abs(dy)>7;
+ if(e.cancelable)e.preventDefault();
+ setSheetHeight(height);
+}
+function finishSheetHandle(e){
+ if(!sheetDrag||e.pointerId!==sheetDrag.id)return;
+ const drag=sheetDrag;sheetDrag=null;
+ sheetPanel.classList.remove('sheet-dragging');
+ try{sheetHandle.releasePointerCapture(e.pointerId)}catch{}
+ const delta=drag.dy??0,elapsed=Math.max(1,performance.now()-drag.started);
+ const swipe=Math.abs(delta)>34||Math.abs(delta/elapsed)>.45;
+ if(!swipe){applySheetSnap();return}
+ if(delta>0){
+  if(drag.snap==='compact'||(sheetHeights().normal-sheetHeights().compact<12&&drag.snap==='normal')){closeSheet();return}
+  sheetSnap=drag.snap==='expanded'?'normal':'compact';
+ }else sheetSnap=drag.snap==='compact'?'normal':'expanded';
+ applySheetSnap();
+}
+sheetHandle.addEventListener('pointerdown',e=>{
+ if(!backdrop.classList.contains('open')||e.button!==0)return;
+ sheetDrag={id:e.pointerId,startY:e.clientY,lastY:e.clientY,dy:0,
+   startHeight:sheetPanel.getBoundingClientRect().height,snap:sheetSnap,started:performance.now()};
+ sheetGestureMoved=false;sheetPanel.classList.add('sheet-dragging');
+ try{sheetHandle.setPointerCapture(e.pointerId)}catch{}
+});
+sheetHandle.addEventListener('pointermove',moveSheetHandle);
+sheetHandle.addEventListener('pointerup',finishSheetHandle);
+sheetHandle.addEventListener('pointercancel',e=>{if(!sheetDrag)return;sheetDrag=null;sheetPanel.classList.remove('sheet-dragging');applySheetSnap()});
+sheetHandle.addEventListener('click',()=>{if(sheetGestureMoved){sheetGestureMoved=false;return}if(!backdrop.classList.contains('open'))return;sheetSnap=sheetSnap==='expanded'?'normal':'expanded';applySheetSnap()});
+sheetHandle.addEventListener('keydown',e=>{if(!backdrop.classList.contains('open'))return;if(e.key==='ArrowUp'){e.preventDefault();sheetSnap='expanded';applySheetSnap()}if(e.key==='ArrowDown'){e.preventDefault();if(sheetSnap==='compact')closeSheet();else{sheetSnap=sheetSnap==='expanded'?'normal':'compact';applySheetSnap()}}});
 function openThemePicker(){openChoice('Apariencia',[['light','Día'],['dark','Noche']],state.settings.theme,v=>{state.settings.theme=v;save();applyTheme();render()})}
 function openPanel(p){if(p==='record')recordSheet();if(p==='parts')partsSheet();if(p==='ai')aiSheet();if(p==='history')vehicleJobsSheet()}
 function itemRow(type,item={}){return `<div class="item-row" data-kind="${type}"><input class="item-name" placeholder="${type==='parts'?'Ej. bandeja, filtro, bujía':'Ej. limpiador, grasa, refrigerante'}" value="${esc(item.name||'')}"><div class="item-price"><span>$</span><input class="item-value money-entry" inputmode="numeric" placeholder="0" value="${prettyInt(item.price||'')}"></div><button class="item-remove" aria-label="Quitar">×</button></div>`}

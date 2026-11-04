@@ -218,7 +218,7 @@ app.get('/healthz', (req, res) => {
     model: geminiConfig().model,
     layout: 'zero-5.2.4',
     protected: tokenReady,
-    build: 'zero-5.2.5'
+    build: 'zero-5.3.0'
   });
 });
 

@@ -60,7 +60,7 @@ test('vehicle tool stack has calmer precomposed light and dark surfaces',()=>{
   assert.match(css,/\.dark \.tool-stack\{background:#1b1b1e!important/);
 });
 test('ZERO 5.2 branding and service worker cache are bumped',()=>{
-  assert.match(html,/THOKAR ZERO 5\.2/);
-  assert.match(sw,/thokar-zero-5-2(?:-[12345])?-2026110[234]/);
-  assert.match(app,/ZERO · 5\.2/);
+  assert.match(html,/THOKAR ZERO 5\.3\.0/);
+  assert.match(sw,/thokar-zero-5-3-0-20261104/);
+  assert.match(app,/ZERO · 5\.3\.0/);
 });

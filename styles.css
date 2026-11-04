@@ -88,82 +88,52 @@ html,body{max-width:100%;overflow-x:hidden}.screen,.content,.bottom-sheet,.recor
 .dark .parts-update-error{background:rgba(255,59,48,.14);color:#ff9a93}
 
 
-/* ZERO 5.2.4 — Android 15/16 edge-to-edge: keep navigation above OS gesture bar.
-   In some Android standalone PWAs safe-area-inset-bottom is incorrectly 0.
-   Prefer the actual visual viewport gap; use 48px only in Android standalone,
-   never double count safe-area and visual viewport (max rather than sum).
-   A single CSS value also controls the archive peek and the content clearance. */
-:root{--zero-visible-gap:0px;--zero-android-standalone-gap:0px;
-  --zero-navigation-clearance:max(env(safe-area-inset-bottom,0px),var(--zero-visible-gap),var(--zero-android-standalone-gap))}
-html.zero-android-pwa{--zero-android-standalone-gap:48px}
+
+/* THOKAR ZERO 5.3.0 — viewport-aware dock and genuinely draggable sheets.
+   The CSS safe area, rather than a hard-coded 48px, is the source of truth.
+   The visual viewport adjustment is only the inset NOT ALREADY excluded by
+   Chrome. Never add a fake Samsung navigation strip inside the sheet. */
+:root{--zero-visible-gap:0px;--zero-navigation-clearance:max(env(safe-area-inset-bottom,0px),var(--zero-visible-gap));--zero-sheet-top:0px;--zero-sheet-bottom:0px}
 .dock{bottom:calc(10px + var(--zero-navigation-clearance))!important}
 .archive-peek{bottom:calc(102px + var(--zero-navigation-clearance))!important}
 .content{padding-bottom:calc(118px + var(--zero-navigation-clearance))!important}
 body.zero-keyboard-open .dock,body.zero-keyboard-open .archive-peek{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
-@media(max-height:540px){.dock{height:72px}.dock-item{height:58px}.dock-lens{height:58px}.dock-main{width:56px;height:56px}}
-
-
-/* ZERO 5.2.5 — unified adaptive sheet geometry for all panels.
-   The overlay fits inside the *visible* Android viewport, including keyboard
-   changes. Only the sheet body scrolls; the grabber and Close control remain
-   visible. Completed work's actions are a pinned footer, not hidden below
-   Android's navigation area. */
-:root{--zero-sheet-top:0px;--zero-sheet-bottom:0px;--zero-sheet-system-reserve:0px}
-html.zero-android-pwa{--zero-sheet-system-reserve:48px}
-body.sheet-open{overflow:hidden}
-.modal-backdrop{
-  inset:auto 0 var(--zero-sheet-bottom) 0!important;
-  top:var(--zero-sheet-top)!important;
-  min-height:0;
-  overscroll-behavior:contain;
-}
+body.sheet-open{overflow:hidden;overscroll-behavior:contain}
+.modal-backdrop{position:fixed!important;inset:var(--zero-sheet-top) 0 var(--zero-sheet-bottom) 0!important;display:flex!important;align-items:flex-end;min-height:0;overflow:hidden;overscroll-behavior:contain}
 .bottom-sheet{
-  display:flex;
-  flex-direction:column;
-  width:100%;
-  min-height:0;
-  max-height:calc(100% - max(12px, env(safe-area-inset-top, 0px)))!important;
-  overflow:hidden!important;
-  padding:10px 16px 0!important;
-  box-sizing:border-box;
+  display:flex;flex-direction:column;width:100%;min-height:0;
+  height:var(--zero-sheet-height,auto);
+  max-height:calc(100% - 12px)!important;
+  overflow:hidden!important;padding:0!important;
+  border-radius:32px 32px 0 0;
+  box-sizing:border-box;contain:layout;
   background:rgba(248,248,250,.985);
-  contain:layout;
+  transition:transform .46s cubic-bezier(.22,.9,.2,1),height .27s cubic-bezier(.25,.8,.25,1);
+  will-change:transform;
 }
-.bottom-sheet .grabber{flex:0 0 auto}
-.bottom-sheet .sheet-close{
-  flex:0 0 auto;
-  align-self:flex-end;
-  float:none!important;
-  margin-bottom:4px;
+.dark .bottom-sheet{background:rgba(20,20,22,.99)}
+.bottom-sheet.sheet-dragging{transition:none!important}
+.bottom-sheet .sheet-handle{
+  width:100%;height:34px;flex:0 0 34px;
+  padding:0;margin:0;display:flex;align-items:center;justify-content:center;
+  cursor:ns-resize;touch-action:none;user-select:none;-webkit-user-select:none;
+  border:0;background:transparent;color:inherit;
 }
+.bottom-sheet .grabber{width:40px;height:5px;flex:0 0 auto;border-radius:6px;background:#c7c7cc;margin:0 auto;pointer-events:none}
+.dark .bottom-sheet .grabber{background:#77777f}
+.bottom-sheet .sheet-handle:focus-visible{outline:2px solid var(--red);outline-offset:-3px;border-radius:18px}
+.bottom-sheet .sheet-close{flex:0 0 auto;align-self:flex-end;float:none!important;margin:0 16px 6px 0;min-height:44px}
 #sheetBody{
-  flex:0 1 auto;
-  min-height:0;
-  overflow-y:auto;
-  overflow-x:hidden;
-  overscroll-behavior-y:contain;
-  -webkit-overflow-scrolling:touch;
-  scrollbar-width:none;
-  padding:0 0 calc(20px + max(env(safe-area-inset-bottom, 0px), var(--zero-sheet-system-reserve)));
+  flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;
+  overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none;padding:0 16px 16px;
 }
 #sheetBody::-webkit-scrollbar{display:none}
 .bottom-sheet .sheet-title{clear:none;padding-top:12px}
-.bottom-sheet.sheet-has-actions .sheet-actions{
-  position:sticky;
-  bottom:0;
-  z-index:4;
-  padding:12px 0 0;
-  margin-top:14px;
-  background:linear-gradient(180deg,rgba(248,248,250,.96),#f8f8fa 30%);
-  box-shadow:0 -14px 20px rgba(248,248,250,.76);
-}
-.dark .bottom-sheet.sheet-has-actions .sheet-actions{
-  background:linear-gradient(180deg,rgba(20,20,22,.95),#141416 30%);
-  box-shadow:0 -12px 20px rgba(20,20,22,.72);
-}
-/* Compact sheets keep their natural height; tall ones open up to near the
-   top safe-area limit rather than waiting for the user to drag them upward. */
-@media(max-height:620px){
- .bottom-sheet{max-height:calc(100% - max(6px, env(safe-area-inset-top, 0px)))!important}
- #sheetBody{padding-bottom:calc(12px + max(env(safe-area-inset-bottom, 0px), var(--zero-sheet-system-reserve)))}
-}
+.sheet-footer{flex:0 0 auto;display:block;max-height:48%;overflow-y:auto;overscroll-behavior:contain;padding:8px 16px calc(12px + env(safe-area-inset-bottom,0px));background:rgba(248,248,250,.985);box-shadow:0 -8px 22px rgba(248,248,250,.7)}
+.sheet-footer:empty{display:none}
+.dark .sheet-footer{background:#141416;box-shadow:0 -8px 22px rgba(20,20,22,.7)}
+.sheet-footer .sheet-actions{position:static!important;display:grid;gap:9px;margin:0!important;padding:0!important;background:none!important;box-shadow:none!important}
+.sheet-footer .composer{margin:0!important}
+@media(max-height:540px){.dock{height:72px}.dock-item{height:58px}.dock-lens{height:58px}.dock-main{width:56px;height:56px}.sheet-footer{max-height:52%}}
+@media(prefers-reduced-motion:reduce){.bottom-sheet{transition:none!important}}

@@ -4,31 +4,33 @@ const fs=require('node:fs');
 const css=fs.readFileSync('styles.css','utf8');
 const app=fs.readFileSync('app.js','utf8');
 const html=fs.readFileSync('index.html','utf8');
-test('all sheets use visual viewport anchored overlay rather than hard-coded 90dvh',()=>{
- assert.match(css,/\.modal-backdrop\{\s*inset:auto 0 var\(--zero-sheet-bottom\) 0!important;/);
- assert.match(css,/top:var\(--zero-sheet-top\)!important/);
- assert.match(css,/max-height:calc\(100% - max\(12px, env\(safe-area-inset-top, 0px\)\)\)!important/);
+test('sheets are anchored to the visual viewport, with no 48px fake navigation reserve',()=>{
+ assert.match(css,/\.modal-backdrop\{position:fixed!important;inset:var\(--zero-sheet-top\) 0 var\(--zero-sheet-bottom\) 0!important;/);
  assert.match(app,/function syncSheetViewport\(\)/);
  assert.match(app,/window\.innerHeight-vv\.height-vv\.offsetTop/);
+ assert.doesNotMatch(css,/--zero-sheet-system-reserve/);
 });
-test('sheet inner body scrolls, close button remains separate and log actions stay pinned',()=>{
+test('body scroll and footer are separate, with accessible header and draggable handle',()=>{
  assert.match(html,/class="sheet-close" id="sheetClose"/);
  assert.match(html,/id="sheetBody"/);
- assert.match(css,/#sheetBody\{\s*flex:0 1 auto;/);
- assert.match(css,/overflow-y:auto;/);
- assert.match(css,/\.bottom-sheet\.sheet-has-actions \.sheet-actions\{\s*position:sticky;/);
- assert.match(app,/sheet-has-actions/);
+ assert.match(html,/id="sheetFooter"/);
+ assert.match(html,/id="sheetHandle"/);
+ assert.match(css,/#sheetBody\{[^}]*overflow-y:auto/);
+ assert.match(css,/\.sheet-footer\{[^}]*flex:0 0 auto/);
+ assert.match(app,/sheetFooter\.appendChild\(actions\)/);
 });
-test('visual viewport listeners track keyboard and screen changes without rerendering vehicles',()=>{
+test('visible viewport updates keyboard positioning without full UI rebuild',()=>{
  assert.match(app,/window\.visualViewport\.addEventListener\('resize',syncSheetViewport/);
  assert.match(app,/window\.visualViewport\.addEventListener\('scroll',syncSheetViewport/);
- const f=app.slice(app.indexOf('function syncSheetViewport'),app.indexOf('function openSheet'));
+ const f=app.slice(app.indexOf('function syncSheetViewport'),app.indexOf('function queueSheetMeasure'));
  assert.match(f,/sheet\.scrollTop/);
  assert.doesNotMatch(f,/render\(\)/);
 });
-test('opening new sheet cancels closing timer and reset scroll position',()=>{
+test('reopening a sheet cancels pending close and resets its height and scroll',()=>{
  const f=app.slice(app.indexOf('function openSheet'),app.indexOf('function openThemePicker'));
  assert.match(f,/clearTimeout\(sheetCloseTimer\)/);
- assert.match(f,/panel\.scrollTop=0;sheet\.scrollTop=0;/);
- assert.match(f,/backdrop\.classList\.remove\('closing'\)/);
+ assert.match(f,/sheet\.scrollTop=0/);
+ assert.match(f,/sheetSnap='normal'/);
+ assert.match(f,/sheetNatural=0/);
+ assert.match(f,/backdrop\.classList\.remove\('closing','ready'\)/);
 });
