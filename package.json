@@ -1,8 +1,8 @@
 {
   "name": "thokar-zero",
-  "version": "0.5.2-3",
+  "version": "0.5.2-5",
   "private": true,
-  "description": "THOKAR ZERO 5.2.3 · ficha, registro detallado, diagnóstico IA y cobro para clientes.",
+  "description": "THOKAR ZERO 5.2.5 · recomendaciones persistentes, mejora de contraste e identidad original.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

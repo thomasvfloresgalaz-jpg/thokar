@@ -17,9 +17,9 @@ const icon=n=>icons[n]||icons.note;
 $$('[data-icon]').forEach(x=>x.innerHTML=icon(x.dataset.icon));
 const oldSettings=(()=>{try{return JSON.parse(localStorage.getItem('thokar.settings')||'{}')}catch{return{}}})();
 const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
-const state={screen:'home',vehicle:null,viewingArchived:false,vehicles:load('thokar.zero2.vehicles',{}),archivedVehicles:load('thokar.zero2.archivedVehicles',{}),logs:load('thokar.zero2.logs',[]),chats:load('thokar.zero2.chats',{}),settings:Object.assign({theme:'light',hourRate:20000,travel:0,appToken:oldSettings.appToken||''},load('thokar.zero2.settings',{})),logFilter:'all',logDirection:1,recordDrafts:load('thokar.zero2.recordDrafts',{}),aiBusy:{}};
+const state={screen:'home',vehicle:null,viewingArchived:false,vehicles:load('thokar.zero2.vehicles',{}),archivedVehicles:load('thokar.zero2.archivedVehicles',{}),logs:load('thokar.zero2.logs',[]),chats:load('thokar.zero2.chats',{}),settings:Object.assign({theme:'light',hourRate:20000,travel:0,appToken:oldSettings.appToken||''},load('thokar.zero2.settings',{})),logFilter:'all',logDirection:1,recordDrafts:load('thokar.zero2.recordDrafts',{}),partsCache:load('thokar.zero2.partsCache',{}),aiBusy:{}};
 const content=$('#content'),title=$('#pageTitle'),backdrop=$('#modalBackdrop'),sheet=$('#sheetBody');
-function save(){localStorage.setItem('thokar.zero2.vehicles',JSON.stringify(state.vehicles));localStorage.setItem('thokar.zero2.archivedVehicles',JSON.stringify(state.archivedVehicles));localStorage.setItem('thokar.zero2.logs',JSON.stringify(state.logs));localStorage.setItem('thokar.zero2.chats',JSON.stringify(state.chats));localStorage.setItem('thokar.zero2.recordDrafts',JSON.stringify(state.recordDrafts));localStorage.setItem('thokar.zero2.settings',JSON.stringify(state.settings))}
+function save(){localStorage.setItem('thokar.zero2.vehicles',JSON.stringify(state.vehicles));localStorage.setItem('thokar.zero2.archivedVehicles',JSON.stringify(state.archivedVehicles));localStorage.setItem('thokar.zero2.logs',JSON.stringify(state.logs));localStorage.setItem('thokar.zero2.chats',JSON.stringify(state.chats));localStorage.setItem('thokar.zero2.recordDrafts',JSON.stringify(state.recordDrafts));localStorage.setItem('thokar.zero2.settings',JSON.stringify(state.settings));localStorage.setItem('thokar.zero2.partsCache',JSON.stringify(state.partsCache))}
 function auth(){const h={Accept:'application/json'};if(state.settings.appToken)h['X-THOKAR-TOKEN']=state.settings.appToken;return h}
 const money=n=>'$'+Math.round(Number(n)||0).toLocaleString('es-CL');
 const plateCore=p=>{const raw=String(p??'').toUpperCase().trim().replace(/\s+/g,'');const clean=(raw.includes('-')?raw.split('-')[0]:raw).replace(/[^A-Z0-9]/g,'');return !raw.includes('-')&&clean.length===7&&/^[A-Z]{2,4}[A-Z0-9]{2,4}[0-9K]$/.test(clean)?clean.slice(0,-1):clean};
@@ -33,41 +33,6 @@ const plate=v=>v?.plate||v?.patente||'—';
 const vehicleId=v=>plateCore(plate(v));
 const chatFor=v=>state.chats[vehicleId(v)]||[];
 function saveChat(v,history){const id=vehicleId(v);if(!id)return;state.chats[id]=history.slice(-80);save()}
-function persistVehicle(v){
- const active=findActiveByPlate(plate(v));
- if(active)state.vehicles[active.key]=v;
- else{const archived=findArchivedByPlate(plate(v));if(archived)state.archivedVehicles[archived.key]=v}
- if(state.vehicle&&samePlate(plate(state.vehicle),plate(v)))state.vehicle=v;
- save();
-}
-function vehicleSpecsSignature(v){
- const pick=x=>String(x??'').trim().toUpperCase();
- return JSON.stringify({motor:pick(v.motor),chasis:pick(v.chasis),marca:pick(v.marca),modelo:pick(v.modelo),anio:pick(v.anio),combustible:pick(v.combustible),cilindrada:pick(v.cilindrada)});
-}
-function formatPartsStamp(ts){
- if(!ts)return'';
- try{return new Date(ts).toLocaleString('es-CL',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).replace(/\./g,'').replace(',', ' ·');}
- catch{return''}
-}
-function getPartsCache(v){
- const cache=v?._partsRecommendations;
- if(!cache||!cache.data||typeof cache.data!=='object')return null;
- return cache;
-}
-function savePartsCache(v,data){
- if(!v)return;
- v._partsRecommendations={signature:vehicleSpecsSignature(v),data,updatedAt:Date.now()};
- persistVehicle(v);
-}
-function renderPartsCards(v,obj,opts={}){
- const updated=formatPartsStamp(opts.updatedAt);
- const head=`<div class="parts-cache-head"><small>${opts.cached?(updated?`Guardado el ${esc(updated)}`:'Recomendación guardada para este vehículo'):'Recomendación recién consultada.'}</small><button id="refreshParts" class="soft-btn small">${icon('reload')} Actualizar recomendaciones</button></div>`;
- const ordered=['aceite','filtroAceite','bujias','refrigerante'].filter(k=>Object.prototype.hasOwnProperty.call(obj,k));
- Object.keys(obj).forEach(k=>{if(!ordered.includes(k))ordered.push(k)});
- $('#aiResult').innerHTML=head+ordered.map(k=>`<section class="part-card" data-part-key="${esc(k)}"><span>${esc(partLabels[k]||k.replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase()))}</span><strong>${esc(cleanAiText(obj[k]))}</strong><button class="part-ask-toggle">Preguntar a THOKAR</button><div class="part-mini-chat"><div class="part-answer"></div><div class="part-composer"><input class="part-question" placeholder="Ej. ¿Por qué este y no 10W-40?"><button class="part-send">Enviar</button></div></div></section>`).join('');
- const btn=$('#refreshParts'); if(btn)btn.onclick=()=>partsSheet(true);
- wirePartQuestions(v,obj);
-}
 function findArchivedByPlate(p){const core=plateCore(p);const key=Object.keys(state.archivedVehicles).find(k=>plateCore(k)===core||plateCore(plate(state.archivedVehicles[k]))===core);return key?{key,vehicle:state.archivedVehicles[key]}:null}
 function findActiveByPlate(p){const core=plateCore(p);const key=Object.keys(state.vehicles).find(k=>plateCore(k)===core||plateCore(plate(state.vehicles[k]))===core);return key?{key,vehicle:state.vehicles[key]}:null}
 function toast(t){$('#toast').textContent=t;$('#toast').classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>$('#toast').classList.remove('show'),2600)}
@@ -82,7 +47,7 @@ function archiveScreen(){const vs=Object.values(state.archivedVehicles);return `
 function lookup(){return `<div class="center-card"><div class="round-icon">${icon('search')}</div><h2>Nueva atención</h2><p>Busca la patente usando el sistema THOKAR.</p><label>Patente</label><input class="plate-input" id="plateInput" maxlength="9" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ABCD12"><button class="red-btn full" id="lookupBtn">Consultar vehículo</button><div class="lookup-state" id="lookupState"></div></div>`}
 function log(){return `<div class="segmented glass" id="logSeg"><span class="seg-lens"></span><button data-filter="all">Todo</button><button data-filter="open">Pendiente</button><button data-filter="done">Listo</button></div><div class="log-viewport"><div id="logList" class="log-page">${renderLogs(state.logFilter)}</div></div>`}
 function renderLogs(f){const ls=state.logs.filter(x=>f==='all'||x.status===f);return ls.length?ls.map(x=>`<div class="swipe-wrap log-${x.status==='done'?'done':'open'}"><button class="swipe-delete delete-log" aria-hidden="true" data-delete-log="${x.id}">Eliminar</button><button class="log-row log-open" data-log="${x.id}"><i>${x.status==='done'?'✓':'!'}</i><div><small>${esc(x.date)} · ${esc(x.plate)}</small><span class="log-vehicle">${esc(x.vehicle||vehicleNameByPlate(x.plate))}</span><strong>${esc(x.title)}</strong><p>${esc(x.note||'Registro THOKAR')}</p><b>${money(x.total||0)}</b></div><em>›</em></button></div>`).join(''):'<div class="empty">No hay registros en esta categoría.</div>'}
-function settings(){return `<div class="settings-group"><h3>Apariencia</h3><button class="setting-row" id="themePicker"><span>Modo</span><strong>${state.settings.theme==='dark'?'Noche':'Día'} ›</strong></button><div class="setting-row static"><span>Liquid Glass</span><strong>Máximo</strong></div></div><div class="settings-group"><h3>Precios</h3><label class="setting-row editable"><span>Hora hombre</span><span class="money-input">$<input id="hourRate" inputmode="numeric" value="${prettyInt(state.settings.hourRate)}"></span></label><label class="setting-row editable"><span>Desplazamiento base</span><span class="money-input">$<input id="travelRate" inputmode="numeric" value="${prettyInt(state.settings.travel)}"></span></label></div><div class="settings-group"><h3>Conexión</h3><label class="setting-row editable"><span>Token THOKAR</span><input class="token-input" id="appToken" type="password" value="${esc(state.settings.appToken)}" placeholder="Opcional"></label></div><div class="settings-group"><h3>Aplicación</h3><div class="setting-row static"><span>Prototipo</span><strong>ZERO · 5.2.3</strong></div></div>`}
+function settings(){return `<div class="settings-group"><h3>Apariencia</h3><button class="setting-row" id="themePicker"><span>Modo</span><strong>${state.settings.theme==='dark'?'Noche':'Día'} ›</strong></button><div class="setting-row static"><span>Liquid Glass</span><strong>Máximo</strong></div></div><div class="settings-group"><h3>Precios</h3><label class="setting-row editable"><span>Hora hombre</span><span class="money-input">$<input id="hourRate" inputmode="numeric" value="${prettyInt(state.settings.hourRate)}"></span></label><label class="setting-row editable"><span>Desplazamiento base</span><span class="money-input">$<input id="travelRate" inputmode="numeric" value="${prettyInt(state.settings.travel)}"></span></label></div><div class="settings-group"><h3>Conexión</h3><label class="setting-row editable"><span>Token THOKAR</span><input class="token-input" id="appToken" type="password" value="${esc(state.settings.appToken)}" placeholder="Opcional"></label></div><div class="settings-group"><h3>Aplicación</h3><div class="setting-row static"><span>Prototipo</span><strong>ZERO · 5.2.5</strong></div></div>`}
 const fichaFields=[['marca','Marca'],['modelo','Modelo'],['anio','Año'],['tipo','Tipo'],['color','Color'],['motor','Número de motor'],['chasis','VIN / Chasis'],['cilindrada','Cilindrada'],['combustible','Combustible'],['procedencia','Procedencia'],['fabricante','Fabricante']];
 function vehicle(){const v=state.vehicle||{},archived=state.viewingArchived||!!v._archived;const back=archived?'archive':'cars';return `<button class="back" data-go="${back}">‹ ${archived?'Reparados':'Vehículos'}</button><div class="vehicle-title"><span class="plate">${esc(plate(v))}</span>${archived?'<span class="archived-badge">Reparado</span>':''}<h2>${esc(carName(v))}</h2><p>${esc([v.anio,v.version,v.combustible].filter(Boolean).join(' · '))}</p></div><div class="data-card ficha-card"><div class="ficha-head"><h3>Ficha</h3>${archived?'':`<button class="paste-btn" id="pasteVehicle">${icon('paste')} Pegar datos</button>`}</div>${fichaFields.map(([k,label])=>`<div><span>${label}</span><strong>${esc(v[k]||'—')}</strong></div>`).join('')}</div><div class="tool-stack">${archived?'':`<button data-panel="ai"><span>${icon('spark')}</span><div><strong>Diagnosticar con THOKAR</strong><small>IA con historial propio de este vehículo</small></div><b>›</b></button><button data-panel="record"><span>${icon('note')}</span><div><strong>Registrar trabajo</strong><small>Detalle, precio, diagnóstico y tareas</small></div><b>›</b></button><button data-panel="parts"><span>${icon('car')}</span><div><strong>Repuestos recomendados</strong><small>Prioriza el número de motor</small></div><b>›</b></button>`}<button data-panel="history"><span>${icon('list')}</span><div><strong>Trabajos registrados</strong><small>Historial de esta patente</small></div><b>›</b></button></div><button class="archive-action ${archived?'reactivate':''}" id="archiveVehicleBtn">${archived?'Reactivar vehículo':'Archivar como reparado'}</button>`}
 function bind(){
@@ -126,7 +91,7 @@ function bindSwipe(){
 function animateRemoval(el,done){if(!el){done();return}el.classList.add('removing');setTimeout(done,390)}
 function animateArchiveRemoval(el,done){if(!el){done();return}el.classList.add('archiving');setTimeout(done,410)}
 function pruneVehicleRows(core){$$('.swipe-wrap').forEach(w=>{const row=w.querySelector('.vehicle-row[data-open]');if(row&&plateCore(row.dataset.open)===core)w.remove()});const list=$('#carsList');if(list&&!list.querySelector('.vehicle-row'))list.innerHTML='<div class="empty">Consulta una patente para comenzar.</div>';if(state.screen==='home'&&!content.querySelector('.vehicle-row')&&!content.querySelector('.empty'))content.insertAdjacentHTML('beforeend','<div class="empty">Aún no hay vehículos guardados.</div>')}
-function confirmDeleteVehicle(p,el){openChoice('Eliminar vehículo',[['delete','Eliminar vehículo y absolutamente todo su historial']],null,v=>{if(v==='delete')animateRemoval(el,()=>{const core=plateCore(p),removedIds=state.logs.filter(x=>plateCore(x.plate)===core).map(x=>x.id);for(const store of [state.vehicles,state.archivedVehicles])Object.keys(store).forEach(k=>{const vv=store[k];if(plateCore(k)===core||plateCore(plate(vv))===core)delete store[k]});state.logs=state.logs.filter(x=>plateCore(x.plate)!==core);delete state.chats[core];Object.keys(state.chats).forEach(k=>{if(plateCore(k)===core)delete state.chats[k]});Object.keys(state.recordDrafts).forEach(k=>{const vehicleDraft=k.startsWith('vehicle:')&&plateCore(k.slice(8))===core;if(vehicleDraft||removedIds.some(id=>k===`log:${id}`))delete state.recordDrafts[k]});if(plateCore(plate(state.vehicle))===core){state.vehicle=null;state.viewingArchived=false}save();el?.remove();pruneVehicleRows(core);toast('Vehículo e historial eliminados por completo')})})}
+function confirmDeleteVehicle(p,el){openChoice('Eliminar vehículo',[['delete','Eliminar vehículo y absolutamente todo su historial']],null,v=>{if(v==='delete')animateRemoval(el,()=>{const core=plateCore(p),removedIds=state.logs.filter(x=>plateCore(x.plate)===core).map(x=>x.id);for(const store of [state.vehicles,state.archivedVehicles])Object.keys(store).forEach(k=>{const vv=store[k];if(plateCore(k)===core||plateCore(plate(vv))===core)delete store[k]});state.logs=state.logs.filter(x=>plateCore(x.plate)!==core);delete state.chats[core];Object.keys(state.partsCache).forEach(k=>{if(plateCore(k)===core)delete state.partsCache[k]});Object.keys(state.chats).forEach(k=>{if(plateCore(k)===core)delete state.chats[k]});Object.keys(state.recordDrafts).forEach(k=>{const vehicleDraft=k.startsWith('vehicle:')&&plateCore(k.slice(8))===core;if(vehicleDraft||removedIds.some(id=>k===`log:${id}`))delete state.recordDrafts[k]});if(plateCore(plate(state.vehicle))===core){state.vehicle=null;state.viewingArchived=false}save();el?.remove();pruneVehicleRows(core);toast('Vehículo e historial eliminados por completo')})})}
 function confirmDeleteLog(id,el){openChoice('Eliminar trabajo',[['delete','Eliminar definitivamente']],null,v=>{if(v==='delete')animateRemoval(el,()=>{state.logs=state.logs.filter(x=>x.id!==id);delete state.recordDrafts[`log:${id}`];save();el?.remove();const page=$('#logList');if(page&&!page.querySelector('.log-row'))page.innerHTML='<div class="empty">No hay registros en esta categoría.</div>';toast('Trabajo eliminado')})})}
 function vehicleKeyByPlate(p){const core=plateCore(p);return Object.keys(state.vehicles).find(k=>plateCore(k)===core)||''}
 function vehicleNameByPlate(p){const key=vehicleKeyByPlate(p);if(key)return carName(state.vehicles[key]);const archived=findArchivedByPlate(p);return archived?carName(archived.vehicle):'Vehículo'}
@@ -142,8 +107,47 @@ function parseClipboardVehicle(text){const out={};const lines=String(text||'').r
 async function pasteVehicleData(){try{if(!navigator.clipboard?.readText)throw new Error('Tu navegador no permite leer el portapapeles automáticamente.');const text=await navigator.clipboard.readText();if(!text.trim())throw new Error('El portapapeles está vacío.');showLoading('Ordenando ficha…');await new Promise(r=>setTimeout(r,650));const parsed=parseClipboardVehicle(text);if(!Object.keys(parsed).length)throw new Error('No reconocí datos de vehículo en el texto copiado.');const current=state.vehicle||{};const currentPlate=plate(current).replace(/[^A-Z0-9-]/g,'');const pastedPlate=String(parsed.plate||'').toUpperCase().replace(/[^A-Z0-9-]/g,'');if(pastedPlate&&currentPlate&&plateCore(pastedPlate)!==plateCore(currentPlate)){hideLoading();return openChoice('Los datos no coinciden',[["cancel",`Mantener ${currentPlate}`],["replace",`Cambiar a ${pastedPlate}`]],'cancel',choice=>{if(choice==='replace'){const merged={...current,...parsed};state.vehicle=merged;state.vehicles[pastedPlate]=merged;save();render();toast('Vehículo cambiado con confirmación')}else toast('Pegado cancelado: patente diferente')})}delete parsed.plate;const merged={...current,...parsed};state.vehicle=merged;state.vehicles[currentPlate||plate(merged)]=merged;save();hideLoading();render();toast('Ficha actualizada desde el portapapeles')}catch(e){hideLoading();toast(e.message)}}
 function showLoading(msg){let el=$('#loadingOverlay');if(!el){el=document.createElement('div');el.id='loadingOverlay';el.className='loading-overlay';document.body.appendChild(el)}el.innerHTML=`<div class="loading-orb"><i></i><i></i><i></i></div><strong>${esc(msg)}</strong>`;requestAnimationFrame(()=>el.classList.add('show'))}
 function hideLoading(){const el=$('#loadingOverlay');if(el){el.classList.remove('show');setTimeout(()=>el.remove(),220)}}
-function openSheet(html){sheet.innerHTML=html;backdrop.classList.add('open');document.body.classList.add('sheet-open');requestAnimationFrame(()=>backdrop.classList.add('ready'))}
-function closeSheet(){backdrop.classList.remove('ready');backdrop.classList.add('closing');setTimeout(()=>{backdrop.classList.remove('open','closing');document.body.classList.remove('sheet-open');sheet.innerHTML=''},360)}
+let sheetCloseTimer=null;
+function syncSheetViewport(){
+ const vv=window.visualViewport;
+ const top=vv?Math.max(0,vv.offsetTop):0;
+ const bottom=vv?Math.max(0,window.innerHeight-vv.height-vv.offsetTop):0;
+ backdrop.style.setProperty('--zero-sheet-top',`${Math.round(top)}px`);
+ backdrop.style.setProperty('--zero-sheet-bottom',`${Math.round(bottom)}px`);
+ // Do not scroll the background when the keyboard changes. Only scroll the
+ // sheet's content enough to keep the currently edited field visible.
+ if(!backdrop.classList.contains('open'))return;
+ requestAnimationFrame(()=>{
+  const active=document.activeElement;
+  if(!sheet.contains(active))return;
+  const box=sheet.getBoundingClientRect(),field=active.getBoundingClientRect();
+  if(field.bottom>box.bottom-18)sheet.scrollTop+=field.bottom-box.bottom+24;
+  else if(field.top<box.top+10)sheet.scrollTop-=box.top+10-field.top;
+ });
+}
+function openSheet(html){
+ if(sheetCloseTimer!==null){clearTimeout(sheetCloseTimer);sheetCloseTimer=null}
+ sheet.innerHTML=html;
+ const panel=sheet.closest('.bottom-sheet');
+ panel.classList.toggle('sheet-has-actions',!!sheet.querySelector('.log-detail + .sheet-actions'));
+ panel.scrollTop=0;sheet.scrollTop=0;
+ backdrop.classList.remove('closing');
+ backdrop.classList.add('open');document.body.classList.add('sheet-open');
+ syncSheetViewport();
+ requestAnimationFrame(()=>backdrop.classList.add('ready'));
+}
+function closeSheet(){
+ if(!backdrop.classList.contains('open'))return;
+ backdrop.classList.remove('ready');backdrop.classList.add('closing');
+ if(sheetCloseTimer!==null)clearTimeout(sheetCloseTimer);
+ sheetCloseTimer=setTimeout(()=>{
+  sheetCloseTimer=null;
+  if(backdrop.classList.contains('ready'))return;
+  backdrop.classList.remove('open','closing');
+  document.body.classList.remove('sheet-open');sheet.innerHTML='';
+  sheet.closest('.bottom-sheet').classList.remove('sheet-has-actions');
+ },360);
+}
 function openThemePicker(){openChoice('Apariencia',[['light','Día'],['dark','Noche']],state.settings.theme,v=>{state.settings.theme=v;save();applyTheme();render()})}
 function openPanel(p){if(p==='record')recordSheet();if(p==='parts')partsSheet();if(p==='ai')aiSheet();if(p==='history')vehicleJobsSheet()}
 function itemRow(type,item={}){return `<div class="item-row" data-kind="${type}"><input class="item-name" placeholder="${type==='parts'?'Ej. bandeja, filtro, bujía':'Ej. limpiador, grasa, refrigerante'}" value="${esc(item.name||'')}"><div class="item-price"><span>$</span><input class="item-value money-entry" inputmode="numeric" placeholder="0" value="${prettyInt(item.price||'')}"></div><button class="item-remove" aria-label="Quitar">×</button></div>`}
@@ -175,33 +179,34 @@ async function shareLog(x){const text=buildShareMessage(x);try{if(navigator.shar
 function openChoice(t,opts,current,onpick){let layer=$('#choiceLayer');if(layer)layer.remove();layer=document.createElement('div');layer.id='choiceLayer';layer.className='choice-layer';layer.innerHTML=`<div class="choice-card"><h3>${esc(t)}</h3><div class="option-list">${opts.map(o=>`<button data-choice="${o[0]}"><span>${esc(o[1])}</span><i class="check">${o[0]===current?'✓':''}</i></button>`).join('')}</div><button class="cancel-choice">Cancelar</button></div>`;document.body.appendChild(layer);requestAnimationFrame(()=>layer.classList.add('show'));const done=()=>{layer.classList.remove('show');setTimeout(()=>layer.remove(),180)};$$('[data-choice]',layer).forEach(b=>b.onclick=()=>{const v=b.dataset.choice;done();onpick(v)});$('.cancel-choice',layer).onclick=done;layer.onclick=e=>{if(e.target===layer)done()}}
 async function aiRequest(prompt,purpose='diagnosis',json=false){const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),65000);try{await fetch('/healthz',{cache:'no-store'}).catch(()=>{});const r=await fetch('/api/ai/json',{method:'POST',headers:{...auth(),'Content-Type':'application/json'},body:JSON.stringify({purpose,contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:json?.1:.25,...(json?{responseMimeType:'application/json'}:{})}}),signal:ctl.signal});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error?.message||`Error IA (${r.status})`);return d.text||''}catch(e){if(e.name==='AbortError')throw new Error('Gemini tardó demasiado. Puedes reintentar.');if(e instanceof TypeError)throw new Error('No se pudo conectar con el servidor de IA. Reintenta en unos segundos.');throw e}finally{clearTimeout(timer)}}
 const partLabels={aceite:'Aceite',filtroAceite:'Filtro de aceite',bujias:'Bujías',refrigerante:'Refrigerante',resultado:'Recomendación'};
-function wirePartQuestions(v,recs){$$('.part-card').forEach(card=>{const key=card.dataset.partKey,toggle=$('.part-ask-toggle',card),chat=$('.part-mini-chat',card),input=$('.part-question',card),send=$('.part-send',card);const collapse=()=>{chat.classList.remove('open');toggle.hidden=false};toggle.onclick=()=>{$$('.part-mini-chat.open').forEach(x=>{x.classList.remove('open');const c=x.closest('.part-card'),t=c&&$('.part-ask-toggle',c);if(t)t.hidden=false});chat.classList.add('open');toggle.hidden=true;setTimeout(()=>input.focus(),120)};send.onclick=async()=>{const q=input.value.trim();if(!q)return;const answer=$('.part-answer',card);input.disabled=true;send.disabled=true;answer.innerHTML=`<div class="mini-qa-user">${esc(q)}</div><div class="mini-qa-thinking"><i></i><i></i><i></i></div>`;try{const label=partLabels[key]||key,rec=cleanAiText(recs[key]||'');const text=cleanAiText(await aiRequest(`Responde como asesor mecánico THOKAR en palabras claras y breves. Vehículo: ${plate(v)} · ${carName(v)} · año ${v.anio||'no informado'} · número de motor prioritario ${v.motor||'no confirmado'} · VIN secundario ${v.chasis||'no confirmado'}. Repuesto o fluido consultado: ${label}. Recomendación actual: ${rec}. Pregunta del mecánico: ${q}. Explica el motivo sin inventar especificaciones, números de parte ni datos no confirmados. Responde solo texto plano, sin Markdown ni asteriscos.`,'recommendations'));answer.innerHTML=`<div class="mini-qa-user">${esc(q)}</div><div class="mini-qa-model">${esc(text)}</div><button class="mini-chat-close">Cerrar consulta</button>`;$('.mini-chat-close',answer).onclick=collapse}catch(e){answer.innerHTML=`<div class="mini-qa-user">${esc(q)}</div><div class="mini-qa-model error">${esc(e.message)}</div><button class="mini-chat-close">Cerrar consulta</button>`;$('.mini-chat-close',answer).onclick=collapse}finally{input.disabled=false;send.disabled=false}};input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();send.click()}})})}
-async function partsSheet(forceRefresh=false){
- const v=state.vehicle||{};
- openSheet(`<div class="sheet-title"><h2>Repuestos recomendados</h2><p>THOKAR pedirá confirmar por VIN/catálogo cuando no haya certeza.</p></div><div id="aiResult" class="ai-result parts-result"><div class="spinner"></div>${forceRefresh?'Actualizando recomendaciones…':'Consultando IA…'}</div>`);
- const cache=getPartsCache(v),signature=vehicleSpecsSignature(v);
- if(cache&&cache.signature===signature&&!forceRefresh){
-  renderPartsCards(v,cache.data,{cached:true,updatedAt:cache.updatedAt});
-  return;
- }
- try{
-  const tx=await aiRequest(`Vehículo: ${plate(v)} · ${carName(v)} · año ${v.anio||'no informado'} · NÚMERO DE MOTOR ${v.motor||'no confirmado'} · VIN/chasis secundario ${v.chasis||'no confirmado'} · cilindrada ${v.cilindrada||'no confirmada'} · combustible ${v.combustible||'no informado'}. Para identificar compatibilidad, PRIORIZA el número de motor como dato principal; usa VIN/chasis, marca, modelo y año solo como apoyo. Recomienda brevemente aceite (viscosidad/norma), filtro de aceite, bujías y refrigerante. No inventes números de parte ni afirmes acceso a un catálogo que no tienes. Si aún no hay certeza, explica brevemente qué dato falta y escribe "Confirmar por catálogo". Devuelve SOLO JSON con claves aceite, filtroAceite, bujias, refrigerante.`,'recommendations',true);
-  let obj;
-  try{obj=JSON.parse(tx)}catch{const m=tx.match(/\{[\s\S]*\}/);obj=m?JSON.parse(m[0]):{resultado:tx}}
-  savePartsCache(v,obj);
-  renderPartsCards(v,obj,{cached:false,updatedAt:Date.now()});
- }catch(e){
-  if(cache&&cache.data){
-   $('#aiResult').innerHTML=`<div class="ai-error soft"><p>No se pudo actualizar ahora mismo. Se muestran las recomendaciones guardadas para este vehículo.</p></div><div id="cachedPartsResult" class="ai-result parts-result"></div>`;
-   const old=$('#aiResult');
-   const holder=$('#cachedPartsResult');
-   if(old&&holder){old.id='';holder.id='aiResult'}
-   renderPartsCards(v,cache.data,{cached:true,updatedAt:cache.updatedAt});
-   return;
-  }
-  $('#aiResult').innerHTML=`<div class="ai-error"><p>${esc(e.message)}</p><button id="retryParts">${icon('reload')} Reintentar</button></div>`;
-  $('#retryParts').onclick=()=>partsSheet(true);
- }
+// Recomendaciones separadas por patente: nunca se transfieren entre vehículos.
+// Una modificación de motor/VIN/ficha no vuelve a consultar automáticamente:
+// conserva el resultado anterior y avisa que requiere una actualización manual.
+const partsIdentity=v=>JSON.stringify([plateCore(plate(v)),v.motor,v.chasis,v.marca,v.modelo,v.anio,v.cilindrada,v.combustible].map(x=>String(x??'').trim().toUpperCase()));
+const savedPartsFor=v=>state.partsCache[vehicleId(v)]||null;
+function storePartsFor(v,recommendations){const key=vehicleId(v);if(!key)return;const prev=savedPartsFor(v);state.partsCache[key]={identity:partsIdentity(v),updatedAt:new Date().toISOString(),recommendations,questions:prev?.identity===partsIdentity(v)?prev.questions||{}:{}};save()}
+function storePartQuestion(v,key,question,answer){const saved=savedPartsFor(v);if(!saved)return;saved.questions??={};saved.questions[key]={question,answer,at:new Date().toISOString()};save()}
+function renderSavedPartQuestion(saved){return saved?`<div class="mini-qa-user">${esc(saved.question)}</div><div class="mini-qa-model">${esc(saved.answer)}</div><button class="mini-chat-close">Cerrar consulta</button>`:''}
+function renderPartsFor(v,data,result){if(!result?.isConnected)return;const recommendations=data.recommendations||{},old=data.identity!==partsIdentity(v),keys=['aceite','filtroAceite','bujias','refrigerante'];const order=keys.filter(k=>Object.hasOwn(recommendations,k));Object.keys(recommendations).forEach(k=>{if(!order.includes(k))order.push(k)});
+ const info=old?'<p class="parts-stale">La ficha del vehículo cambió desde esta consulta. Se muestran las recomendaciones anteriores; actualízalas para utilizar los nuevos datos.</p>':`<p class="parts-saved">Consulta guardada · ${esc(new Date(data.updatedAt).toLocaleDateString('es-CL'))}. No se consumen nuevas consultas al abrir.</p>`;
+ result.innerHTML=`${info}<div class="parts-toolbar"><button id="refreshParts" type="button">${icon('reload')} Actualizar recomendaciones</button></div>${order.map(k=>`<section class="part-card" data-part-key="${esc(k)}"><span>${esc(partLabels[k]||k.replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase()))}</span><strong>${esc(cleanAiText(recommendations[k]))}</strong><button class="part-ask-toggle">Preguntar a THOKAR</button><div class="part-mini-chat"><div class="part-answer">${renderSavedPartQuestion(data.questions?.[k])}</div><div class="part-composer"><input class="part-question" placeholder="Ej. ¿Por qué este y no 10W-40?"><button class="part-send">Enviar</button></div></div></section>`).join('')}`;
+ $('#refreshParts',result).onclick=()=>partsSheet(true);wirePartQuestions(v,recommendations,result)
+}
+function wirePartQuestions(v,recs,result){$$('.part-card',result).forEach(card=>{const key=card.dataset.partKey,toggle=$('.part-ask-toggle',card),chat=$('.part-mini-chat',card),input=$('.part-question',card),send=$('.part-send',card),answer=$('.part-answer',card);const collapse=()=>{chat.classList.remove('open');toggle.hidden=false};
+ const bindClose=()=>{const closer=$('.mini-chat-close',answer);if(closer)closer.onclick=collapse};bindClose();
+ toggle.onclick=()=>{$$('.part-mini-chat.open',result).forEach(x=>{x.classList.remove('open');const c=x.closest('.part-card'),t=c&&$('.part-ask-toggle',c);if(t)t.hidden=false});chat.classList.add('open');toggle.hidden=true;if(!answer.children.length)setTimeout(()=>input.focus(),120)};
+ send.onclick=async()=>{const q=input.value.trim();if(!q)return;input.disabled=true;send.disabled=true;answer.innerHTML=`<div class="mini-qa-user">${esc(q)}</div><div class="mini-qa-thinking"><i></i><i></i><i></i></div>`;
+ try{const label=partLabels[key]||key,rec=cleanAiText(recs[key]||'');const text=cleanAiText(await aiRequest(`Responde como asesor mecánico THOKAR en palabras claras y breves. Vehículo: ${plate(v)} · ${carName(v)} · año ${v.anio||'no informado'} · número de motor prioritario ${v.motor||'no confirmado'} · VIN secundario ${v.chasis||'no confirmado'}. Repuesto o fluido consultado: ${label}. Recomendación actual: ${rec}. Pregunta del mecánico: ${q}. Explica el motivo sin inventar especificaciones, números de parte ni datos no confirmados. Responde solo texto plano, sin Markdown ni asteriscos.`,'recommendations'));storePartQuestion(v,key,q,text);if(answer.isConnected){answer.innerHTML=renderSavedPartQuestion({question:q,answer:text});bindClose()}}
+ catch(e){if(answer.isConnected){answer.innerHTML=`<div class="mini-qa-user">${esc(q)}</div><div class="mini-qa-model error">${esc(e.message)}</div><button class="mini-chat-close">Cerrar consulta</button>`;bindClose()}}finally{input.disabled=false;send.disabled=false}};
+ input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();send.click()}})})}
+async function partsSheet(force=false){const v={...(state.vehicle||{})},cached=savedPartsFor(v);openSheet(`<div class="sheet-title"><h2>Repuestos recomendados</h2><p>Prioridad: número de motor y luego VIN/chasis. Confirma referencias críticas con catálogo o fabricante.</p></div><div id="aiResult" class="ai-result parts-result"></div>`);const result=$('#aiResult');
+ if(cached?.recommendations&&!force){renderPartsFor(v,cached,result);return}
+ if(cached?.recommendations){renderPartsFor(v,cached,result);const refresh=$('#refreshParts',result);if(refresh){refresh.disabled=true;refresh.textContent='Actualizando…'}result.insertAdjacentHTML('afterbegin','<p class="parts-updating"><span class="mini-spinner"></span> Consultando nuevamente…</p>')}
+ else result.innerHTML='<div class="parts-loading"><span class="spinner"></span> Consultando IA…</div>';
+ try{const tx=await aiRequest(`Vehículo: ${plate(v)} · ${carName(v)} · año ${v.anio||'no informado'} · NÚMERO DE MOTOR ${v.motor||'no confirmado'} · VIN/chasis secundario ${v.chasis||'no confirmado'} · cilindrada ${v.cilindrada||'no confirmada'} · combustible ${v.combustible||'no informado'}. Para identificar compatibilidad, PRIORIZA el número de motor como dato principal; usa VIN/chasis, marca, modelo y año solo como apoyo. Recomienda brevemente aceite (viscosidad/norma), filtro de aceite, bujías y refrigerante. No inventes números de parte ni afirmes acceso a un catálogo que no tienes. Si aún no hay certeza, explica brevemente qué dato falta y escribe "Confirmar por catálogo". Devuelve SOLO JSON con claves aceite, filtroAceite, bujias, refrigerante.`,'recommendations',true);
+ let obj;try{obj=JSON.parse(tx)}catch{const m=tx.match(/\{[\s\S]*\}/);obj=m?JSON.parse(m[0]):{resultado:tx}};
+ if(!obj||typeof obj!=='object'||Array.isArray(obj)||!Object.keys(obj).length)throw new Error('Gemini no devolvió recomendaciones válidas.');storePartsFor(v,obj);renderPartsFor(v,savedPartsFor(v),result);toast('Recomendaciones guardadas para este vehículo')}
+ catch(e){if(!result.isConnected)return;if(cached?.recommendations){renderPartsFor(v,cached,result);result.insertAdjacentHTML('afterbegin',`<div class="parts-update-error">No se pudieron actualizar las recomendaciones: ${esc(e.message)}. Se mantienen los datos guardados.</div>`)}else{result.innerHTML=`<div class="ai-error"><p>${esc(e.message)}</p><button id="retryParts">${icon('reload')} Reintentar</button></div>`;$('#retryParts',result).onclick=()=>partsSheet(true)}}
 }
 function renderChatMessage(m,index){const text=esc(cleanAiText(m.text||''));if(m.role==='user')return `<div class="bubble user enter">${text}</div>`;return `<div class="chat-model-wrap"><div class="bubble model enter">${text}</div><button class="use-tasks" data-use-tasks="${index}">Usar como lista de tareas</button></div>`}
 function updatePendingDiagnosis(v,summary){const clean=cleanAiText(summary);if(!clean)return;v._aiDiagnosis=clean;const key=findActiveByPlate(plate(v))?.key;if(key)state.vehicles[key]=v;const pending=state.logs.find(x=>samePlate(x.plate,plate(v))&&x.status==='open');if(pending){pending.diagnosis=clean;const logDraft=state.recordDrafts[`log:${pending.id}`];if(logDraft)logDraft.diagnosis=clean}const vehicleDraftKey=`vehicle:${plate(v)}`;if(state.recordDrafts[vehicleDraftKey])state.recordDrafts[vehicleDraftKey].diagnosis=clean;const live=$('#rDiagnosis');if(live&&pending)live.value=clean;save()}
@@ -209,4 +214,30 @@ async function useMessageAsTasks(v,text,btn){btn.disabled=true;const original=bt
 async function aiConversationRequest(v,history){const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),65000);const contents=history.slice(-14).map(m=>({role:m.role==='model'?'model':'user',parts:[{text:m.text}]}));try{await fetch('/healthz',{cache:'no-store'}).catch(()=>{});const r=await fetch('/api/ai/json',{method:'POST',headers:{...auth(),'Content-Type':'application/json'},body:JSON.stringify({purpose:'diagnosis',systemInstruction:{parts:[{text:`Actúa como asistente mecánico THOKAR. Vehículo aislado: patente ${plate(v)}, ${carName(v)}, año ${v.anio||'no informado'}, número de motor ${v.motor||'no confirmado'}, VIN/chasis ${v.chasis||'no confirmado'}, combustible ${v.combustible||'no informado'}. No mezcles información con otros vehículos. No inventes torques, referencias ni especificaciones. Responde en español claro, texto plano, sin Markdown ni asteriscos. Da diagnóstico probable, verificaciones y próximos pasos. Al final agrega una sola línea que empiece exactamente con RESUMEN_DIAGNOSTICO: y resuma el diagnóstico acumulado.`}]},contents,generationConfig:{temperature:.25}}),signal:ctl.signal});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error?.message||`Error IA (${r.status})`);return d.text||''}catch(e){if(e.name==='AbortError')throw new Error('Gemini tardó demasiado. Puedes reintentar.');if(e instanceof TypeError)throw new Error('No se pudo conectar con el servidor de IA. Reintenta en unos segundos.');throw e}finally{clearTimeout(timer)}}
 function aiSheet(){const v=state.vehicle||{},key=vehicleId(v);let history=[...chatFor(v)],lastRetryIndex=-1;const initial=history.length?history.map(renderChatMessage).join(''):'<div class="bubble model enter">Cuéntame qué síntoma presenta el vehículo.</div>';openSheet(`<div class="sheet-title"><h2>Diagnóstico THOKAR</h2><p>${esc(plate(v))} · ${esc(carName(v))}</p></div><div class="chat" id="chat">${initial}</div><div class="composer glass-composer"><input id="aiInput" placeholder="Describe el problema"><button id="aiSend">Enviar</button></div>`);const chat=$('#chat'),input=$('#aiInput'),sendBtn=$('#aiSend');const wireTaskButtons=()=>{$$('[data-use-tasks]',chat).forEach(b=>{if(b.dataset.wired)return;b.dataset.wired='1';b.onclick=()=>{const m=history[Number(b.dataset.useTasks)];if(m?.role==='model')useMessageAsTasks(v,m.text,b)}})};wireTaskButtons();chat.scrollTop=chat.scrollHeight;const finishBusy=()=>{state.aiBusy[key]=false;sendBtn.disabled=false;input.disabled=false};const send=async(q,{retry=false}={})=>{q=String(q||'').trim();if(!q||state.aiBusy[key])return;state.aiBusy[key]=true;sendBtn.disabled=true;input.disabled=true;let userIndex;if(!retry){history.push({role:'user',text:q,at:Date.now()});userIndex=history.length-1;saveChat(v,history);chat.insertAdjacentHTML('beforeend',renderChatMessage(history[userIndex],userIndex))}else userIndex=lastRetryIndex;const thinking=document.createElement('div');thinking.className='bubble model thinking enter';thinking.innerHTML='<span>Pensando</span><i></i><i></i><i></i>';chat.appendChild(thinking);chat.scrollTop=chat.scrollHeight;try{const text=cleanAiText(await aiConversationRequest(v,history));const dm=text.match(/RESUMEN_DIAGNOSTICO:\s*([^\n]+)/i);const visible=cleanAiText(text.replace(/^\s*RESUMEN_DIAGNOSTICO:.*$/gim,'')).trim()||'No pude generar una respuesta útil.';updatePendingDiagnosis(v,dm?.[1]||visible);const model={role:'model',text:visible,at:Date.now()};history.push(model);saveChat(v,history);thinking.remove();chat.insertAdjacentHTML('beforeend',renderChatMessage(model,history.length-1));wireTaskButtons();lastRetryIndex=-1}catch(e){thinking.className='bubble model error-bubble enter';thinking.innerHTML=`<span>${esc(e.message)}</span><button class="retry-ai" aria-label="Reintentar">${icon('reload')}</button>`;lastRetryIndex=userIndex;$('.retry-ai',thinking).onclick=()=>{thinking.remove();send(q,{retry:true})}}finally{finishBusy();chat.scrollTop=chat.scrollHeight}};sendBtn.onclick=()=>{const q=input.value.trim();if(!q)return;input.value='';send(q)};input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendBtn.click()}})}
 $('#sheetClose').onclick=closeSheet;backdrop.onclick=e=>{if(e.target===backdrop)closeSheet()};$('#profileBtn').onclick=()=>go('settings');document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g&&!content.contains(g))go(g.dataset.go)});addEventListener('resize',()=>requestAnimationFrame(moveLens));if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));render();
+
+// ZERO 5.2.4: Samsung/Android edge-to-edge may reserve a visual system-nav
+// strip that env(safe-area-inset-bottom) reports as zero. Re-anchor the dock to
+// the visible viewport, without jumping over the on-screen keyboard.
+function syncAndroidVisibleBottom(){
+ const vv=window.visualViewport;
+ if(!vv)return;
+ const uncovered=Math.max(0,window.innerHeight-vv.height-vv.offsetTop);
+ const focused=!!document.activeElement?.matches?.('input,textarea,[contenteditable="true"]');
+ const keyboard=focused&&uncovered>140;
+ document.body.classList.toggle('zero-keyboard-open',keyboard);
+ document.documentElement.style.setProperty('--zero-visible-gap',`${Math.round(keyboard?0:Math.min(150,uncovered))}px`);
+}
+if(window.visualViewport){
+ window.visualViewport.addEventListener('resize',syncAndroidVisibleBottom,{passive:true});
+ window.visualViewport.addEventListener('resize',syncSheetViewport,{passive:true});
+ window.visualViewport.addEventListener('scroll',syncSheetViewport,{passive:true});
+ window.visualViewport.addEventListener('scroll',syncAndroidVisibleBottom,{passive:true});
+ window.addEventListener('resize',syncAndroidVisibleBottom,{passive:true});
+ window.addEventListener('pageshow',syncAndroidVisibleBottom);
+ window.addEventListener('pageshow',syncSheetViewport);
+ document.addEventListener('focusin',syncAndroidVisibleBottom,{passive:true});
+ document.addEventListener('focusout',()=>requestAnimationFrame(syncAndroidVisibleBottom),{passive:true});
+ syncAndroidVisibleBottom();
+ syncSheetViewport();
+}
 })();

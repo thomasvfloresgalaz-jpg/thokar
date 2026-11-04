@@ -57,19 +57,113 @@ html,body{max-width:100%;overflow-x:hidden}.screen,.content,.bottom-sheet,.recor
 .swipe-archive{position:absolute;z-index:0;left:0;top:0;bottom:0;width:104px;border:0;border-radius:24px 0 0 24px;background:#64d2ff;color:#07364a;font-weight:850;opacity:0;transform:translateX(-18px);transition:opacity .16s ease,transform .26s cubic-bezier(.2,.8,.2,1);pointer-events:none}.swipe-wrap.archive-open .swipe-archive{opacity:1;transform:none;pointer-events:auto}.swipe-wrap.archive-open .swipe-delete{opacity:0!important;pointer-events:none!important}.swipe-wrap.delete-open .swipe-archive{opacity:0!important;pointer-events:none!important}.swipe-wrap.archive-open.swipe-closing .swipe-archive{opacity:1!important;transform:none!important;pointer-events:none!important}.swipe-wrap.archive-open.swipe-closing .swipe-delete{opacity:0!important}.swipe-wrap.archiving{animation:archiveRow .4s cubic-bezier(.4,0,.2,1) forwards}@keyframes archiveRow{0%{opacity:1;max-height:160px;transform:translateX(0) scale(1)}55%{opacity:0;transform:translateX(38px) scale(.97);max-height:160px}100%{opacity:0;transform:translateX(55px) scale(.95);max-height:0;margin-bottom:0}}
 .dark .swipe-archive{background:#64d2ff;color:#052f42}
 
+/* ZERO 5.2.3 — text above ambience, no white flash on navigation, solid readable cards */
+.ambient{z-index:0!important;pointer-events:none!important}
+.content{position:relative;z-index:1;isolation:isolate}
+.screen{animation:zero524Slide .22s cubic-bezier(.2,.85,.2,1) both!important}
+@keyframes zero524Slide{from{opacity:1;transform:translateY(7px)}to{opacity:1;transform:none}}
+.data-card,.tool-stack{isolation:isolate;opacity:1!important}
+.data-card{background:linear-gradient(145deg,#fff,#fff7f8)!important;border-color:rgba(255,255,255,.92)!important}
+.tool-stack{background:linear-gradient(145deg,#fff,#fff8f9)!important;border-color:rgba(255,255,255,.94)!important}
+.tool-stack>button{background:transparent!important;opacity:1!important}
+.tool-stack>button strong{color:#16161a!important;opacity:1!important}
+.tool-stack>button small{color:#51515a!important;opacity:1!important}
+.ficha-card div>span{color:#606069!important;opacity:1!important}
+.ficha-card div>strong{color:#111115!important;opacity:1!important;overflow-wrap:anywhere}
+.dark .data-card,.dark .tool-stack{background:#1c1c20!important;border-color:rgba(255,255,255,.11)!important}
+.dark .tool-stack>button{background:transparent!important}
+.dark .tool-stack>button strong,.dark .ficha-card div>strong{color:#f5f5f7!important}
+.dark .tool-stack>button small,.dark .ficha-card div>span{color:#b7b7c0!important}
+.parts-saved,.parts-stale,.parts-update-error{margin:12px 0;padding:11px 13px;border-radius:15px;line-height:1.5;font-size:13px}
+.parts-saved{background:rgba(52,199,89,.09);color:#286d3d}
+.parts-stale{background:rgba(255,149,0,.11);color:#986100}
+.parts-update-error{background:rgba(255,59,48,.08);color:#aa2722}
+.parts-toolbar{display:flex;justify-content:flex-end;margin:9px 0 15px}
+.parts-toolbar button{border:0;border-radius:14px;padding:10px 12px;display:flex;align-items:center;gap:7px;background:rgba(255,45,45,.11);color:var(--red);font-size:13px;font-weight:800}
+.parts-toolbar svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2}
+.parts-toolbar button:disabled{opacity:.55}
+.parts-updating,.parts-loading{padding:10px 5px;display:flex;gap:10px;align-items:center;color:var(--muted)}
+.dark .parts-saved{background:rgba(52,199,89,.14);color:#81db94}
+.dark .parts-stale{background:rgba(255,159,10,.14);color:#f5bb6c}
+.dark .parts-update-error{background:rgba(255,59,48,.14);color:#ff9a93}
 
-/* ZERO 5.2.3 — cached parts and softer ambient highlight */
-#app{position:relative;isolation:isolate}
-#app>.ambient{z-index:0;mix-blend-mode:normal}
-.topbar,.content,.dock{position:relative;z-index:1}
-.a1{opacity:.18!important}
-.a2{background:radial-gradient(circle at center, rgba(255,255,255,.20), rgba(255,255,255,0) 72%)!important;opacity:.40!important}
-.settings-group,.data-card,.tool-stack,.vehicle-row,.archive-entry,.segmented{background:linear-gradient(145deg,rgba(255,255,255,.985),rgba(255,249,250,.955))!important}
-.tool-stack>button,.vehicle-row{background:transparent!important}
-.data-card span,.tool-stack small{opacity:.96}
-.dark .settings-group,.dark .data-card,.dark .tool-stack,.dark .vehicle-row,.dark .archive-entry,.dark .segmented{background:linear-gradient(145deg,rgba(28,28,30,.975),rgba(20,20,22,.95))!important}
-.parts-cache-head{display:flex;gap:12px;align-items:center;justify-content:space-between;margin:0 0 12px}
-.parts-cache-head small{color:var(--muted);display:block;line-height:1.35}
-.soft-btn.small{border-radius:12px;padding:10px 12px;font-size:13px;white-space:nowrap}
-.ai-error.soft{margin-bottom:10px}
-@media (max-width:520px){.parts-cache-head{flex-direction:column;align-items:flex-start}.soft-btn.small{width:100%;justify-content:center}}
+
+/* ZERO 5.2.4 — Android 15/16 edge-to-edge: keep navigation above OS gesture bar.
+   In some Android standalone PWAs safe-area-inset-bottom is incorrectly 0.
+   Prefer the actual visual viewport gap; use 48px only in Android standalone,
+   never double count safe-area and visual viewport (max rather than sum).
+   A single CSS value also controls the archive peek and the content clearance. */
+:root{--zero-visible-gap:0px;--zero-android-standalone-gap:0px;
+  --zero-navigation-clearance:max(env(safe-area-inset-bottom,0px),var(--zero-visible-gap),var(--zero-android-standalone-gap))}
+html.zero-android-pwa{--zero-android-standalone-gap:48px}
+.dock{bottom:calc(10px + var(--zero-navigation-clearance))!important}
+.archive-peek{bottom:calc(102px + var(--zero-navigation-clearance))!important}
+.content{padding-bottom:calc(118px + var(--zero-navigation-clearance))!important}
+body.zero-keyboard-open .dock,body.zero-keyboard-open .archive-peek{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
+@media(max-height:540px){.dock{height:72px}.dock-item{height:58px}.dock-lens{height:58px}.dock-main{width:56px;height:56px}}
+
+
+/* ZERO 5.2.5 — unified adaptive sheet geometry for all panels.
+   The overlay fits inside the *visible* Android viewport, including keyboard
+   changes. Only the sheet body scrolls; the grabber and Close control remain
+   visible. Completed work's actions are a pinned footer, not hidden below
+   Android's navigation area. */
+:root{--zero-sheet-top:0px;--zero-sheet-bottom:0px;--zero-sheet-system-reserve:0px}
+html.zero-android-pwa{--zero-sheet-system-reserve:48px}
+body.sheet-open{overflow:hidden}
+.modal-backdrop{
+  inset:auto 0 var(--zero-sheet-bottom) 0!important;
+  top:var(--zero-sheet-top)!important;
+  min-height:0;
+  overscroll-behavior:contain;
+}
+.bottom-sheet{
+  display:flex;
+  flex-direction:column;
+  width:100%;
+  min-height:0;
+  max-height:calc(100% - max(12px, env(safe-area-inset-top, 0px)))!important;
+  overflow:hidden!important;
+  padding:10px 16px 0!important;
+  box-sizing:border-box;
+  background:rgba(248,248,250,.985);
+  contain:layout;
+}
+.bottom-sheet .grabber{flex:0 0 auto}
+.bottom-sheet .sheet-close{
+  flex:0 0 auto;
+  align-self:flex-end;
+  float:none!important;
+  margin-bottom:4px;
+}
+#sheetBody{
+  flex:0 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior-y:contain;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+  padding:0 0 calc(20px + max(env(safe-area-inset-bottom, 0px), var(--zero-sheet-system-reserve)));
+}
+#sheetBody::-webkit-scrollbar{display:none}
+.bottom-sheet .sheet-title{clear:none;padding-top:12px}
+.bottom-sheet.sheet-has-actions .sheet-actions{
+  position:sticky;
+  bottom:0;
+  z-index:4;
+  padding:12px 0 0;
+  margin-top:14px;
+  background:linear-gradient(180deg,rgba(248,248,250,.96),#f8f8fa 30%);
+  box-shadow:0 -14px 20px rgba(248,248,250,.76);
+}
+.dark .bottom-sheet.sheet-has-actions .sheet-actions{
+  background:linear-gradient(180deg,rgba(20,20,22,.95),#141416 30%);
+  box-shadow:0 -12px 20px rgba(20,20,22,.72);
+}
+/* Compact sheets keep their natural height; tall ones open up to near the
+   top safe-area limit rather than waiting for the user to drag them upward. */
+@media(max-height:620px){
+ .bottom-sheet{max-height:calc(100% - max(6px, env(safe-area-inset-top, 0px)))!important}
+ #sheetBody{padding-bottom:calc(12px + max(env(safe-area-inset-bottom, 0px), var(--zero-sheet-system-reserve)))}
+}

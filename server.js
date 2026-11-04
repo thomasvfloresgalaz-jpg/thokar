@@ -152,7 +152,7 @@ async function googleGeminiFetch(mode, input, signal, modelOverride) {
   const suffix = mode === 'stream' ? ':streamGenerateContent?alt=sse' : ':generateContent';
   const response = await fetch(`${GEMINI_BASE}/models/${encodeURIComponent(selectedModel)}${suffix}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-ZERO/5.2.3' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-ZERO/5.2.4' },
     body: JSON.stringify(body), signal
   });
   if (!response.ok) {
@@ -216,9 +216,9 @@ app.get('/healthz', (req, res) => {
     boostrConfigured: isBoostrConfigured(),
     geminiConfigured: Boolean(geminiConfig().apiKey),
     model: geminiConfig().model,
-    layout: 'zero-5.2.3',
+    layout: 'zero-5.2.4',
     protected: tokenReady,
-    build: 'zero-5.2.3'
+    build: 'zero-5.2.5'
   });
 });
 
@@ -325,7 +325,7 @@ app.post('/api/ai/stream', aiRateLimit, async (req, res) => {
 
 const PUBLIC_FILES = new Set([
   'index.html', 'app.js', 'lib.js', 'styles.css', 'sw.js', 'manifest.webmanifest',
-  'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'
+  'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'favicon-48.png', 'thokar-logo.png'
 ]);
 
 function sendPublicFile(req, res, filename) {
