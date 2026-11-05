@@ -1,12 +1,12 @@
 {
   "name": "thokar-zero",
-  "version": "5.3.1",
+  "version": "5.3.2",
   "private": true,
-  "description": "THOKAR ZERO 5.3.1 · cabecera compacta de registros, manteniendo ventanas adaptativas Android.",
+  "description": "THOKAR ZERO 5.3.2 · Bitácora Pendiente primero y detalle de trabajos finalizados rediseñado.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test *.test.js"
+    "test": "node --check app.js && node --check server.js && node --check sw.js"
   },
   "engines": {
     "node": ">=22"

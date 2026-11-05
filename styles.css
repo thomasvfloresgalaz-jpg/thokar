@@ -160,3 +160,43 @@ body.sheet-open{overflow:hidden;overscroll-behavior:contain}
 .record-header-mode #sheetBody{padding-top:0}
 .record-header-mode .record-tabs{margin-top:10px;margin-bottom:16px}
 @media(max-width:370px){.record-header-mode .sheet-overline{font-size:13px}.record-vehicle-name{font-size:20px}}
+
+/* ZERO 5.3.2 — resumen finalizado, lectura rápida y acciones compactas. */
+.completed-receipt{display:grid;gap:14px;min-width:0;padding:8px 0 10px}
+.completed-hero{padding:16px 16px 17px;background:linear-gradient(150deg,rgba(53,199,89,.10),rgba(118,118,128,.06) 64%,rgba(255,45,45,.035));border:1px solid rgba(52,199,89,.16);border-radius:24px}
+.completed-hero-top{display:flex;gap:11px;align-items:center}
+.completed-success-icon{display:grid;place-items:center;flex:0 0 37px;width:37px;height:37px;border-radius:13px;background:#26b857;color:white;font-size:23px;font-weight:800;box-shadow:0 6px 15px rgba(36,176,80,.16)}
+.completed-hero-top>div{display:flex;flex-direction:column;gap:3px}
+.completed-eyebrow{font-size:11px;letter-spacing:.075em;font-weight:850;color:#188d48}
+.completed-subtitle{font-size:12px;color:var(--muted)}
+.completed-hero h2{font-size:clamp(22px,6.1vw,29px);letter-spacing:-.035em;line-height:1.16;margin:17px 0;overflow-wrap:anywhere}
+.completed-car{display:flex;align-items:center;gap:10px;padding:11px;background:rgba(118,118,128,.085);border-radius:15px;min-width:0}
+.completed-car-icon{width:32px;height:32px;display:grid;place-items:center;border-radius:10px;background:rgba(255,45,45,.11);color:var(--red);flex:0 0 32px}
+.completed-car-icon svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.completed-car>div{min-width:0;display:flex;flex-direction:column;gap:3px}
+.completed-car strong{font-size:13px;line-height:1.25;overflow-wrap:anywhere}
+.completed-car>div span{color:var(--muted);font-size:12px;font-weight:750;letter-spacing:.045em}
+.completed-total-card{border-radius:22px;padding:17px 18px;background:var(--card);border:1px solid var(--line);display:flex;flex-direction:column;gap:3px}
+.completed-total-card>span{font-size:13px;color:var(--muted);font-weight:650}
+.completed-total-card>strong{font-size:clamp(30px,9vw,40px);color:var(--text);letter-spacing:-.04em;font-variant-numeric:tabular-nums;line-height:1.25}
+.completed-total-card>small{font-size:12px;color:var(--muted);margin-top:3px}
+.completed-section{padding:2px 1px}
+.completed-section h3{font-size:15px;font-weight:800;letter-spacing:-.01em;margin:3px 0 11px}
+.completed-rows,.completed-items{background:rgba(118,118,128,.07);border-radius:17px;padding:0 14px}
+.completed-row,.completed-item{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}
+.completed-row:last-child,.completed-item:last-child{border-bottom:0}
+.completed-row span,.completed-item span{color:var(--muted);flex:1;min-width:0;overflow-wrap:anywhere}
+.completed-row strong,.completed-item b{font-size:13px;font-weight:750;text-align:right;max-width:56%;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.completed-discount strong{color:#208b4e}
+.completed-diagnosis{margin:0;padding:14px;border-radius:17px;background:rgba(118,118,128,.07);font-size:14px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.sheet-footer .sheet-actions.completed-actions{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px}
+.sheet-footer .sheet-actions.completed-actions button{font-size:13px;min-height:45px;padding:12px 8px;background:rgba(118,118,128,.12);border:1px solid var(--line)}
+.sheet-footer .sheet-actions.completed-actions .primary{grid-column:1/-1;background:linear-gradient(180deg,#ff453a,#d70015);color:#fff;border:0;font-size:16px;min-height:48px}
+.dark .completed-hero{background:linear-gradient(155deg,rgba(52,199,89,.11),rgba(255,255,255,.035) 58%,rgba(255,45,45,.035));border-color:rgba(52,199,89,.24)}
+.dark .completed-eyebrow{color:#62da8a}
+.dark .completed-car,.dark .completed-rows,.dark .completed-items,.dark .completed-diagnosis{background:rgba(255,255,255,.055)}
+.dark .completed-total-card{background:#202023;border-color:rgba(255,255,255,.10)}
+.dark .completed-discount strong{color:#72e99a}
+.dark .sheet-footer .sheet-actions.completed-actions button{background:rgba(255,255,255,.075);border-color:rgba(255,255,255,.08);color:#fff}
+.dark .sheet-footer .sheet-actions.completed-actions .primary{background:linear-gradient(180deg,#ff453a,#d70015);color:#fff}
+@media(max-width:365px){.completed-receipt{gap:11px}.completed-hero{padding:13px}.completed-total-card{padding:14px}.sheet-footer .sheet-actions.completed-actions button{font-size:12px}}
