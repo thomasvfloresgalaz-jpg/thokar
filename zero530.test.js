@@ -24,8 +24,8 @@ test('no standalone system nav reserve, and close/drag state are reset properly'
  assert.match(app,/sheetObserver\?\.disconnect\(\)/);
 });
 test('latest cache and legacy storage keys remain unchanged for data migration',()=>{
- assert.match(html,/THOKAR ZERO 5\.3\.0/);
- assert.match(sw,/thokar-zero-5-3-0-20261104/);
- assert.equal(pkg.version,'5.3.0');
+ assert.match(html,/THOKAR ZERO 5\.3\.1/);
+ assert.match(sw,/thokar-zero-5-3-1-20261104/);
+ assert.equal(pkg.version,'5.3.1');
  for(const k of ['vehicles','archivedVehicles','logs','chats','recordDrafts','settings','partsCache'])assert.ok(app.includes(`thokar.zero2.${k}`),`Missing ${k}`);
 });

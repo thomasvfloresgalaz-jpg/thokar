@@ -137,3 +137,26 @@ body.sheet-open{overflow:hidden;overscroll-behavior:contain}
 .sheet-footer .composer{margin:0!important}
 @media(max-height:540px){.dock{height:72px}.dock-item{height:58px}.dock-lens{height:58px}.dock-main{width:56px;height:56px}.sheet-footer{max-height:52%}}
 @media(prefers-reduced-motion:reduce){.bottom-sheet{transition:none!important}}
+
+/* ZERO 5.3.1 · Compact, persistent record header. The previous sheet controls,
+   snap heights and footer layout are preserved unchanged. */
+.sheet-chrome{flex:0 0 auto;min-width:0;padding:0 16px}
+.sheet-chrome-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px}
+.sheet-chrome-row .sheet-close{margin:0 0 4px auto!important;align-self:center!important}
+.sheet-overline{display:none}
+.sheet-record-meta{display:none}
+.record-header-mode .sheet-overline{display:block;color:var(--red);font-size:14px;font-weight:750;letter-spacing:.01em;line-height:1.25}
+.record-header-mode .sheet-record-meta{display:block;padding:0 0 4px}
+.record-vehicle-name{font-size:clamp(20px,5.15vw,24px);font-weight:760;line-height:1.2;letter-spacing:-.035em;margin:6px 0 10px;color:var(--text);overflow-wrap:anywhere;text-wrap:balance}
+.record-meta-line{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-height:28px;margin-bottom:3px}
+.record-plate{font-size:14px;font-weight:600;color:var(--muted);letter-spacing:.01em}
+.record-status{font-size:12px;line-height:1;white-space:nowrap;font-weight:760;padding:7px 10px;border-radius:99px}
+.record-status.is-pending{background:rgba(235,166,42,.16);color:#8a5b09}
+.record-status.is-done{background:rgba(33,163,87,.15);color:#157a41}
+.dark .record-vehicle-name{color:#fff}
+.dark .record-plate{color:#aaaab0}
+.dark .record-status.is-pending{background:rgba(251,191,55,.17);color:#ffcd65}
+.dark .record-status.is-done{background:rgba(52,211,153,.17);color:#86efac}
+.record-header-mode #sheetBody{padding-top:0}
+.record-header-mode .record-tabs{margin-top:10px;margin-bottom:16px}
+@media(max-width:370px){.record-header-mode .sheet-overline{font-size:13px}.record-vehicle-name{font-size:20px}}

@@ -34,11 +34,11 @@ test('ambient background is behind readable cards and fade opacity does not wash
  assert.match(css,/\.dark \.data-card,\.dark \.tool-stack/);
 });
 test('THOKAR supplied logo, app icons and browser favicon included',()=>{
- assert.match(html,/favicon-48\.png\?v=zero530/);
- assert.match(html,/THOKAR ZERO 5\.3\.0/);
+ assert.match(html,/favicon-48\.png\?v=zero531/);
+ assert.match(html,/THOKAR ZERO 5\.3\.1/);
  assert.match(sw,/favicon-48\.png/);
- assert.match(sw,/thokar-zero-5-3-0-20261104/);
- assert.match(server,/build: 'zero-5\.3\.0'/);
+ assert.match(sw,/thokar-zero-5-3-1-20261104/);
+ assert.match(server,/build: 'zero-5\.3\.1'/);
  assert.ok(manifest.icons.some(x=>x.sizes==='192x192'));
  assert.ok(manifest.icons.some(x=>x.sizes==='512x512'));
  for(const f of ['thokar-logo.png','favicon-48.png','icon-192.png','icon-512.png'])assert.ok(fs.statSync(f).size>100);

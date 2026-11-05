@@ -1,4 +1,4 @@
-# THOKAR ZERO 5.3.0 · versión oficial
+# THOKAR ZERO 5.3.1 · versión oficial
 
 Aplicación web/PWA THOKAR (HTML, CSS, JavaScript y backend Node.js/Render). Esta versión parte de ZERO 5.2.5 y corrige el sistema compartido de ventanas de Android sin cambiar claves de almacenamiento ni datos del usuario.
 
@@ -15,7 +15,7 @@ Aplicación web/PWA THOKAR (HTML, CSS, JavaScript y backend Node.js/Render). Est
 
 1. Reemplazar los archivos del repositorio GitHub con el contenido completo de este ZIP.
 2. Confirmar que Render despliega el nuevo commit. Mantener las variables existentes de Render (`GEMINI_API_KEY`, `BOOSTR_API_KEY`, `APP_TOKEN` si aplica), sin poner secretos en GitHub.
-3. Abrir THOKAR y comprobar el número **ZERO 5.3.0** en Ajustes. El Service Worker tiene nuevo identificador de caché y se actualiza con navegación/reapertura según el navegador.
+3. Abrir THOKAR y comprobar el número **ZERO 5.3.1** en Ajustes. El Service Worker tiene nuevo identificador de caché y se actualiza con navegación/reapertura según el navegador.
 4. **No borrar datos de navegación**: los datos siguen bajo las claves `thokar.zero2.*` en el mismo origen.
 
 ## Verificación

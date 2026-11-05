@@ -1,8 +1,8 @@
 {
   "name": "thokar-zero",
-  "version": "5.3.0",
+  "version": "5.3.1",
   "private": true,
-  "description": "THOKAR ZERO 5.3.0 · lanzamiento oficial: ventanas adaptativas, arrastre táctil y navegación Android segura.",
+  "description": "THOKAR ZERO 5.3.1 · cabecera compacta de registros, manteniendo ventanas adaptativas Android.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

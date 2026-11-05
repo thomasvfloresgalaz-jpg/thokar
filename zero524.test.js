@@ -28,11 +28,11 @@ test('visual viewport observer avoids keyboard overlap and restores dock',()=>{
  assert.match(css,/body\.zero-keyboard-open \.dock/);
 });
 test('new build cache and assets retained',()=>{
- assert.match(html,/THOKAR ZERO 5\.3\.0/);
- assert.match(html,/styles\.css\?v=zero530/);
- assert.match(html,/app\.js\?v=zero530/);
- assert.match(sw,/thokar-zero-5-3-0-20261104/);
- assert.match(server,/build: 'zero-5\.3\.0'/);
- assert.equal(pkg.version,'5.3.0');
+ assert.match(html,/THOKAR ZERO 5\.3\.1/);
+ assert.match(html,/styles\.css\?v=zero531/);
+ assert.match(html,/app\.js\?v=zero531/);
+ assert.match(sw,/thokar-zero-5-3-1-20261104/);
+ assert.match(server,/build: 'zero-5\.3\.1'/);
+ assert.equal(pkg.version,'5.3.1');
  for (const asset of ['icon-192.png','icon-512.png','favicon-48.png','thokar-logo.png'])assert.ok(fs.statSync(asset).size>100);
 });
