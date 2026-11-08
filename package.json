@@ -1,8 +1,8 @@
 {
   "name": "thokar-zero",
-  "version": "5.3.2",
+  "version": "5.4.0",
   "private": true,
-  "description": "THOKAR ZERO 5.3.2 · Bitácora Pendiente primero y detalle de trabajos finalizados rediseñado.",
+  "description": "THOKAR ZERO 5.4.0 · multitarea por patente, herramientas de terreno, escáner por imagen, cronómetro y chat minimizable",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
