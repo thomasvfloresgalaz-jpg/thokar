@@ -1,4 +1,4 @@
-# THOKAR ZERO 5.5.0 · Chats por vehículo
+# THOKAR ZERO 5.5.1 · Chats por vehículo
 
 PWA de mecánica automotriz (frontend HTML/CSS/JavaScript vanilla y backend Node.js/Express) para uso de THOKAR.
 
@@ -6,7 +6,7 @@ PWA de mecánica automotriz (frontend HTML/CSS/JavaScript vanilla y backend Node
 
 - **Chats** es una sección principal: lista conversaciones por **marca, modelo y patente**, incluyendo vehículos archivados, ordenadas por la actividad más reciente. El historial técnico se conserva **por patente**, con aislamiento de cada vehículo.
 - El chat es una pantalla completa, no una hoja que deba arrastrarse: cabecera propia, historial desplazable, campo de escritura y enviar anclados al área visible incluso en Android al cambiar el tamaño del teclado. Se puede salir y regresar sin perder mensajes.
-- La ficha del vehículo ya no muestra “Diagnosticar con THOKAR”; el chat se abre desde **Chats**. El botón TF de la cabecera abre **Ajustes**.
+- La ficha del vehículo ofrece **Chat con THOKAR**, que abre el mismo historial que la pestaña **Chats**. El botón TF de la cabecera abre **Ajustes**.
 - El chat técnico **no rellena ni reemplaza automáticamente el Diagnóstico de una orden de trabajo**. Los diagnósticos existentes se conservan.
 - En la edición de una orden, **Diagnóstico → Redactar para el cliente con IA** toma exclusivamente las notas escritas y propone un texto breve, sin tecnicismos innecesarios y sin inventar trabajos realizados. La propuesta se puede **aprobar** o **descartar** antes de guardar.
 - En conversaciones, el backend prioriza el modelo Flash configurado como respaldo para reducir latencia, limita las llamadas a dos intentos con tiempos acotados y devuelve errores comprensibles para reintentar. No garantiza que Gemini o Render estén siempre disponibles.
@@ -16,7 +16,7 @@ PWA de mecánica automotriz (frontend HTML/CSS/JavaScript vanilla y backend Node
 
 No se cambian las claves locales `thokar.zero2.*`. Vehículos, órdenes, conversaciones anteriores, recomendaciones guardadas, registros y archivos de vehículos deben permanecer accesibles al actualizar, siempre que **no borres los datos del sitio ni reinstales la PWA**.
 
-Los datos antiguos de herramientas retiradas permanecen en almacenamiento local, pero ya no tienen interfaz en 5.5.0. Esto evita una eliminación irreversible durante la actualización.
+Los datos antiguos de herramientas retiradas permanecen en almacenamiento local, pero ya no tienen interfaz en 5.5.1. Esto evita una eliminación irreversible durante la actualización.
 
 ## Instalación
 
@@ -35,3 +35,6 @@ El modelo principal es configurable mediante `GEMINI_MODEL`. El backend prioriza
 - El ZIP de producción no trae archivos de pruebas ni herramientas retiradas.
 - **No se verificó** la latencia de Gemini real con las credenciales de Render ni se probó físicamente la barra de chat en el Samsung: deben validarse después del despliegue.
 - La información de diagnóstico asistido no sustituye la comprobación técnica ni los procedimientos OEM.
+
+## Novedades 5.5.1
+Ver README-ZERO5.5.1.md. Búsqueda dentro del chat, resumen profesional editable para cliente, cilindrada desde modelo, Montserrat mediante Google Fonts, vista previa para WhatsApp.

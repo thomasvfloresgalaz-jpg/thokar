@@ -1,8 +1,8 @@
 {
   "name": "thokar-zero",
-  "version": "5.5.0",
+  "version": "5.5.1",
   "private": true,
-  "description": "THOKAR ZERO 5.5.0 · Conversaciones por vehículo, diagnóstico para cliente separado y chat optimizado",
+  "description": "THOKAR ZERO 5.5.1 · Acceso rápido al chat por vehículo y vista previa editable para WhatsApp",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
