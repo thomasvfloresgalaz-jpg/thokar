@@ -125,6 +125,7 @@ function validateGeminiBody(input) {
     thinkingConfig: { thinkingLevel: 'low' }
   };
   if (cfg.responseMimeType === 'application/json') out.generationConfig.responseMimeType = 'application/json';
+  if (Number.isFinite(Number(cfg.maxOutputTokens)) && Number(cfg.maxOutputTokens) > 0) out.generationConfig.maxOutputTokens = Math.min(1400, Math.max(128, Math.round(Number(cfg.maxOutputTokens))));
   return out;
 }
 
@@ -152,7 +153,7 @@ async function googleGeminiFetch(mode, input, signal, modelOverride) {
   const suffix = mode === 'stream' ? ':streamGenerateContent?alt=sse' : ':generateContent';
   const response = await fetch(`${GEMINI_BASE}/models/${encodeURIComponent(selectedModel)}${suffix}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-ZERO/5.4.0' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-ZERO/5.5.0' },
     body: JSON.stringify(body), signal
   });
   if (!response.ok) {
@@ -176,16 +177,20 @@ function geminiRetryable(error) {
 
 async function googleGeminiFetchResilient(mode, input, outerSignal) {
   const cfg = geminiConfig();
-  const models = [cfg.model, cfg.fallbackModel].filter((v, i, a) => v && a.indexOf(v) === i);
+  // Las conversaciones interactivas priorizan el modelo Flash menos lento.
+  // Las otras funciones conservan el orden configurable anterior de Render.
+  const fastChat = mode === 'json' && input && (input.purpose === 'chat' || input.purpose === 'client-summary');
+  const preferred = fastChat ? [cfg.fallbackModel, cfg.model] : [cfg.model, cfg.fallbackModel];
+  const models = preferred.filter((v, i, a) => v && a.indexOf(v) === i);
   const attempts = models.slice(0, 2); // máximo dos llamadas externas por acción del usuario
   let lastError;
   for (let attempt = 0; attempt < attempts.length; attempt++) {
     if (outerSignal && outerSignal.aborted) { const e = new Error('Solicitud cancelada.'); e.name = 'AbortError'; throw e; }
-    if (attempt) await new Promise((r) => setTimeout(r, 1800 + Math.floor(Math.random() * 350)));
+    if (attempt) await new Promise((r) => setTimeout(r, fastChat ? 650 : 1800));
     const ctl = new AbortController();
     const onAbort = () => ctl.abort();
     if (outerSignal) outerSignal.addEventListener('abort', onAbort, { once: true });
-    const perAttemptMs = mode === 'stream' ? 30_000 : 27_000;
+    const perAttemptMs = fastChat ? (attempt === 0 ? 19_000 : 22_000) : (mode === 'stream' ? 30_000 : 27_000);
     const timer = setTimeout(() => ctl.abort(), perAttemptMs);
     try {
       const response = await googleGeminiFetch(mode, input, ctl.signal, attempts[attempt]);
@@ -216,9 +221,9 @@ app.get('/healthz', (req, res) => {
     boostrConfigured: isBoostrConfigured(),
     geminiConfigured: Boolean(geminiConfig().apiKey),
     model: geminiConfig().model,
-    layout: 'zero-5.4.0',
+    layout: 'zero-5.5.0',
     protected: tokenReady,
-    build: 'zero-5.4.0'
+    build: 'zero-5.5.0'
   });
 });
 
@@ -260,7 +265,7 @@ app.get('/api/vehiculo/:patente/boostr', plateRateLimit, async (req, res) => {
 app.post('/api/ai/json', aiRateLimit, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 135_000);
+  const timer = setTimeout(() => ctl.abort(), req.body?.purpose === 'chat' ? 49000 : 135000);
   try {
     const response = await googleGeminiFetchResilient('json', req.body, ctl.signal);
     const payload = await response.json();
