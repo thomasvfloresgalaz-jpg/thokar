@@ -293,3 +293,35 @@ h1,h2,h3,.vehicle-title h2,.hero h2,.conversation-heading strong,.chat-item-main
 .sheet-footer .sheet-actions.summary-actions{display:grid;grid-template-columns:1fr 1.5fr;gap:9px}
 .summary-actions [disabled]{opacity:.5;pointer-events:none}
 @media(max-width:370px){.conversation-header{padding:8px}.chat-utilities{padding-left:10px}.chat-find-panel input{font-size:12px}.chat-find-panel span{max-width:35px;overflow:hidden;text-overflow:ellipsis}}
+
+/* ZERO 5.5.2 · Ficha primero, compras privadas inline, varios servicios por orden */
+.ficha-card .ficha-head{display:flex;align-items:center;justify-content:space-between;gap:9px;flex-wrap:wrap;padding:12px 0 14px;border-top:0}
+.ficha-card .ficha-head h3{margin:0;font-size:22px;flex:0 0 auto}
+.ficha-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;min-width:0}
+.ficha-actions button{display:inline-flex;align-items:center;gap:5px;justify-content:center;min-height:40px;border:0;border-radius:12px;padding:9px 10px;font-size:12px;font-weight:800;white-space:nowrap;color:var(--red);background:rgba(255,45,45,.10)}
+.ficha-actions button.copy-data-btn{color:var(--text);background:rgba(118,118,128,.11)}
+.ficha-actions button svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8;flex:0 0 auto}
+.personal-shopping{margin:0 0 18px;padding:17px 15px 14px;border-radius:26px;background:var(--card);border:1px solid var(--line);box-shadow:0 9px 30px rgba(30,30,40,.055);min-width:0}
+.shopping-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.shopping-heading>div{min-width:0}.shopping-heading h3{margin:0;font-size:18px;line-height:1.28;font-weight:800;letter-spacing:-.035em}.shopping-heading p{margin:4px 0 0;color:var(--muted);font-size:11px;font-weight:650}
+.shopping-heading button{border:0;border-radius:13px;color:var(--red);background:rgba(255,45,45,.1);display:flex;gap:4px;align-items:center;min-height:38px;padding:7px 9px;font-weight:800;font-size:12px;flex-shrink:0}
+.shopping-heading svg,.shopping-import svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2}
+.shopping-empty{font-size:13px;line-height:1.5;padding:11px 1px;color:var(--muted);margin:0}
+#purchaseList{display:grid;gap:9px;min-width:0}
+.purchase-row{display:grid;grid-template-columns:25px minmax(0,1fr) 64px 30px;gap:7px;align-items:center;min-width:0;transition:opacity .18s ease,transform .18s ease}
+.purchase-row.is-bought .purchase-name{text-decoration:line-through;opacity:.65}
+.purchase-row.purchase-removing{opacity:0;transform:translateX(-12px)}
+.purchase-check{display:grid;place-items:center}.purchase-check input{width:20px;height:20px;accent-color:#30af72;margin:0}
+.purchase-name,.purchase-qty{min-width:0;width:100%;border:1px solid var(--line);background:rgba(118,118,128,.075);border-radius:12px;padding:11px 9px;color:var(--text);outline:none;font-size:13px}
+.purchase-name:focus,.purchase-qty:focus{border-color:var(--red)}
+.purchase-qty-label{min-width:0;color:var(--muted);font-size:10px;font-weight:700;text-align:center}
+.purchase-qty{font-size:13px;padding:6px 2px;text-align:center;min-height:29px;appearance:textfield;-moz-appearance:textfield}
+.purchase-qty::-webkit-inner-spin-button,.purchase-qty::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.purchase-remove{width:30px;height:36px;border:0;border-radius:10px;color:var(--red);background:rgba(255,45,45,.08);font-size:23px;line-height:1}
+.shopping-import{width:100%;display:flex;justify-content:center;align-items:center;gap:7px;margin-top:13px;padding:10px 6px;min-height:43px;border:1px solid var(--line);background:rgba(118,118,128,.055);border-radius:13px;color:var(--text);font-size:12px;font-weight:750}
+.dark .personal-shopping{background:#1c1c20;border-color:rgba(255,255,255,.12)}
+.dark .ficha-actions button.copy-data-btn{background:rgba(255,255,255,.10);color:#f5f5f7}
+.dark .shopping-import{background:rgba(255,255,255,.055)}
+.subnote{color:var(--muted);font-size:12px;line-height:1.45;padding:0 2px 11px}
+.service-row{min-width:0}.service-row .service-name{min-width:0}
+@media(max-width:370px){.ficha-card .ficha-head h3{font-size:20px}.ficha-actions{gap:5px}.ficha-actions button{font-size:11px;padding:8px}.personal-shopping{padding:14px 10px}.shopping-heading h3{font-size:16px}.purchase-row{grid-template-columns:22px minmax(0,1fr) 56px 28px;gap:5px}.purchase-name{font-size:12px;padding:10px 7px}}

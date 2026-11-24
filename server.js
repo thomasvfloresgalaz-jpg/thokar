@@ -153,7 +153,7 @@ async function googleGeminiFetch(mode, input, signal, modelOverride) {
   const suffix = mode === 'stream' ? ':streamGenerateContent?alt=sse' : ':generateContent';
   const response = await fetch(`${GEMINI_BASE}/models/${encodeURIComponent(selectedModel)}${suffix}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-ZERO/5.5.1' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey, 'User-Agent': 'THOKAR-ZERO/5.5.2' },
     body: JSON.stringify(body), signal
   });
   if (!response.ok) {
@@ -221,9 +221,9 @@ app.get('/healthz', (req, res) => {
     boostrConfigured: isBoostrConfigured(),
     geminiConfigured: Boolean(geminiConfig().apiKey),
     model: geminiConfig().model,
-    layout: 'zero-5.5.1',
+    layout: 'zero-5.5.2',
     protected: tokenReady,
-    build: 'zero-5.5.1'
+    build: 'zero-5.5.2'
   });
 });
 

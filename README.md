@@ -1,40 +1,27 @@
-# THOKAR ZERO 5.5.1 · Chats por vehículo
+# THOKAR ZERO 5.5.2
 
-PWA de mecánica automotriz (frontend HTML/CSS/JavaScript vanilla y backend Node.js/Express) para uso de THOKAR.
+Aplicación web PWA de mecánica automotriz a domicilio, construida con HTML/CSS/JavaScript y backend Node.js/Express. Paquete completo para GitHub + Render; **no incluye archivos de pruebas**.
 
-## Lo nuevo
+## Cambios de 5.5.2
 
-- **Chats** es una sección principal: lista conversaciones por **marca, modelo y patente**, incluyendo vehículos archivados, ordenadas por la actividad más reciente. El historial técnico se conserva **por patente**, con aislamiento de cada vehículo.
-- El chat es una pantalla completa, no una hoja que deba arrastrarse: cabecera propia, historial desplazable, campo de escritura y enviar anclados al área visible incluso en Android al cambiar el tamaño del teclado. Se puede salir y regresar sin perder mensajes.
-- La ficha del vehículo ofrece **Chat con THOKAR**, que abre el mismo historial que la pestaña **Chats**. El botón TF de la cabecera abre **Ajustes**.
-- El chat técnico **no rellena ni reemplaza automáticamente el Diagnóstico de una orden de trabajo**. Los diagnósticos existentes se conservan.
-- En la edición de una orden, **Diagnóstico → Redactar para el cliente con IA** toma exclusivamente las notas escritas y propone un texto breve, sin tecnicismos innecesarios y sin inventar trabajos realizados. La propuesta se puede **aprobar** o **descartar** antes de guardar.
-- En conversaciones, el backend prioriza el modelo Flash configurado como respaldo para reducir latencia, limita las llamadas a dos intentos con tiempos acotados y devuelve errores comprensibles para reintentar. No garantiza que Gemini o Render estén siempre disponibles.
-- Se retiraron de la interfaz las herramientas de ZERO 5.4.x que no se utilizaban: modelo 3D, asistente eléctrico, preparación, cronómetro, captura de escáner, línea de tiempo, multitarea y chat flotante. Se conserva la lógica principal de búsqueda de patente, ficha, registros, Bitácora, repuestos recomendados, archivo/reactivación, cotizaciones y compartir WhatsApp.
+- **Ficha siempre primero:** la ficha del vehículo permanece arriba. Junto al botón existente **Pegar datos** aparece **Copiar datos**, que copia al portapapeles la información disponible en un formato de líneas similar al que se puede pegar (patente, tipo, marca, modelo, año, color, motor, chasis, cilindrada, combustible, procedencia, fabricante).
+- **Compras para este vehículo:** tarjeta integrada **inmediatamente debajo de la ficha**, sin ventana extra y sin enviar mensajes a tiendas. Permite añadir productos, indicar cantidad, marcar Comprado, eliminar y guardar automáticamente por patente. Incluye el botón voluntario **Agregar repuestos de un trabajo**, que toma los repuestos del último trabajo con piezas registradas de ese mismo vehículo, sin duplicar nombres existentes. La lista no cambia el presupuesto.
+- **Varios servicios en una orden:** dentro de Registrar trabajo se pueden agregar **Servicios adicionales** con nombre y precio individual de mano de obra. Se suman al cobro principal y aparecen en los detalles del registro y en el mensaje de compartir. Los repuestos y materiales permanecen como totales de la orden. Trabajos anteriores sin servicios adicionales siguen conservando su forma y sus importes.
+- **Ventanas de trabajo inicialmente expandidas:** Registrar trabajo, Trabajos registrados y el detalle del trabajo se abren expandidos. Se pueden contraer/expandir con el tirador gris, con el contenido desplazable dentro de la ventana.
 
 ## Datos y migración
 
-No se cambian las claves locales `thokar.zero2.*`. Vehículos, órdenes, conversaciones anteriores, recomendaciones guardadas, registros y archivos de vehículos deben permanecer accesibles al actualizar, siempre que **no borres los datos del sitio ni reinstales la PWA**.
-
-Los datos antiguos de herramientas retiradas permanecen en almacenamiento local, pero ya no tienen interfaz en 5.5.1. Esto evita una eliminación irreversible durante la actualización.
+Se mantienen las claves existentes `thokar.zero2.vehicles`, `thokar.zero2.archivedVehicles`, `thokar.zero2.logs`, `thokar.zero2.chats`, `thokar.zero2.recordDrafts`, `thokar.zero2.partsCache`, `thokar.zero2.settings`. La nueva lista se guarda en `thokar.zero2.shopping` y permanece vinculada a la patente base. **Archivar conserva** las compras; **eliminar el vehículo borra** su lista junto al resto de datos. No borrar datos de Chrome ni reinstalar PWA para actualizar.
 
 ## Instalación
 
-1. Copia el contenido del ZIP en la raíz del repositorio GitHub conectado a Render; conserva la conexión del servicio existente.
-2. Elimina del repositorio los archivos antiguos que ya no deben desplegarse (p. ej. `car3d.js`, archivos `*.test.js` y README históricos): subir un ZIP no los borra automáticamente de GitHub.
-3. Haz commit y push. Render ejecutará `npm install` y `npm start` desde `package.json` / Dockerfile.
-4. En Render conserva `APP_TOKEN` (mínimo 32 caracteres), `GEMINI_API_KEY`, `BOOSTR_API_KEY` y demás variables de entorno que ya tenías. Nunca subas claves al repositorio.
-5. Abre THOKAR con tu mismo perfil de Chrome. Si el Service Worker actualiza, cierra y vuelve a abrir la PWA sin limpiar el almacenamiento.
+1. Respaldar el repositorio y los datos locales antes de una actualización importante.
+2. Reemplazar los archivos de la raíz del repositorio GitHub con los de este ZIP y conservar la conexión a Render. Los archivos ya existentes en GitHub no se eliminan automáticamente al subir un ZIP.
+3. Conservar en Render las variables de entorno de la versión previa, como `GEMINI_API_KEY`, `BOOSTR_API_KEY` y `APP_TOKEN` cuando corresponda. Nunca subir credenciales a GitHub.
+4. Desplegar con `npm start`. La PWA actualiza el caché de archivos de aplicación, pero no borra el almacenamiento local del usuario.
 
-El modelo principal es configurable mediante `GEMINI_MODEL`. El backend prioriza `GEMINI_FALLBACK_MODEL` (predeterminado `gemini-3.6-flash`) para solicitudes de chat, y después prueba `GEMINI_MODEL` (predeterminado `gemini-3.8-flash`) solo en fallos transitorios. Si esos nombres no estuvieran disponibles para tu clave, configura modelos válidos en Render.
+## Verificaciones y limitaciones
 
-## Verificación y límites
-
-- `npm test` valida sintaxis de `app.js`, `server.js` y `sw.js`.
-- Se realizaron pruebas de interacción con respuesta simulada de Gemini: chats de vehículos distintos, persistencia, segundo mensaje, reintento, teclado simulado y redacción para clientes con aprobación explícita.
-- El ZIP de producción no trae archivos de pruebas ni herramientas retiradas.
-- **No se verificó** la latencia de Gemini real con las credenciales de Render ni se probó físicamente la barra de chat en el Samsung: deben validarse después del despliegue.
-- La información de diagnóstico asistido no sustituye la comprobación técnica ni los procedimientos OEM.
-
-## Novedades 5.5.1
-Ver README-ZERO5.5.1.md. Búsqueda dentro del chat, resumen profesional editable para cliente, cilindrada desde modelo, Montserrat mediante Google Fonts, vista previa para WhatsApp.
+- `node --check app.js`, `node --check server.js`, `node --check sw.js`.
+- Navegador Chromium sin navegación externa: se ejecutaron pruebas integrando HTML/CSS/JS **en memoria**, en tamaños 393×780 Día y 360×640 Noche, sin errores JS. Se verificó la ficha y portapapeles, compras por vehículo, importación desde trabajos, precios en vivo, servicios adicionales, registros anteriores y estado expandido de las ventanas.
+- La interacción con el backend Render y el teclado físico Samsung requieren validación en el dispositivo real; las pruebas en memoria no sustituyen un despliegue completo.
